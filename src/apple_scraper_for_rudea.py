@@ -6,29 +6,54 @@ from webdriver_manager.chrome import ChromeDriverManager
 # 買取ルデアのiPhone 16買取価格ページURL
 url_kaitori = 'https://kaitori-rudeya.com/category/detail/183'
 
-# Seleniumを使用して買取価格情報を取得する関数
 def get_kaitori_prices(url):
-    # Chromeドライバを使用
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service)
     driver.get(url)
 
-    # ページが完全に読み込まれるのを待つ
-    driver.implicitly_wait(10)  # 10秒待機
+    driver.implicitly_wait(10)
 
-    # 買取価格を取得
-    prices = driver.find_elements(By.CSS_SELECTOR, '.td.td2 .td2wrap')
+    items = driver.find_elements(By.CSS_SELECTOR, '.tr')
+    product_details = []
+    error_log = []
 
-    # 取得した価格情報をリストに格納
-    kaitori_prices = [price.text for price in prices if '円' in price.text]
+    for item in items:
+        model_name = "不明"
+        price_text = "不明"
 
-    driver.quit()  # ブラウザを閉じる
-    return kaitori_prices
+        # モデル名を取得
+        try:
+            model_element = item.find_element(By.CSS_SELECTOR, '.ttl h2')
+            model_name = model_element.text.strip()
+        except Exception as e:
+            error_log.append(f"モデル名取得エラー: {e} - 行にモデル名が存在しませんでした。")
+
+        # 買取価格を取得
+        try:
+            price_element = item.find_element(By.CSS_SELECTOR, '.td.td2 .td2wrap')
+            price_text = price_element.text.strip()
+        except Exception as e:
+            error_log.append(f"買取価格取得エラー: {e} - 行に買取価格が存在しませんでした。")
+
+        if model_name and price_text and '円' in price_text:
+            product_details.append({
+                "model": model_name,
+                "price": price_text
+            })
+
+    driver.quit()
+    return product_details, error_log
 
 # 買取ルデアの価格取得
-iphone16_kaitori_prices = get_kaitori_prices(url_kaitori)
+iphone16_kaitori_prices, error_log = get_kaitori_prices(url_kaitori)
 
 # 結果を出力
 print("買取ルデアのiPhone 16の買取価格:")
-for price in iphone16_kaitori_prices:
-    print(price)
+for detail in iphone16_kaitori_prices:
+    print(f"モデル: {detail['model']} | 買取価格: {detail['price']}")
+
+# エラー情報を表示
+if error_log:
+    print("\nエラー情報:")
+    for error in error_log:
+        print(error)
