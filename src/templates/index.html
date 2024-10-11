@@ -4,9 +4,37 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>iPhone買取価格比較</title>
+    <script>
+      // ページが読み込まれた時に「ロード中」表示を非表示にする
+      document.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('priceTable').style.display = 'block';
+      });
+    </script>
+    <style>
+      #priceTable {
+        display: none;
+      }
+    </style>
   </head>
   <body>
     <h1>iPhone 16シリーズ 買取価格比較</h1>
-    <p>Flaskアプリケーションのセットアップが完了しました。</p>
+
+    <div id="loading">
+      <p>Loading（読み込み中）...</p>
+    </div>
+
+    <table id="priceTable" border="1">
+      <tr>
+        <th>モデル</th>
+        <th>買取価格</th>
+      </tr>
+      {% for iphone in iphone_prices %}
+      <tr>
+        <td>{{ iphone.model }}</td>
+        <td>{{ iphone.price }}</td>
+      </tr>
+      {% endfor %}
+    </table>
   </body>
 </html>
