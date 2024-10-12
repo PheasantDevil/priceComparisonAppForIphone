@@ -48,9 +48,12 @@ def home():
 # データ取得用APIエンドポイント
 @app.route('/get_prices')
 def get_prices():
-    url_kaitori = 'https://kaitori-rudeya.com/category/detail/183'
-    iphone_prices = get_kaitori_prices(url_kaitori)
-    return jsonify(iphone_prices)
+    try:
+        url_kaitori = 'https://kaitori-rudeya.com/category/detail/183'
+        iphone_prices = get_kaitori_prices(url_kaitori)
+        return jsonify(iphone_prices)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
