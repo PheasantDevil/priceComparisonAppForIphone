@@ -10,7 +10,5 @@ services:
     name: priceComparisonAppForIphone
     plan: free
     runtime: python
-    buildCommand: |
-      pip install -r requirements.txt
-      playwright install
+    buildCommand: 'pip install -r requirements.txt && playwright install'
     startCommand: 'gunicorn app:app'
