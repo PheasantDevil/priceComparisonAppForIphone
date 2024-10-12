@@ -1,0 +1,13 @@
+# デプロイの設定を詳細に指定するためのファイルで、以下のような情報を設定可能
+# ・ サービスの種類（web service、background jobなど）
+# ・ 環境変数
+# ・ ビルドコマンドやスタートコマンド
+# ・ 自動デプロイの有無など
+
+# 以下サンプルコード
+# services:
+#   - type: web
+#     name: my-flask-app
+#     env: python
+#     buildCommand: pip install -r requirements.txt
+#     startCommand: gunicorn app:app
