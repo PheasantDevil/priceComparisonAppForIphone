@@ -25,21 +25,36 @@
         }
       }
 
-      /* ローディング画面のセンタリング */
-      #loading {
-        text-align: center;
-        padding: 50px;
-      }
-
       #priceTable {
         display: none;
       }
     </style>
     <script>
-      // ページが読み込まれた時に「ロード中」表示を非表示にし、テーブルを表示する
+      // ページが読み込まれた時に価格データを取得する
       document.addEventListener('DOMContentLoaded', function () {
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('priceTable').style.display = 'block';
+        // ローディング表示
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('priceTable').style.display = 'none';
+
+        // データを非同期で取得
+        fetch('/get_prices')
+          .then(response => response.json())
+          .then(data => {
+            // テーブルにデータを表示
+            const table = document.getElementById('priceTableBody');
+            table.innerHTML = ''; // 既存の内容をクリア
+            data.forEach(iphone => {
+              const row = `<tr>
+                                        <td>${iphone.model}</td>
+                                        <td>${iphone.price}</td>
+                                     </tr>`;
+              table.innerHTML += row;
+            });
+
+            // ローディングを非表示にしてテーブルを表示
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('priceTable').style.display = 'block';
+          });
       });
     </script>
   </head>
@@ -58,12 +73,7 @@
         <th>モデル</th>
         <th>買取価格</th>
       </tr>
-      {% for iphone in iphone_prices %}
-      <tr>
-        <td>{{ iphone.model }}</td>
-        <td>{{ iphone.price }}</td>
-      </tr>
-      {% endfor %}
+      <tbody id="priceTableBody"></tbody>
     </table>
   </body>
 </html>

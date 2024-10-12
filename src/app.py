@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, jsonify, render_template
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options  # 追加
 from selenium.webdriver.chrome.service import Service
@@ -9,14 +9,13 @@ app = Flask(__name__)
 
 # スクレイピング関数の定義
 def get_kaitori_prices(url):
-    # Chromeのオプションにヘッドレスモードを追加
     chrome_options = Options()
-    chrome_options.add_argument('--headless')  # ヘッドレスモードを有効化
+    chrome_options.add_argument('--headless')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
 
     service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)  # オプションを追加
+    driver = webdriver.Chrome(service=service, options=chrome_options)
 
     driver.get(url)
     driver.implicitly_wait(10)
@@ -49,12 +48,17 @@ def get_kaitori_prices(url):
     driver.quit()
     return product_details
 
-# ルートページでスクレイピングデータを取得し表示する
+# ルートページ（HTML表示用）
 @app.route('/')
 def home():
+    return render_template('index.html')
+
+# データ取得用APIエンドポイント
+@app.route('/get_prices')
+def get_prices():
     url_kaitori = 'https://kaitori-rudeya.com/category/detail/183'
     iphone_prices = get_kaitori_prices(url_kaitori)
-    return render_template('index.html', iphone_prices=iphone_prices)
+    return jsonify(iphone_prices)
 
 if __name__ == '__main__':
     app.run(debug=True)
