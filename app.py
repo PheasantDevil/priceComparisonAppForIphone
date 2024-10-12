@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, render_template
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options  # 追加
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
@@ -61,4 +61,4 @@ def get_prices():
     return jsonify(iphone_prices)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True)  # 重複していた部分を削除

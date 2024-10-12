@@ -4,10 +4,11 @@
 # ・ ビルドコマンドやスタートコマンド
 # ・ 自動デプロイの有無など
 
-# 以下サンプルコード
-# services:
-#   - type: web
-#     name: my-flask-app
-#     env: python
-#     buildCommand: pip install -r requirements.txt
-#     startCommand: gunicorn app:app
+version: '1'
+services:
+  - type: web
+    name: priceComparisonAppForIphone
+    plan: free
+    runtime: python
+    buildCommand: 'pip install -r requirements.txt'
+    startCommand: 'gunicorn app:app'
