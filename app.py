@@ -1,5 +1,12 @@
+import os
+
 from flask import Flask, jsonify, render_template
 from playwright.sync_api import sync_playwright
+
+# Playwrightのブラウザをインストールする
+if not os.path.exists("/opt/render/.cache/ms-playwright/chromium-1134/chrome-linux/chrome"):
+    with sync_playwright() as p:
+        p.chromium.install()
 
 app = Flask(__name__)
 
