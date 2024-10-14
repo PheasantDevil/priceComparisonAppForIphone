@@ -3,10 +3,19 @@ import os
 from flask import Flask, jsonify, render_template
 from playwright.sync_api import sync_playwright
 
-# Playwrightのブラウザをインストールする
-if not os.path.exists("/opt/render/.cache/ms-playwright/chromium-1134/chrome-linux/chrome"):
-    with sync_playwright() as p:
-        p.chromium.install()
+
+# Playwrightのブラウザがインストールされているか確認
+def check_playwright_installation():
+    try:
+        with sync_playwright() as p:
+            p.chromium.launch()  # これでブラウザが起動できればインストール済み
+    except Exception as e:
+        print("Playwrightのブラウザがインストールされていません:", str(e))
+        return False
+    return True
+
+if not check_playwright_installation():
+    print("ブラウザを手動でインストールしてください。")
 
 app = Flask(__name__)
 
