@@ -24,7 +24,9 @@ def get_kaitori_prices(url):
     product_details = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        # システムにインストールされたChromiumを使用
+        browser = p.chromium.launch(chromium_sandbox=False)
+        # セキュリティ上の理由から、chromium_sandbox=Falseの使用は本番環境では推奨されません。可能であれば、適切なサンドボックス設定を行ってください。
         page = browser.new_page()
         page.goto(url)
         page.wait_for_selector('.tr')  # 適切なセレクタを待つ
