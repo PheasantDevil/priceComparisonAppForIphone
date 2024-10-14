@@ -12,5 +12,5 @@ services:
     runtime: python
     buildCommand: |
       pip install -r requirements.txt
-      npx playwright install chromium
+      npx playwright install --with-deps chromium
     startCommand: 'gunicorn app:app'
