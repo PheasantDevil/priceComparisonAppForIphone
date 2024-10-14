@@ -12,6 +12,6 @@ services:
     runtime: python
     buildCommand: |
       pip install -r requirements.txt
-      pip install --upgrade playwright
-      npx playwright install --with-deps chromium
+      pip install --upgrade 'playwright==1.30.0'
+      playwright install --with-deps chromium
     startCommand: 'gunicorn app:app'
