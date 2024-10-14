@@ -1,16 +1,13 @@
 {
   "extends": ["config:base"],
   "labels": ["dependencies"],
-  "labels_comment": "すべてのPRに 'dependencies' ラベルが付与されます。",
   "packageRules": [
     {
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true,
       "automergeType": "pr",
       "excludePackagePatterns": ["*"],
-      "prConcurrentLimit": 10,
-      "prConcurrentLimit_comment": "一度に開かれるPRの上限値",
-      "_comment": "minor と patch の自動マージ: 自動的にPRがマージされます。大規模なマイナー変更（特定のパッケージ）やメジャーアップデートは自動マージされません。"
+      "prConcurrentLimit": 10
     },
     {
       "matchUpdateTypes": ["major"],
@@ -23,5 +20,5 @@
       "automerge": false
     }
   ],
-  "prConcurrentLimit": 5
+  "prConcurrentLimit": 10
 }
