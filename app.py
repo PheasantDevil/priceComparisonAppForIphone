@@ -9,13 +9,10 @@ def get_kaitori_prices(url):
     product_details = []
     
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            executable_path='/opt/render/.cache/ms-playwright/chromium-1134/chrome-linux/chrome',
-            args=['--no-sandbox', '--disable-setuid-sandbox']
-        )
+        browser = p.chromium.launch(chromium_sandbox=False)
         page = browser.new_page()
         page.goto(url)
-        page.wait_for_selector('.tr')  # 適切なセレクタを待つ
+        page.wait_for_selector('.tr')
 
         items = page.query_selector_all('.tr')
 
@@ -27,12 +24,14 @@ def get_kaitori_prices(url):
                 model_element = item.query_selector('.ttl h2')
                 model_name = model_element.inner_text().strip()
             except Exception as e:
+                app.logger.error(f"モデル名取得エラー: {str(e)}")
                 model_name = "エラー: モデル名取得失敗"
 
             try:
                 price_element = item.query_selector('.td.td2 .td2wrap')
                 price_text = price_element.inner_text().strip()
             except Exception as e:
+                app.logger.error(f"価格取得エラー: {str(e)}")
                 price_text = "エラー: 買取価格取得失敗"
 
             if model_name and price_text and '円' in price_text:
@@ -55,6 +54,7 @@ def get_prices():
         iphone_prices = get_kaitori_prices(url_kaitori)
         return jsonify(iphone_prices)
     except Exception as e:
+        app.logger.error(f"価格取得エラー: {str(e)}")
         return jsonify([{"error": str(e)}]), 500
 
 if __name__ == '__main__':
