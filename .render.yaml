@@ -4,16 +4,18 @@
 # ・ ビルドコマンドやスタートコマンド
 # ・ 自動デプロイの有無など
 
-version: '1'
 services:
   - type: web
     name: priceComparisonAppForIphone
-    plan: free
     runtime: python
     buildCommand: |
       pip install -r requirements.txt
       playwright install chromium
       playwright install-deps
-    startCommand: |
-      playwright install chromium
-      gunicorn app:app
+    startCommand: gunicorn app:app
+    envVars:
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /opt/render/.cache/ms-playwright
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: 'true'
+    env: python
