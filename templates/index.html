@@ -29,6 +29,28 @@
         display: none;
       }
     </style>
+  </head>
+  <body>
+    <h1>iPhone 16シリーズ 買取価格比較</h1>
+
+    <!-- ローディング中の表示 -->
+    <div id="loading">
+      <div class="loader"></div>
+      <p>Loading（読み込み中）...</p>
+    </div>
+
+    <!-- エラーメッセージ表示エリア -->
+    <div id="error-message" style="display: none; color: red"></div>
+
+    <!-- 価格テーブル -->
+    <table id="priceTable" border="1">
+      <tr>
+        <th>モデル</th>
+        <th>買取価格</th>
+      </tr>
+      <tbody id="priceTableBody"></tbody>
+    </table>
+
     <script>
       // ページが読み込まれた時に価格データを取得する
       document.addEventListener('DOMContentLoaded', function () {
@@ -40,40 +62,42 @@
         fetch('/get_prices')
           .then(response => response.json())
           .then(data => {
-            // テーブルにデータを表示
-            const table = document.getElementById('priceTableBody');
-            table.innerHTML = ''; // 既存の内容をクリア
-            data.forEach(iphone => {
-              const row = `<tr>
-                                        <td>${iphone.model}</td>
-                                        <td>${iphone.price}</td>
-                                     </tr>`;
-              table.innerHTML += row;
-            });
+            if (data.length > 0 && data[0].error) {
+              console.error('Error:', data[0].error);
+              document.getElementById('loading').innerHTML =
+                'エラーが発生しました。詳細はコンソールを確認してください。';
+            } else {
+              const table = document.getElementById('priceTableBody');
+              table.innerHTML = ''; // 既存の内容をクリア
+              data.forEach(iphone => {
+                const row = `<tr>
+                                <td>${iphone.model}</td>
+                                <td>${iphone.price}</td>
+                             </tr>`;
+                table.innerHTML += row;
+              });
 
-            // ローディングを非表示にしてテーブルを表示
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('priceTable').style.display = 'block';
+              // ローディングを非表示にしてテーブルを表示
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('priceTable').style.display = 'block';
+            }
+          })
+          .catch(error => {
+            console.error('Fetch error:', error);
+            document.getElementById('loading').innerHTML =
+              'データの取得中にエラーが発生しました。';
           });
       });
+
+      // ブラウザ拡張機能のエラーハンドリング
+      window.addEventListener('error', function (event) {
+        if (event.error && event.error.message.includes('runtime.lastError')) {
+          console.warn('Browser extension error:', event.error.message);
+          document.getElementById('error-message').textContent =
+            'ブラウザ拡張機能の動作に問題が発生しています。拡張機能を無効にしてみてください。';
+          document.getElementById('error-message').style.display = 'block';
+        }
+      });
     </script>
-  </head>
-  <body>
-    <h1>iPhone 16シリーズ 買取価格比較</h1>
-
-    <!-- ローディング中の表示 -->
-    <div id="loading">
-      <div class="loader"></div>
-      <p>Loading（読み込み中）...</p>
-    </div>
-
-    <!-- 価格テーブル -->
-    <table id="priceTable" border="1">
-      <tr>
-        <th>モデル</th>
-        <th>買取価格</th>
-      </tr>
-      <tbody id="priceTableBody"></tbody>
-    </table>
   </body>
 </html>
