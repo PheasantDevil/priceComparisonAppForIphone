@@ -15,7 +15,5 @@ services:
     startCommand: gunicorn app:app
     envVars:
       - key: PLAYWRIGHT_BROWSERS_PATH
-        value: /opt/render/.cache/ms-playwright
-      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-        value: 'true'
+        value: /home/render/.cache/ms-playwright
     env: python
