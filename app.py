@@ -3,30 +3,16 @@ import os
 from flask import Flask, jsonify, render_template
 from playwright.sync_api import sync_playwright
 
-
-# Playwrightのブラウザがインストールされているか確認
-def check_playwright_installation():
-    try:
-        with sync_playwright() as p:
-            p.chromium.launch()  # これでブラウザが起動できればインストール済み
-    except Exception as e:
-        print("Playwrightのブラウザがインストールされていません:", str(e))
-        return False
-    return True
-
-if not check_playwright_installation():
-    print("ブラウザを手動でインストールしてください。")
-
 app = Flask(__name__)
 
-# スクレイピング関数の定義
 def get_kaitori_prices(url):
     product_details = []
-
+    
     with sync_playwright() as p:
-        # システムにインストールされたChromiumを使用
-        browser = p.chromium.launch(chromium_sandbox=False)
-        # セキュリティ上の理由から、chromium_sandbox=Falseの使用は本番環境では推奨されません。可能であれば、適切なサンドボックス設定を行ってください。
+        browser = p.chromium.launch(
+            executable_path='/opt/render/.cache/ms-playwright/chromium-1134/chrome-linux/chrome',
+            args=['--no-sandbox', '--disable-setuid-sandbox']
+        )
         page = browser.new_page()
         page.goto(url)
         page.wait_for_selector('.tr')  # 適切なセレクタを待つ
@@ -58,12 +44,10 @@ def get_kaitori_prices(url):
         browser.close()
     return product_details
 
-# ルートページ（HTML表示用）
 @app.route('/')
 def home():
     return render_template('index.html')
 
-# データ取得用APIエンドポイント
 @app.route('/get_prices')
 def get_prices():
     try:
@@ -71,7 +55,7 @@ def get_prices():
         iphone_prices = get_kaitori_prices(url_kaitori)
         return jsonify(iphone_prices)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify([{"error": str(e)}]), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
