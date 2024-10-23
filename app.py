@@ -1,17 +1,36 @@
+import logging
 import os
 
 from flask import Flask, jsonify, render_template
 from playwright.sync_api import sync_playwright
 
-app = Flask(__name__)
+from config import config
 
-def get_kaitori_prices(url):
+
+def create_app():
+    app = Flask(__name__)
+    
+    # アプリケーション設定の適用
+    app.config['DEBUG'] = config.app.DEBUG
+    app.config['SECRET_KEY'] = config.app.SECRET_KEY
+    
+    # ログ設定
+    logging.basicConfig(
+        level=getattr(logging, config.app.LOG_LEVEL),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    return app
+
+def get_kaitori_prices():
     product_details = []
     
     with sync_playwright() as p:
         browser = p.chromium.launch(chromium_sandbox=False)
         page = browser.new_page()
-        page.goto(url)
+        
+        # 設定から URL を使用
+        page.goto(config.scraper.KAITORI_RUDEA_URL)
         page.wait_for_selector('.tr')
 
         items = page.query_selector_all('.tr')
@@ -43,6 +62,9 @@ def get_kaitori_prices(url):
         browser.close()
     return product_details
 
+# アプリケーションインスタンスの作成
+app = create_app()
+
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -50,12 +72,11 @@ def home():
 @app.route('/get_prices')
 def get_prices():
     try:
-        url_kaitori = 'https://kaitori-rudeya.com/category/detail/183'
-        iphone_prices = get_kaitori_prices(url_kaitori)
+        iphone_prices = get_kaitori_prices()
         return jsonify(iphone_prices)
     except Exception as e:
         app.logger.error(f"価格取得エラー: {str(e)}")
         return jsonify([{"error": str(e)}]), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
