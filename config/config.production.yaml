@@ -1,0 +1,9 @@
+app:
+  debug: false
+  log_level: INFO
+
+scraper:
+  kaitori_rudea_url: https://kaitori-rudeya.com/category/detail/183
+  apple_store_url: https://www.apple.com/jp/shop/buy-iphone
+  request_timeout: 60
+  retry_count: 5
