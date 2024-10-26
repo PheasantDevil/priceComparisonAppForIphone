@@ -1,3 +1,3 @@
-from config.manager import config
+from .manager import AppConfig, ConfigManager, ScraperConfig, config
 
-__all__ = ['config']
+__all__ = ['AppConfig', 'ConfigManager', 'ScraperConfig', 'config']
