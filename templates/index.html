@@ -28,6 +28,12 @@
       #priceTable {
         display: none;
       }
+
+      .price-table {
+        display: inline-block;
+        margin: 10px;
+        vertical-align: top;
+      }
     </style>
   </head>
   <body>
@@ -43,51 +49,60 @@
     <div id="error-message" style="display: none; color: red"></div>
 
     <!-- 価格テーブル -->
-    <table id="priceTable" border="1">
-      <thead>
-        <tr>
-          <th>モデル</th>
-          <th>買取価格</th>
-        </tr>
-      </thead>
-      <tbody id="priceTableBody"></tbody>
-    </table>
+    <div id="priceTablesContainer" style="display: none;"></div>
 
     <script>
       // ページが読み込まれた時に価格データを取得する
       document.addEventListener('DOMContentLoaded', function () {
         // ローディング表示
         document.getElementById('loading').style.display = 'block';
-        document.getElementById('priceTable').style.display = 'none';
+        document.getElementById('priceTablesContainer').style.display = 'none';
 
         // データを非同期で取得
         fetch('/get_prices')
           .then(response => response.json())
           .then(data => {
-            if (data.length > 0 && data[0].error) {
-              console.error('Error:', data[0].error);
-              document.getElementById('loading').innerHTML =
-                'エラーが発生しました。詳細はコンソールを確認してください。';
+            if (data.error) {
+              console.error('Error:', data.error);
+              document.getElementById('loading').innerHTML = 'エラーが発生しました。詳細はコンソールを確認してください。';
             } else {
-              const table = document.getElementById('priceTableBody');
-              table.innerHTML = ''; // 既存の内容をクリア
-              data.forEach(iphone => {
-                const row = `<tr>
-                                <td>${iphone.model}</td>
-                                <td>${iphone.price}</td>
-                             </tr>`;
-                table.innerHTML += row;
-              });
+              const container = document.getElementById('priceTablesContainer');
+              container.innerHTML = ''; // 既存の内容をクリア
+
+              for (const [series, models] of Object.entries(data)) {
+                const table = document.createElement('table');
+                table.className = 'price-table';
+                table.border = '1';
+                table.innerHTML = `
+                  <thead>
+                    <tr>
+                      <th colspan="2">${series}</th>
+                    </tr>
+                    <tr>
+                      <th>モデル</th>
+                      <th>買取価格</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${Object.entries(models).map(([model, price]) => `
+                      <tr>
+                        <td>${model}</td>
+                        <td>${price}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                `;
+                container.appendChild(table);
+              }
 
               // ローディングを非表示にしてテーブルを表示
               document.getElementById('loading').style.display = 'none';
-              document.getElementById('priceTable').style.display = 'table';
+              document.getElementById('priceTablesContainer').style.display = 'block';
             }
           })
           .catch(error => {
             console.error('Fetch error:', error);
-            document.getElementById('loading').innerHTML =
-              'データの取得中にエラーが発生しました。';
+            document.getElementById('loading').innerHTML = 'データの取得中にエラーが発生しました。';
           });
       });
 
