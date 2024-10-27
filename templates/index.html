@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>iPhone買取価格比較</title>
+    <title>iPhone 16シリーズ 買取価格比較</title>
     <style>
       /* ローディングスピナーのスタイル */
       .loader {
@@ -44,10 +44,12 @@
 
     <!-- 価格テーブル -->
     <table id="priceTable" border="1">
-      <tr>
-        <th>モデル</th>
-        <th>買取価格</th>
-      </tr>
+      <thead>
+        <tr>
+          <th>モデル</th>
+          <th>買取価格</th>
+        </tr>
+      </thead>
       <tbody id="priceTableBody"></tbody>
     </table>
 
@@ -79,7 +81,7 @@
 
               // ローディングを非表示にしてテーブルを表示
               document.getElementById('loading').style.display = 'none';
-              document.getElementById('priceTable').style.display = 'block';
+              document.getElementById('priceTable').style.display = 'table';
             }
           })
           .catch(error => {
