@@ -1,28 +1,21 @@
 import pytest
 from pathlib import Path
-import os
-
-
-
-@pytest.fixture
-def temp_config_dir(tmp_path):
-    """一時的な設定ファイルディレクトリを作成するフィクスチャ"""
-    config_dir = tmp_path / "config"
-    config_dir.mkdir()
-    return config_dir
+import shutil
 
 @pytest.fixture(scope="function")
 def mock_env_vars(monkeypatch):
     """環境変数をモックするフィクスチャ"""
-    monkeypatch.setenv("FLASK_ENV", "testing")
-    monkeypatch.setenv("SECRET_KEY", "test-secret-key-12345")
-    return {
+    test_vars = {
         "FLASK_ENV": "testing",
-        "SECRET_KEY": "test-secret-key-12345"
+        "SECRET_KEY": "test-secret-key-12345",
+        "LOG_LEVEL": "DEBUG"
     }
+    for key, value in test_vars.items():
+        monkeypatch.setenv(key, value)
+    return test_vars
 
-@pytest.fixture
-def test_config_file(temp_config_dir):
+@pytest.fixture(scope="function")
+def test_config_file(tmp_path):
     """テスト用の設定ファイルを作成するフィクスチャ"""
     config_content = """
 app:
@@ -37,6 +30,16 @@ scraper:
   retry_count: 3
   user_agent: "Test User Agent"
 """
-    config_file = temp_config_dir / "config.testing.yaml"
+    config_file = tmp_path / "config.testing.yaml"
     config_file.write_text(config_content)
-    return config_file
+    
+    # ConfigManagerが参照するディレクトリにファイルをコピー
+    dest_dir = Path(__file__).parent.parent / "config"
+    dest_file = dest_dir / "config.testing.yaml"
+    dest_dir.mkdir(exist_ok=True)
+    shutil.copy(str(config_file), str(dest_file))
+    
+    yield dest_file
+    
+    # テスト後にファイルを削除
+    dest_file.unlink()
