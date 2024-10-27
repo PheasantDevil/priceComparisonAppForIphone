@@ -14,31 +14,37 @@ def get_kaitori_prices():
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service)
     
+    all_product_details = []
+    
     try:
-        driver.get(config.scraper.KAITORI_RUDEA_URL)
-        driver.implicitly_wait(config.scraper.REQUEST_TIMEOUT)
+        # ここを修正
+        for url in config.scraper.KAITORI_RUDEA_URLS:
+            driver.get(url)
+            driver.implicitly_wait(config.scraper.REQUEST_TIMEOUT)
 
-        items = driver.find_elements(By.CSS_SELECTOR, '.tr')
-        product_details = []
+            items = driver.find_elements(By.CSS_SELECTOR, '.tr')
+            product_details = []
 
-        for item in items:
-            try:
-                model_element = item.find_element(By.CSS_SELECTOR, '.ttl h2')
-                model_name = model_element.text.strip()
-                
-                price_element = item.find_element(By.CSS_SELECTOR, '.td.td2 .td2wrap')
-                price_text = price_element.text.strip()
+            for item in items:
+                try:
+                    model_element = item.find_element(By.CSS_SELECTOR, '.ttl h2')
+                    model_name = model_element.text.strip()
+                    
+                    price_element = item.find_element(By.CSS_SELECTOR, '.td.td2 .td2wrap')
+                    price_text = price_element.text.strip()
 
-                if model_name and price_text and '円' in price_text:
-                    product_details.append({
-                        "model": model_name,
-                        "price": price_text
-                    })
-            except Exception as e:
-                logger.error(f"データ取得エラー: {str(e)}")
-                continue
+                    if model_name and price_text and '円' in price_text:
+                        product_details.append({
+                            "model": model_name,
+                            "price": price_text
+                        })
+                except Exception as e:
+                    logger.error(f"データ取得エラー: {str(e)}")
+                    continue
 
-        return product_details
+            all_product_details.extend(product_details)
+        
+        return all_product_details
         
     except Exception as e:
         logger.error(f"スクレイピングエラー: {str(e)}")

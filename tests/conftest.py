@@ -7,7 +7,7 @@ def mock_env_vars(monkeypatch):
     """環境変数をモックするフィクスチャ"""
     test_vars = {
         "FLASK_ENV": "testing",
-        "SECRET_KEY": "test-secret-key-12345",
+        "SECRET_KEY": "test-secret-key-16ch",  # 16文字以上に変更
         "LOG_LEVEL": "DEBUG"
     }
     for key, value in test_vars.items():
@@ -21,10 +21,12 @@ def test_config_file(tmp_path):
 app:
   debug: true
   log_level: DEBUG
-  secret_key: test-secret-key
+  secret_key: test-secret-key-16
 
 scraper:
-  kaitori_rudea_url: https://test.example.com/kaitori
+  kaitori_rudea_urls:
+    - https://test1.example.com/kaitori
+    - https://test2.example.com/kaitori
   apple_store_url: https://test.example.com/apple
   request_timeout: 30
   retry_count: 3
