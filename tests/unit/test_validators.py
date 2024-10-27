@@ -1,6 +1,7 @@
 import pytest
 
 from config import AppConfig, ScraperConfig
+from config.manager import ConfigManager
 
 
 class TestAppConfigValidation:
@@ -91,3 +92,21 @@ def test_app_log_level_invalid():
             SECRET_KEY="valid-secret-key-12345",
             LOG_LEVEL="INVALID"  # 無効な LOG_LEVEL
         )
+
+# SECRET_KEY が設定されていない場合、デフォルト値が使用されるかのテスト
+def test_config_environment_with_missing_secret_key(monkeypatch):
+    """SECRET_KEY が存在しない場合のテスト"""
+    # SECRET_KEY を削除して、デフォルト値が設定されるか確認
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    config = ConfigManager()
+    # デフォルトのシークレットキーが使用されるか確認
+    assert config.app.SECRET_KEY == "default-secret-key"  # デフォルト値として設定されている
+
+# FLASK_ENV が production の場合に正しく設定されるか確認
+def test_config_environment_with_different_env(monkeypatch):
+    """異なる FLASK_ENV のテスト"""
+    # FLASK_ENV を production に設定
+    monkeypatch.setenv("FLASK_ENV", "production")
+    config = ConfigManager()
+    # 環境が production になっているか確認
+    assert config.env == "production"
