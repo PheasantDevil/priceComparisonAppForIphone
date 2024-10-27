@@ -63,22 +63,26 @@ class AppConfig:
 
 class ConfigManager:
     """設定を一元管理するクラス"""
-    def __init__(self):
+    def __init__(self, config_dir=None):
         self._config: Optional[dict] = None
         self._scraper_config: Optional[ScraperConfig] = None
         self._app_config: Optional[AppConfig] = None
         
         self.load_environment()
-        self.load_config_file()
+        self.load_config_file(config_dir)
 
     def load_environment(self) -> None:
         """環境変数を読み込む"""
         load_dotenv()
         self.env: str = os.getenv('FLASK_ENV', 'development')
         
-    def load_config_file(self) -> None:
+    def load_config_file(self, config_dir=None) -> None:
         """設定ファイルを読み込む"""
-        config_dir = Path(__file__).parent
+        if config_dir is None:
+            config_dir = Path(__file__).parent
+        else:
+            config_dir = Path(config_dir)
+        
         config_file = config_dir / f'config.{self.env}.yaml'
         
         if not config_file.exists():
