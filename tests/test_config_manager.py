@@ -19,7 +19,9 @@ app:
   log_level: "DEBUG"
 
 scraper:
-  kaitori_rudea_url: "https://example.com/kaitori"
+  kaitori_rudea_urls:
+    - "https://example.com/kaitori1"
+    - "https://example.com/kaitori2"
   apple_store_url: "https://example.com/apple"
   request_timeout: 30
   retry_count: 3
@@ -65,7 +67,7 @@ def test_scraper_config_validation():
     """ScraperConfigのバリデーションテスト"""
     with pytest.raises(ValueError, match="Invalid URL format"):
         ScraperConfig(
-            KAITORI_RUDEA_URL="invalid-url",
+            KAITORI_RUDEA_URLS=["invalid-url"],
             APPLE_STORE_URL="https://example.com",
             REQUEST_TIMEOUT=30,
             RETRY_COUNT=3,
@@ -74,9 +76,17 @@ def test_scraper_config_validation():
     
     with pytest.raises(ValueError, match="REQUEST_TIMEOUT must be a positive integer"):
         ScraperConfig(
-            KAITORI_RUDEA_URL="https://example.com",
+            KAITORI_RUDEA_URLS=["https://example.com"],
             APPLE_STORE_URL="https://example.com",
             REQUEST_TIMEOUT=0,
             RETRY_COUNT=3,
             USER_AGENT="Test Agent"
         )
+
+def test_scraper_config_multiple_urls(mock_env_vars, test_config_file):
+    """複数のkaitori_rudea_urlsを持つScraperConfigのテスト"""
+    config = ConfigManager()
+    assert isinstance(config.scraper.KAITORI_RUDEA_URLS, list)
+    assert len(config.scraper.KAITORI_RUDEA_URLS) == 2
+    assert "https://example.com/kaitori1" in config.scraper.KAITORI_RUDEA_URLS
+    assert "https://example.com/kaitori2" in config.scraper.KAITORI_RUDEA_URLS

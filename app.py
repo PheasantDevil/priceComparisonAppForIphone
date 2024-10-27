@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 
 from flask import Flask, jsonify, render_template
 from playwright.sync_api import sync_playwright
@@ -14,6 +15,9 @@ def create_app():
     app.config['DEBUG'] = config.app.DEBUG
     app.config['SECRET_KEY'] = config.app.SECRET_KEY
     
+    # Playwrightのタイムアウト設定
+    app.config['PLAYWRIGHT_TIMEOUT'] = config.scraper.REQUEST_TIMEOUT * 1000  # ミリ秒単位に変換
+    
     # ログ設定
     logging.basicConfig(
         level=getattr(logging, config.app.LOG_LEVEL),
@@ -23,44 +27,52 @@ def create_app():
     return app
 
 def get_kaitori_prices():
-    product_details = []
+    all_product_details = {}
     
     with sync_playwright() as p:
         browser = p.chromium.launch(chromium_sandbox=False)
         page = browser.new_page()
         
-        # 設定から URL を使用
-        page.goto(config.scraper.KAITORI_RUDEA_URL)
-        page.wait_for_selector('.tr')
+        for url in config.scraper.KAITORI_RUDEA_URLS:
+            page.goto(url)
+            page.wait_for_load_state('networkidle')
 
-        items = page.query_selector_all('.tr')
+            items = page.query_selector_all('.tr')
+            
+            for item in items:
+                try:
+                    model_element = item.query_selector('.ttl h2')
+                    model_name = model_element.inner_text().strip() if model_element else ""
+                    
+                    price_element = item.query_selector('.td.td2 .td2wrap')
+                    price_text = price_element.inner_text().strip() if price_element else ""
 
-        for item in items:
-            model_name = "不明"
-            price_text = "不明"
-
-            try:
-                model_element = item.query_selector('.ttl h2')
-                model_name = model_element.inner_text().strip()
-            except Exception as e:
-                app.logger.error(f"モデル名取得エラー: {str(e)}")
-                model_name = "エラー: モデル名取得失敗"
-
-            try:
-                price_element = item.query_selector('.td.td2 .td2wrap')
-                price_text = price_element.inner_text().strip()
-            except Exception as e:
-                app.logger.error(f"価格取得エラー: {str(e)}")
-                price_text = "エラー: 買取価格取得失敗"
-
-            if model_name and price_text and '円' in price_text:
-                product_details.append({
-                    "model": model_name,
-                    "price": price_text
-                })
+                    if model_name and price_text and '円' in price_text:
+                        # iPhoneシリーズを判断（例：iPhone 16, iPhone 16 Pro Max）
+                        series = " ".join(model_name.split()[:3])
+                        if series not in all_product_details:
+                            all_product_details[series] = {}
+                        all_product_details[series][model_name] = price_text
+                except Exception as e:
+                    app.logger.error(f"データ取得エラー: {str(e)}")
+                    continue
 
         browser.close()
-    return product_details
+    
+    # 容量でソート
+    for series in all_product_details:
+        all_product_details[series] = dict(sorted(all_product_details[series].items(), key=lambda x: get_capacity(x[0])))
+    
+    return all_product_details
+
+def get_capacity(model_name):
+    match = re.search(r'(\d+)GB', model_name)
+    if match:
+        return int(match.group(1))
+    match = re.search(r'(\d+)TB', model_name)
+    if match:
+        return int(match.group(1)) * 1024
+    return 0
 
 # アプリケーションインスタンスの作成
 app = create_app()
@@ -76,7 +88,7 @@ def get_prices():
         return jsonify(iphone_prices)
     except Exception as e:
         app.logger.error(f"価格取得エラー: {str(e)}")
-        return jsonify([{"error": str(e)}]), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
