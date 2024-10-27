@@ -17,10 +17,22 @@ class ScraperConfig:
     RETRY_COUNT: int
     USER_AGENT: str
 
+    # ScraperConfig 型検証を __post_init__ メソッド内で実装
     def __post_init__(self):
         self._validate_urls()
         self._validate_timeout()
         self._validate_retry_count()
+        # 型チェック
+        if not isinstance(self.KAITORI_RUDEA_URL, str):
+            raise TypeError("KAITORI_RUDEA_URL must be a string")
+        if not isinstance(self.APPLE_STORE_URL, str):
+            raise TypeError("APPLE_STORE_URL must be a string")
+        if not isinstance(self.REQUEST_TIMEOUT, int):
+            raise TypeError("REQUEST_TIMEOUT must be an integer")
+        if not isinstance(self.RETRY_COUNT, int):
+            raise TypeError("RETRY_COUNT must be an integer")
+        if not isinstance(self.USER_AGENT, str):
+            raise TypeError("USER_AGENT must be a string")
 
     def _validate_urls(self) -> None:
         """URLの形式を検証"""
@@ -45,10 +57,17 @@ class AppConfig:
     DEBUG: bool
     SECRET_KEY: str
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-
+    # AppConfig 型検証を __post_init__ メソッド内で実装
     def __post_init__(self):
         self._validate_secret_key()
         self._validate_log_level()
+        # 型チェック
+        if not isinstance(self.DEBUG, bool):
+            raise TypeError("DEBUG must be a boolean")
+        if not isinstance(self.SECRET_KEY, str):
+            raise TypeError("SECRET_KEY must be a string")
+        if not isinstance(self.LOG_LEVEL, str):
+            raise TypeError("LOG_LEVEL must be a string")
 
     def _validate_secret_key(self) -> None:
         """シークレットキーの検証"""
