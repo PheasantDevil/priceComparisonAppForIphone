@@ -17,7 +17,8 @@ def get_kaitori_prices():
     all_product_details = []
     
     try:
-        for url in config.scraper.kaitori_rudea_urls:
+        # ここを修正
+        for url in config.scraper.KAITORI_RUDEA_URLS:
             driver.get(url)
             driver.implicitly_wait(config.scraper.REQUEST_TIMEOUT)
 

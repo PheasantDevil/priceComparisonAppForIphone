@@ -33,35 +33,29 @@ def get_kaitori_prices():
         browser = p.chromium.launch(chromium_sandbox=False)
         page = browser.new_page()
         
-        for url in config.scraper.KAITORI_RUDEA_URL:
-            page.goto(url, timeout=app.config['PLAYWRIGHT_TIMEOUT'])
-            page.wait_for_selector('.tr', timeout=app.config['PLAYWRIGHT_TIMEOUT'])
+        for url in config.scraper.KAITORI_RUDEA_URLS:
+            page.goto(url)
+            page.wait_for_load_state('networkidle')
 
             items = page.query_selector_all('.tr')
-
+            
             for item in items:
-                model_name = "不明"
-                price_text = "不明"
-
                 try:
                     model_element = item.query_selector('.ttl h2')
-                    model_name = model_element.inner_text().strip()
-                except Exception as e:
-                    app.logger.error(f"モデル名取得エラー: {str(e)}")
-                    model_name = "エラー: モデル名取得失敗"
-
-                try:
+                    model_name = model_element.inner_text().strip() if model_element else ""
+                    
                     price_element = item.query_selector('.td.td2 .td2wrap')
-                    price_text = price_element.inner_text().strip()
-                except Exception as e:
-                    app.logger.error(f"価格取得エラー: {str(e)}")
-                    price_text = "エラー: 買取価格取得失敗"
+                    price_text = price_element.inner_text().strip() if price_element else ""
 
-                if model_name and price_text and '円' in price_text:
-                    series = "iPhone 16 Pro Max" if "Pro Max" in model_name else "iPhone 16"
-                    if series not in all_product_details:
-                        all_product_details[series] = {}
-                    all_product_details[series][model_name] = price_text
+                    if model_name and price_text and '円' in price_text:
+                        # iPhoneシリーズを判断（例：iPhone 16, iPhone 16 Pro Max）
+                        series = " ".join(model_name.split()[:3])
+                        if series not in all_product_details:
+                            all_product_details[series] = {}
+                        all_product_details[series][model_name] = price_text
+                except Exception as e:
+                    app.logger.error(f"データ取得エラー: {str(e)}")
+                    continue
 
         browser.close()
     
