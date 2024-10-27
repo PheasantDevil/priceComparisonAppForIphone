@@ -110,3 +110,11 @@ def test_config_environment_with_different_env(monkeypatch):
     config = ConfigManager()
     # 環境が production になっているか確認
     assert config.env == "production"
+
+# 無効な SECRET_KEY を渡した場合のエラーハンドリングテスト
+def test_invalid_secret_key_length(monkeypatch):
+    """SECRET_KEY が無効な場合のテスト"""
+    # 環境変数 SECRET_KEY に短すぎる値を設定
+    monkeypatch.setenv("SECRET_KEY", "short")
+    with pytest.raises(ValueError, match="SECRET_KEY must be at least 16 characters"):
+        ConfigManager()
