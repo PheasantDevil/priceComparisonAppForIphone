@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 @dataclass(frozen=True)
 class ScraperConfig:
     """スクレイピング関連の設定を管理するデータクラス"""
-    KAITORI_RUDEA_URL: str
+    KAITORI_RUDEA_URL: list  # str から list に変更
     APPLE_STORE_URL: str
     REQUEST_TIMEOUT: int
     RETRY_COUNT: int
@@ -23,8 +23,8 @@ class ScraperConfig:
         self._validate_timeout()
         self._validate_retry_count()
         # 型チェック
-        if not isinstance(self.KAITORI_RUDEA_URL, str):
-            raise TypeError("KAITORI_RUDEA_URL must be a string")
+        if not isinstance(self.KAITORI_RUDEA_URL, list):  # list のチェックに変更
+            raise TypeError("KAITORI_RUDEA_URL must be a list of strings")
         if not isinstance(self.APPLE_STORE_URL, str):
             raise TypeError("APPLE_STORE_URL must be a string")
         if not isinstance(self.REQUEST_TIMEOUT, int):
@@ -36,7 +36,7 @@ class ScraperConfig:
 
     def _validate_urls(self) -> None:
         """URLの形式を検証"""
-        for url in [self.KAITORI_RUDEA_URL, self.APPLE_STORE_URL]:
+        for url in self.KAITORI_RUDEA_URL + [self.APPLE_STORE_URL]:  # リストの各URLをチェック
             parsed = urlparse(url)
             if not all([parsed.scheme, parsed.netloc]):
                 raise ValueError(f"Invalid URL format: {url}")
@@ -115,7 +115,7 @@ class ConfigManager:
         """スクレイピング設定を取得"""
         if self._scraper_config is None:
             self._scraper_config = ScraperConfig(
-                KAITORI_RUDEA_URL=self._config['scraper']['kaitori_rudea_url'],
+                KAITORI_RUDEA_URL=self._config['scraper']['kaitori_rudea_urls'],  # 複数形に変更
                 APPLE_STORE_URL=self._config['scraper']['apple_store_url'],
                 REQUEST_TIMEOUT=self._config['scraper']['request_timeout'],
                 RETRY_COUNT=self._config['scraper']['retry_count'],

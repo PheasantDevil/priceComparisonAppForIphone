@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 
 from flask import Flask, jsonify, render_template
 from playwright.sync_api import sync_playwright
@@ -26,13 +27,13 @@ def create_app():
     return app
 
 def get_kaitori_prices():
-    all_product_details = []
+    all_product_details = {}
     
     with sync_playwright() as p:
         browser = p.chromium.launch(chromium_sandbox=False)
         page = browser.new_page()
         
-        for url in config.scraper.kaitori_rudea_urls:
+        for url in config.scraper.KAITORI_RUDEA_URL:
             page.goto(url, timeout=app.config['PLAYWRIGHT_TIMEOUT'])
             page.wait_for_selector('.tr', timeout=app.config['PLAYWRIGHT_TIMEOUT'])
 
@@ -57,13 +58,27 @@ def get_kaitori_prices():
                     price_text = "エラー: 買取価格取得失敗"
 
                 if model_name and price_text and '円' in price_text:
-                    all_product_details.append({
-                        "model": model_name,
-                        "price": price_text
-                    })
+                    series = "iPhone 16 Pro Max" if "Pro Max" in model_name else "iPhone 16"
+                    if series not in all_product_details:
+                        all_product_details[series] = {}
+                    all_product_details[series][model_name] = price_text
 
         browser.close()
+    
+    # 容量でソート
+    for series in all_product_details:
+        all_product_details[series] = dict(sorted(all_product_details[series].items(), key=lambda x: get_capacity(x[0])))
+    
     return all_product_details
+
+def get_capacity(model_name):
+    match = re.search(r'(\d+)GB', model_name)
+    if match:
+        return int(match.group(1))
+    match = re.search(r'(\d+)TB', model_name)
+    if match:
+        return int(match.group(1)) * 1024
+    return 0
 
 # アプリケーションインスタンスの作成
 app = create_app()
@@ -79,7 +94,7 @@ def get_prices():
         return jsonify(iphone_prices)
     except Exception as e:
         app.logger.error(f"価格取得エラー: {str(e)}")
-        return jsonify([{"error": str(e)}]), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
