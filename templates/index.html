@@ -33,6 +33,21 @@
         display: inline-block;
         margin: 10px;
         vertical-align: top;
+        border-collapse: collapse;
+      }
+
+      .price-table caption {
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+
+      .price-table th, .price-table td {
+        padding: 5px 10px;
+        border: 1px solid #ddd;
+      }
+
+      .price-table th {
+        background-color: #f2f2f2;
       }
     </style>
   </head>
@@ -73,25 +88,21 @@
                 const table = document.createElement('table');
                 table.className = 'price-table';
                 table.border = '1';
-                table.innerHTML = `
-                  <thead>
-                    <tr>
-                      <th colspan="2">${series}</th>
-                    </tr>
-                    <tr>
-                      <th>モデル</th>
-                      <th>買取価格</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${Object.entries(models).map(([model, price]) => `
-                      <tr>
-                        <td>${model}</td>
-                        <td>${price}</td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                `;
+                
+                // テーブルのキャプション（シリーズ名）を追加
+                const caption = table.createCaption();
+                caption.textContent = series;
+
+                // ヘッダー行を作成
+                const headerRow = table.insertRow();
+                headerRow.innerHTML = '<th>モデル</th><th>買取価格</th>';
+
+                // データ行を作成
+                for (const [model, price] of Object.entries(models)) {
+                  const row = table.insertRow();
+                  row.innerHTML = `<td>${model}</td><td>${price}</td>`;
+                }
+
                 container.appendChild(table);
               }
 
