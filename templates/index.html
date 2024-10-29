@@ -29,25 +29,36 @@
         display: none;
       }
 
+      .tables-container {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-top: 20px;
+      }
+
       .price-table {
-        display: inline-block;
-        margin: 10px;
-        vertical-align: top;
         border-collapse: collapse;
+        min-width: 400px;
       }
 
       .price-table caption {
         font-weight: bold;
         margin-bottom: 10px;
+        font-size: 1.2em;
       }
 
       .price-table th, .price-table td {
-        padding: 5px 10px;
+        padding: 8px 15px;
         border: 1px solid #ddd;
+        text-align: left;
       }
 
       .price-table th {
         background-color: #f2f2f2;
+      }
+
+      .price-table td:last-child {
+        text-align: right;
       }
     </style>
   </head>
@@ -64,7 +75,7 @@
     <div id="error-message" style="display: none; color: red"></div>
 
     <!-- 価格テーブル -->
-    <div id="priceTablesContainer" style="display: none;"></div>
+    <div id="priceTablesContainer" class="tables-container" style="display: none;"></div>
 
     <script>
       // ページが読み込まれた時に価格データを取得する
@@ -82,33 +93,38 @@
               document.getElementById('loading').innerHTML = 'エラーが発生しました。詳細はコンソールを確認してください。';
             } else {
               const container = document.getElementById('priceTablesContainer');
-              container.innerHTML = ''; // 既存の内容をクリア
+              container.innerHTML = '';
 
-              for (const [series, models] of Object.entries(data)) {
-                const table = document.createElement('table');
-                table.className = 'price-table';
-                table.border = '1';
-                
-                // テーブルのキャプション（シリーズ名）を追加
-                const caption = table.createCaption();
-                caption.textContent = series;
+              // シリーズの順序を指定
+              const seriesOrder = ['iPhone 16', 'iPhone 16 Pro Max'];
+              
+              // 指定された順序でテーブルを作成
+              seriesOrder.forEach(seriesName => {
+                if (data[seriesName]) {
+                  const table = document.createElement('table');
+                  table.className = 'price-table';
+                  
+                  // テーブルのキャプション（シリーズ名）を追加
+                  const caption = table.createCaption();
+                  caption.textContent = seriesName;
 
-                // ヘッダー行を作成
-                const headerRow = table.insertRow();
-                headerRow.innerHTML = '<th>モデル</th><th>買取価格</th>';
+                  // ヘッダー行を作成
+                  const headerRow = table.insertRow();
+                  headerRow.innerHTML = '<th>モデル</th><th>買取価格</th>';
 
-                // データ行を作成
-                for (const [model, price] of Object.entries(models)) {
-                  const row = table.insertRow();
-                  row.innerHTML = `<td>${model}</td><td>${price}</td>`;
+                  // データ行を作成
+                  for (const [model, price] of Object.entries(data[seriesName])) {
+                    const row = table.insertRow();
+                    row.innerHTML = `<td>${model}</td><td>${price}</td>`;
+                  }
+
+                  container.appendChild(table);
                 }
-
-                container.appendChild(table);
-              }
+              });
 
               // ローディングを非表示にしてテーブルを表示
               document.getElementById('loading').style.display = 'none';
-              document.getElementById('priceTablesContainer').style.display = 'block';
+              document.getElementById('priceTablesContainer').style.display = 'flex';
             }
           })
           .catch(error => {

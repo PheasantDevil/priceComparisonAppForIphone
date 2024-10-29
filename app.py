@@ -27,7 +27,10 @@ def create_app():
     return app
 
 def get_kaitori_prices():
-    all_product_details = {}
+    all_product_details = {
+        'iPhone 16': {},
+        'iPhone 16 Pro Max': {}
+    }
     
     with sync_playwright() as p:
         browser = p.chromium.launch(chromium_sandbox=False)
@@ -48,10 +51,12 @@ def get_kaitori_prices():
                     price_text = price_element.inner_text().strip() if price_element else ""
 
                     if model_name and price_text and '円' in price_text:
-                        # iPhoneシリーズを判断（例：iPhone 16, iPhone 16 Pro Max）
-                        series = " ".join(model_name.split()[:3])
-                        if series not in all_product_details:
-                            all_product_details[series] = {}
+                        # iPhoneシリーズを判断
+                        if 'Pro Max' in model_name:
+                            series = 'iPhone 16 Pro Max'
+                        else:
+                            series = 'iPhone 16'
+                            
                         all_product_details[series][model_name] = price_text
                 except Exception as e:
                     app.logger.error(f"データ取得エラー: {str(e)}")
@@ -61,7 +66,10 @@ def get_kaitori_prices():
     
     # 容量でソート
     for series in all_product_details:
-        all_product_details[series] = dict(sorted(all_product_details[series].items(), key=lambda x: get_capacity(x[0])))
+        all_product_details[series] = dict(sorted(
+            all_product_details[series].items(),
+            key=lambda x: get_capacity(x[0])
+        ))
     
     return all_product_details
 
@@ -85,6 +93,7 @@ def home():
 def get_prices():
     try:
         iphone_prices = get_kaitori_prices()
+        app.logger.debug(f"取得した価格データ: {iphone_prices}")  # デバッグログを追加
         return jsonify(iphone_prices)
     except Exception as e:
         app.logger.error(f"価格取得エラー: {str(e)}")
