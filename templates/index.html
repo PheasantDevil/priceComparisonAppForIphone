@@ -60,6 +60,14 @@
       .price-table td:last-child {
         text-align: right;
       }
+
+      .price-table td[style*="color: green"] {
+        font-weight: bold;
+      }
+
+      .price-table td[style*="color: red"] {
+        font-weight: bold;
+      }
     </style>
   </head>
   <body>
@@ -108,14 +116,52 @@
                   const caption = table.createCaption();
                   caption.textContent = seriesName;
 
-                  // ヘッダー行を作成
+                  // ヘッダー行を更新
                   const headerRow = table.insertRow();
-                  headerRow.innerHTML = '<th>モデル</th><th>買取価格</th>';
+                  headerRow.innerHTML = `
+                    <th>容量</th>
+                    <th>カラー別買取価格</th>
+                    <th>公式価格</th>
+                    <th>収支（最小～最大）</th>
+                  `;
 
                   // データ行を作成
-                  for (const [model, price] of Object.entries(data[seriesName])) {
+                  for (const [capacity, details] of Object.entries(data[seriesName])) {
                     const row = table.insertRow();
-                    row.innerHTML = `<td>${model}</td><td>${price}</td>`;
+                    
+                    // 価格をフォーマットする関数
+                    const formatPrice = (price) => {
+                      if (price === null || price === undefined) return '-';
+                      return new Intl.NumberFormat('ja-JP', {
+                        style: 'currency',
+                        currency: 'JPY'
+                      }).format(price);
+                    };
+
+                    // 収支の色を決定する関数
+                    const getProfitColor = (profit) => {
+                      if (profit === null || profit === undefined) return '';
+                      return profit >= 0 ? 'color: green;' : 'color: red;';
+                    };
+
+                    // カラー別価格のHTML生成
+                    const colorPricesHtml = Object.entries(details.colors)
+                      .map(([color, colorDetails]) => `${color}: ${colorDetails.price_text}`)
+                      .join('<br>');
+
+                    // 収支範囲の表示を生成
+                    const profitRangeHtml = details.profit_min !== null && details.profit_max !== null
+                      ? `<span style="${getProfitColor(details.profit_min)}">${formatPrice(details.profit_min)}</span>
+                         ～
+                         <span style="${getProfitColor(details.profit_max)}">${formatPrice(details.profit_max)}</span>`
+                      : '-';
+
+                    row.innerHTML = `
+                      <td>${capacity}</td>
+                      <td>${colorPricesHtml}</td>
+                      <td>${formatPrice(details.official_price)}</td>
+                      <td>${profitRangeHtml}</td>
+                    `;
                   }
 
                   container.appendChild(table);
