@@ -1,0 +1,45 @@
+{
+  "iPhone 16": {
+    "128GB": {
+      "black 黒 MYDQ3J/A 未開封 SIMフリー": 124800,
+      "pink 桃 MYDT3J/A 未開封 SIMフリー": 124800,
+      "teal 緑 MYDV3J/A 未開封 SIMフリー": 124800,
+      "ultramarine 青 MYDU3J/A 未開封 SIMフリー": 124800,
+      "white 白 MYDR3J/A 未開封 SIMフリー": 124800
+    },
+    "256GB": {
+      "black 黒 MYDW3J/A 未開封 SIMフリー": 139800,
+      "pink 桃 MYDY3J/A 未開封 SIMフリー": 139800,
+      "teal 緑 MYDZ3J/A 未開封 SIMフリー": 139800,
+      "ultramarine 青 MYDX3J/A 未開封 SIMフリー": 139800,
+      "white 白 MYDW3J/A 未開封 SIMフリー": 139800
+    },
+    "512GB": {
+      "black 黒 MYDQ3J/A 未開封 SIMフリー": 169800,
+      "pink 桃 MYDT3J/A 未開封 SIMフリー": 169800,
+      "teal 緑 MYDV3J/A 未開封 SIMフリー": 169800,
+      "ultramarine 青 MYDU3J/A 未開封 SIMフリー": 169800,
+      "white 白 MYDR3J/A 未開封 SIMフリー": 169800
+    }
+  },
+  "iPhone 16 Pro Max": {
+    "256GB": {
+      "black 黒 MYWG3J/A 未開封 SIMフリー": 189800,
+      "desert 金 MYWH3J/A 未開封 SIMフリー": 189800,
+      "natural 灰 MYWJ3J/A 未開封 SIMフリー": 189800,
+      "white 白 MYWK3J/A 未開封 SIMフリー": 189800
+    },
+    "512GB": {
+      "black 黒 MYWQ3J/A 未開封 SIMフリー": 219800,
+      "desert 金 MYWT3J/A 未開封 SIMフリー": 219800,
+      "natural 灰 MYWU3J/A 未開封 SIMフリー": 219800,
+      "white 白 MYWR3J/A 未開封 SIMフリー": 219800
+    },
+    "1TB": {
+      "black 黒 MYWQ3J/A 未開封 SIMフリー": 249800,
+      "desert 金 MYWT3J/A 未開封 SIMフリー": 249800,
+      "natural 灰 MYWU3J/A 未開封 SIMフリー": 249800,
+      "white 白 MYWR3J/A 未開封 SIMフリー": 249800
+    }
+  }
+}
