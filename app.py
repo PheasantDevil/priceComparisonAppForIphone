@@ -68,29 +68,30 @@ def get_kaitori_prices():
                     model_element = item.query_selector('.ttl h2')
                     model_name = model_element.inner_text().strip() if model_element else ""
                     
+                    # モデル名からシリーズを判定
+                    if 'Pro Max' in model_name:
+                        series = 'iPhone 16 Pro Max'
+                    elif 'Pro' in model_name:
+                        series = 'iPhone 16 Pro'
+                    elif '16' in model_name:
+                        series = 'iPhone 16'
+                    else:
+                        continue
+                    
+                    # 容量を抽出（例: "128GB"）
+                    capacity_match = re.search(r'(\d+)GB', model_name)
+                    if not capacity_match:
+                        continue
+                    capacity = capacity_match.group(0)
+                    
                     price_element = item.query_selector('.td.td2 .td2wrap')
                     price_text = price_element.inner_text().strip() if price_element else ""
 
                     if model_name and price_text and '円' in price_text:
-                        # モデル名から容量を抽出
-                        capacity_match = re.search(r'(\d+)(GB|TB)', model_name)
-                        if not capacity_match:
-                            continue
-                            
-                        capacity = f"{capacity_match.group(1)}{capacity_match.group(2)}"
-                        
                         # カラーを抽出（黒、白、桃、緑、青、金、灰など）
                         color_match = re.search(r'(黒|白|桃|緑|青|金|灰)', model_name)
                         color = color_match.group(1) if color_match else "不明"
                         
-                        # iPhoneシリーズを判断
-                        if 'Pro Max' in model_name:
-                            series = 'iPhone 16 Pro Max'
-                        elif 'Pro' in model_name:
-                            series = 'iPhone 16 Pro'
-                        else:
-                            series = 'iPhone 16'
-                            
                         # 容量ごとのデータを初期化・更新
                         if capacity not in all_product_details[series]:
                             all_product_details[series][capacity] = {

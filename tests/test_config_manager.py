@@ -20,8 +20,9 @@ app:
 
 scraper:
   kaitori_rudea_urls:
-    - "https://example.com/kaitori1"
-    - "https://example.com/kaitori2"
+    - "https://kaitori-rudeya.com/category/detail/183"  # iPhone 16
+    - "https://kaitori-rudeya.com/category/detail/185"  # iPhone 16 Pro
+    - "https://kaitori-rudeya.com/category/detail/186"  # iPhone 16 Pro Max
   apple_store_url: "https://example.com/apple"
   request_timeout: 30
   retry_count: 3
@@ -87,6 +88,7 @@ def test_scraper_config_multiple_urls(mock_env_vars, test_config_file):
     """複数のkaitori_rudea_urlsを持つScraperConfigのテスト"""
     config = ConfigManager()
     assert isinstance(config.scraper.KAITORI_RUDEA_URLS, list)
-    assert len(config.scraper.KAITORI_RUDEA_URLS) == 2
-    assert "https://example.com/kaitori1" in config.scraper.KAITORI_RUDEA_URLS
-    assert "https://example.com/kaitori2" in config.scraper.KAITORI_RUDEA_URLS
+    assert len(config.scraper.KAITORI_RUDEA_URLS) == 3
+    assert "https://kaitori-rudeya.com/category/detail/183" in config.scraper.KAITORI_RUDEA_URLS
+    assert "https://kaitori-rudeya.com/category/detail/185" in config.scraper.KAITORI_RUDEA_URLS
+    assert "https://kaitori-rudeya.com/category/detail/186" in config.scraper.KAITORI_RUDEA_URLS
