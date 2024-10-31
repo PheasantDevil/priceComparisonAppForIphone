@@ -49,6 +49,7 @@ def price_text_to_int(price_text):
 def get_kaitori_prices():
     all_product_details = {
         'iPhone 16': {},
+        'iPhone 16 Pro': {},
         'iPhone 16 Pro Max': {}
     }
     
@@ -85,6 +86,8 @@ def get_kaitori_prices():
                         # iPhoneシリーズを判断
                         if 'Pro Max' in model_name:
                             series = 'iPhone 16 Pro Max'
+                        elif 'Pro' in model_name:
+                            series = 'iPhone 16 Pro'
                         else:
                             series = 'iPhone 16'
                             

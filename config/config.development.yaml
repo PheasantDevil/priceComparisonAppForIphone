@@ -6,6 +6,7 @@ app:
 scraper:
   kaitori_rudea_urls:
     - https://kaitori-rudeya.com/category/detail/183 # iPhone 16
+    - https://kaitori-rudeya.com/category/detail/185 # iPhone 16 Pro
     - https://kaitori-rudeya.com/category/detail/186 # iPhone 16 Pro Max
   apple_store_url: https://www.apple.com/jp/shop/buy-iphone
   request_timeout: 30
