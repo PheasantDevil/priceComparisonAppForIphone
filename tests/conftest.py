@@ -25,8 +25,9 @@ app:
 
 scraper:
   kaitori_rudea_urls:
-    - https://test1.example.com/kaitori
-    - https://test2.example.com/kaitori
+    - https://kaitori-rudeya.com/category/detail/183  # iPhone 16
+    - https://kaitori-rudeya.com/category/detail/185  # iPhone 16 Pro
+    - https://kaitori-rudeya.com/category/detail/186  # iPhone 16 Pro Max
   apple_store_url: https://test.example.com/apple
   request_timeout: 30
   retry_count: 3
