@@ -43,3 +43,24 @@ def test_config_file_not_found():
     # 存在しないディレクトリを指定して ConfigManager を初期化
     with pytest.raises(FileNotFoundError, match="Configuration file not found"):
         ConfigManager(config_dir="non_existent_directory")
+
+def test_iphone16_pro_url_integration(mock_env_vars, test_config_file):
+    """iPhone 16 Pro URLの統合テスト"""
+    config = ConfigManager(config_dir=test_config_file.parent)
+    
+    # 全てのiPhoneモデルのURLが含まれているか確認
+    expected_urls = [
+        "https://kaitori-rudeya.com/category/detail/183",  # iPhone 16
+        "https://kaitori-rudeya.com/category/detail/185",  # iPhone 16 Pro
+        "https://kaitori-rudeya.com/category/detail/186"   # iPhone 16 Pro Max
+    ]
+    
+    # URLの数が正しいか確認
+    assert len(config.scraper.KAITORI_RUDEA_URLS) == len(expected_urls)
+    
+    # 各URLが正しく含まれているか確認
+    for url in expected_urls:
+        assert url in config.scraper.KAITORI_RUDEA_URLS
+        
+    # URLの順序が正しいか確認
+    assert config.scraper.KAITORI_RUDEA_URLS == expected_urls

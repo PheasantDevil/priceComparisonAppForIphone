@@ -168,3 +168,47 @@ def test_config_manager_with_multiple_urls(monkeypatch, tmp_path):
     assert len(config.scraper.KAITORI_RUDEA_URLS) == 2
     assert "https://test1.example.com/kaitori" in config.scraper.KAITORI_RUDEA_URLS
     assert "https://test2.example.com/kaitori" in config.scraper.KAITORI_RUDEA_URLS
+
+def test_scraper_config_with_iphone16_pro_url():
+    """iPhone 16 Pro URLを含むスクレイパー設定のテスト"""
+    config = ScraperConfig(
+        KAITORI_RUDEA_URLS=[
+            "https://kaitori-rudeya.com/category/detail/183",  # iPhone 16
+            "https://kaitori-rudeya.com/category/detail/185",  # iPhone 16 Pro
+            "https://kaitori-rudeya.com/category/detail/186"   # iPhone 16 Pro Max
+        ],
+        APPLE_STORE_URL="https://example.com/apple",
+        REQUEST_TIMEOUT=30,
+        RETRY_COUNT=3,
+        USER_AGENT="Test Agent"
+    )
+    assert len(config.KAITORI_RUDEA_URLS) == 3
+    assert "https://kaitori-rudeya.com/category/detail/185" in config.KAITORI_RUDEA_URLS
+
+def test_config_manager_loads_iphone16_pro_url(mock_env_vars, tmp_path):
+    """ConfigManagerがiPhone 16 Pro URLを正しく読み込むかテスト"""
+    config_content = """
+    app:
+      debug: true
+      log_level: DEBUG
+      secret_key: test-secret-key-16ch
+
+    scraper:
+      kaitori_rudea_urls:
+        - https://kaitori-rudeya.com/category/detail/183
+        - https://kaitori-rudeya.com/category/detail/185
+        - https://kaitori-rudeya.com/category/detail/186
+      apple_store_url: https://example.com/apple
+      request_timeout: 30
+      retry_count: 3
+      user_agent: "Test User Agent"
+    """
+    config_file = tmp_path / "config.testing.yaml"
+    config_file.write_text(config_content)
+
+    monkeypatch = mock_env_vars
+    monkeypatch.setenv("FLASK_ENV", "testing")
+    config = ConfigManager(config_dir=tmp_path)
+
+    assert len(config.scraper.KAITORI_RUDEA_URLS) == 3
+    assert "https://kaitori-rudeya.com/category/detail/185" in config.scraper.KAITORI_RUDEA_URLS
