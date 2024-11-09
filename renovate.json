@@ -1,30 +1,43 @@
 {
-  "extends": ["config:base"],
-  "labels": ["dependencies"],
+  "extends": [
+    "config:recommended"
+  ],
+  "labels": [
+    "dependencies"
+  ],
   "packageRules": [
     {
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "automerge": true,
       "automergeType": "pr",
       "prConcurrentLimit": 10,
       "prPriority": -1,
-      "excludePackagePatterns": [
-        "@*",
-        "some-risky-package",
-        "another-risky-package"
+      "matchPackageNames": [
+        "!/@*/",
+        "!/some-risky-package/",
+        "!/another-risky-package/"
       ]
     },
     {
-      "matchUpdateTypes": ["major"],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "automerge": false,
       "prConcurrentLimit": 5,
       "prPriority": 1
     },
     {
-      "matchPackagePatterns": ["@*"],
-      "matchUpdateTypes": ["minor"],
+      "matchUpdateTypes": [
+        "minor"
+      ],
       "automerge": false,
-      "prPriority": 1
+      "prPriority": 1,
+      "matchPackageNames": [
+        "/@*/"
+      ]
     }
   ],
   "prConcurrentLimit": 10
