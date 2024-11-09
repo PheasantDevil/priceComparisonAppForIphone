@@ -6,18 +6,25 @@
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true,
       "automergeType": "pr",
-      "excludePackagePatterns": ["*"],
-      "prConcurrentLimit": 10
+      "prConcurrentLimit": 10,
+      "prPriority": -1,
+      "excludePackagePatterns": [
+        "@*",
+        "some-risky-package",
+        "another-risky-package"
+      ]
     },
     {
       "matchUpdateTypes": ["major"],
       "automerge": false,
-      "prConcurrentLimit": 5
+      "prConcurrentLimit": 5,
+      "prPriority": 1
     },
     {
+      "matchPackagePatterns": ["@*"],
       "matchUpdateTypes": ["minor"],
-      "excludePackagePatterns": ["@*"],
-      "automerge": false
+      "automerge": false,
+      "prPriority": 1
     }
   ],
   "prConcurrentLimit": 10
