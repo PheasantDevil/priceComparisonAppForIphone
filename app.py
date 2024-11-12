@@ -78,11 +78,11 @@ def get_kaitori_prices():
                     else:
                         continue
                     
-                    # 容量を抽出（例: "128GB"）
-                    capacity_match = re.search(r'(\d+)GB', model_name)
+                    # 容量を抽出（例: "128GB" または "1TB"）
+                    capacity_match = re.search(r'(\d+)(GB|TB)', model_name)
                     if not capacity_match:
                         continue
-                    capacity = capacity_match.group(0)
+                    capacity = capacity_match.group(0)  # "128GB" or "1TB"
                     
                     price_element = item.query_selector('.td.td2 .td2wrap')
                     price_text = price_element.inner_text().strip() if price_element else ""
