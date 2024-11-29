@@ -10,10 +10,9 @@ services:
     runtime: python
     buildCommand: |
       pip install -r requirements.txt
-      playwright install chromium
-      playwright install-deps
+      playwright install chromium  # 必要なブラウザをインストール
+      playwright install-deps      # 依存ライブラリをインストール
     startCommand: gunicorn app:app
     envVars:
       - key: PLAYWRIGHT_BROWSERS_PATH
-        value: /home/render/.cache/ms-playwright
-    env: python
+        value: /opt/render/.cache/ms-playwright
