@@ -10,6 +10,7 @@ services:
     runtime: python
     buildCommand: |
       pip install -r requirements.txt
+      playwright install
       playwright install chromium  # 必要なブラウザをインストール
       playwright install-deps      # 依存ライブラリをインストール
     startCommand: gunicorn app:app
