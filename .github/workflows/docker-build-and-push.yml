@@ -1,10 +1,9 @@
-name: Build and Push Docker Image
+name: Build, Push, and Deploy
 
-# ワークフローをトリガーする条件
 on:
   push:
     branches:
-      - main  # mainブランチへのプッシュをトリガー
+      - main
 
 jobs:
   build-and-push:
@@ -12,21 +11,44 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # リポジトリをクローン
+      # リポジトリをチェックアウト
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Dockerログイン
+      # Dockerにログイン
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Dockerイメージのビルドとプッシュ
+      # Dockerイメージをビルド＆プッシュ
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           push: true
           tags: |
             koninji/price-comparison-app:latest
+
+      # Render APIからサービスIDを取得してデプロイ
+      - name: Trigger Render Deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          # Render APIからサービス一覧を取得
+          SERVICE_ID=$(curl -s -X GET \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            https://api.render.com/v1/services \
+            | jq -r '.[] | select(.name=="price-comparison-app") | .id')
+
+          # サービスIDが取得できたか確認
+          if [ -z "$SERVICE_ID" ]; then
+            echo "Service ID not found for 'price-comparison-app'."
+            exit 1
+          fi
+
+          # Renderでデプロイをトリガー
+          curl -X POST \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            https://api.render.com/v1/services/$SERVICE_ID/deploys
