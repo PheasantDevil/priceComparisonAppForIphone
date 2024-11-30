@@ -4,11 +4,10 @@ import os
 import re
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, send_from_directory
 from playwright.sync_api import sync_playwright
 
 from config import config
-
 
 def create_app():
     app = Flask(__name__)
@@ -25,8 +24,25 @@ def create_app():
         level=getattr(logging, config.app.LOG_LEVEL),
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    
+
+    @app.route('/static/favicon.ico')
+    def favicon():
+        try:
+            favicon_path = os.path.join(app.root_path, 'static')
+            app.logger.debug(f"Favicon path: {favicon_path}")  # パスを確認
+            return send_from_directory(
+                favicon_path,
+                'favicon.ico',
+                mimetype='image/vnd.microsoft.icon'
+            )
+        except Exception as e:
+            app.logger.error(f"Favicon error: {str(e)}")  # エラーの詳細を確認
+            return '', 204
+
     return app
+
+# アプリケーションインスタンスの作成
+app = create_app()
 
 def load_official_prices():
     """公式価格データをJSONファイルから読み込む"""
@@ -123,9 +139,6 @@ def get_kaitori_prices():
         browser.close()
     
     return all_product_details
-
-# アプリケーションインスタンスの作成
-app = create_app()
 
 @app.route('/')
 def home():

@@ -3,7 +3,7 @@
 # ベースイメージ
 FROM python:3.11-slim
 
-# 必要な依存ライブラリをインストール
+# 必要なシステムパッケージとPlaywrightの依存ライブラリをインストール
 RUN apt-get update && apt-get install -y \
     libnss3 \
     libnspr4 \
@@ -23,18 +23,20 @@ RUN apt-get update && apt-get install -y \
     libcurl4 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Pythonの作業ディレクトリを設定
+# 作業ディレクトリを設定
 WORKDIR /app
 
 # プロジェクトのファイルをコピー
 COPY . /app
 
-# PythonパッケージとPlaywrightのブラウザをインストール
-RUN pip install -r requirements.txt \
-    && playwright install
+# Pythonパッケージのインストール
+RUN pip install -r requirements.txt
 
-# 環境変数を設定
+# Playwrightの環境変数を設定
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright
+
+# Playwrightブラウザのインストール
+RUN playwright install chromium
 
 # アプリケーションを起動
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000"]
