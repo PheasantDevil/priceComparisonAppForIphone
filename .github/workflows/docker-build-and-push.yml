@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-push:
-    name: Build and Push Docker Image
+    name: Build, Push, and Deploy to Render
     runs-on: ubuntu-latest
 
     steps:
@@ -30,24 +30,29 @@ jobs:
           tags: |
             koninji/price-comparison-app:latest
 
-      # Render APIからサービスIDを取得してデプロイ
+      # Renderの環境変数からサービスIDを取得
+      - name: Fetch Render Service ID
+        id: fetch-service-id
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          SERVICE_ID=$(curl -s -X GET \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            https://api.render.com/v1/services/<service-name>/env-vars \
+            | jq -r '.[] | select(.key=="SERVICE_ID") | .value')
+
+          if [ -z "$SERVICE_ID" ]; then
+            echo "Service ID not found in environment variables."
+            exit 1
+          fi
+
+          echo "SERVICE_ID=$SERVICE_ID" >> $GITHUB_ENV
+
+      # Renderでデプロイをトリガー
       - name: Trigger Render Deploy
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: |
-          # Render APIからサービス一覧を取得
-          SERVICE_ID=$(curl -s -X GET \
-            -H "Authorization: Bearer $RENDER_API_KEY" \
-            https://api.render.com/v1/services \
-            | jq -r '.[] | select(.name=="price-comparison-app:latest") | .id')
-
-          # サービスIDが取得できたか確認
-          if [ -z "$SERVICE_ID" ]; then
-            echo "Service ID not found for 'price-comparison-app:latest'."
-            exit 1
-          fi
-
-          # Renderでデプロイをトリガー
           curl -X POST \
             -H "Authorization: Bearer $RENDER_API_KEY" \
             -H "Content-Type: application/json" \
