@@ -39,4 +39,4 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright
 RUN playwright install chromium
 
 # アプリケーションを起動
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000"]
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers=3", "--timeout=60"]
