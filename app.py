@@ -174,3 +174,11 @@ def get_prices():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    response = {
+        "error": str(e),
+        "message": "An internal error occurred. Please try again later."
+    }
+    return jsonify(response), 500
