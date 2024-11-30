@@ -39,15 +39,23 @@ jobs:
           SERVICE_ID=$(curl -s -X GET \
             -H "Authorization: Bearer $RENDER_API_KEY" \
             https://api.render.com/v1/services \
-            | jq -r '.[] | select(.name=="price-comparison-app") | .id')
-
+            | jq -r '.[] | select(.name=="<正しいサービス名>") | .id')
+      
           if [ -z "$SERVICE_ID" ]; then
-            echo "Service ID not found for 'price-comparison-app'."
+            echo "Service ID not found for '<正しいサービス名>'."
             exit 1
           fi
-
+      
           echo "SERVICE_ID=$SERVICE_ID" >> $GITHUB_ENV
 
+      - name: Debug Render Services
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          curl -s -X GET \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            https://api.render.com/v1/services
+        
       # Renderでデプロイをトリガー
       - name: Trigger Render Deploy
         env:
