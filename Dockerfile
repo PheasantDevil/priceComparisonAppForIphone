@@ -1,21 +1,35 @@
-# ベースイメージ
+# Dockerのイメージ名: price-comparison-app:latest
+
+# ベースイメージを指定
 FROM python:3.11-slim
 
-# 必要な依存ライブラリをインストール
+# 必要なシステムパッケージとPlaywrightの依存ライブラリをインストール
 RUN apt-get update && apt-get install -y \
-    gstreamer1.0-gl \
-    gstreamer1.0-libav \
-    libavif15 \
-    libenchant-2-2 \
-    libsecret-1-dev \
-    libmanette-0.2-dev \
-    libgles2-mesa \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libatspi2.0-0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libxkbcommon0 \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Python環境のセットアップ
+# Pythonの作業ディレクトリを設定
 WORKDIR /app
-COPY . /app
-RUN pip install -r requirements.txt && playwright install
 
-# アプリケーションのエントリーポイント
+# プロジェクトのファイルをコピー
+COPY . /app
+
+# PythonパッケージとPlaywrightのブラウザをインストール
+RUN pip install -r requirements.txt \
+    && playwright install
+
+# 環境変数を設定
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright
+
+# アプリケーションを起動
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000"]
+
