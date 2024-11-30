@@ -38,7 +38,7 @@ jobs:
         run: |
           SERVICE_ID=$(curl -s -X GET \
             -H "Authorization: Bearer $RENDER_API_KEY" \
-            https://api.render.com/v1/services/<service-name>/env-vars \
+            https://api.render.com/v1/services/price-comparison-app:latest/env-vars \
             | jq -r '.[] | select(.key=="SERVICE_ID") | .value')
 
           if [ -z "$SERVICE_ID" ]; then
