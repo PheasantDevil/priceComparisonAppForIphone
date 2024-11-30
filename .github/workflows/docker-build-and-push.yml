@@ -30,6 +30,14 @@ jobs:
           tags: |
             koninji/price-comparison-app:latest
 
+      - name: Debug Render Services
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          curl -s -X GET \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            https://api.render.com/v1/services
+    
       # Renderのサービス一覧からサービスIDを動的に取得
       - name: Fetch Render Service ID
         id: fetch-service-id
@@ -47,14 +55,6 @@ jobs:
           fi
       
           echo "SERVICE_ID=$SERVICE_ID" >> $GITHUB_ENV
-
-      - name: Debug Render Services
-        env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-        run: |
-          curl -s -X GET \
-            -H "Authorization: Bearer $RENDER_API_KEY" \
-            https://api.render.com/v1/services
         
       # Renderでデプロイをトリガー
       - name: Trigger Render Deploy
