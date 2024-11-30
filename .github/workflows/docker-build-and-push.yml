@@ -30,7 +30,7 @@ jobs:
           tags: |
             koninji/price-comparison-app:latest
 
-      # Renderの環境変数からサービスIDを取得
+      # Renderのサービス一覧からサービスIDを動的に取得
       - name: Fetch Render Service ID
         id: fetch-service-id
         env:
@@ -38,11 +38,11 @@ jobs:
         run: |
           SERVICE_ID=$(curl -s -X GET \
             -H "Authorization: Bearer $RENDER_API_KEY" \
-            https://api.render.com/v1/services/price-comparison-app:latest/env-vars \
-            | jq -r '.[] | select(.key=="SERVICE_ID") | .value')
+            https://api.render.com/v1/services \
+            | jq -r '.[] | select(.name=="price-comparison-app") | .id')
 
           if [ -z "$SERVICE_ID" ]; then
-            echo "Service ID not found in environment variables."
+            echo "Service ID not found for 'price-comparison-app'."
             exit 1
           fi
 
