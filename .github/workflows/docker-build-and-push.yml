@@ -13,7 +13,7 @@ jobs:
     steps:
       # リポジトリをチェックアウト
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Dockerにログイン
       - name: Log in to Docker Hub
