@@ -1,0 +1,29 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Initialize Terraform
+        env:
+          TF_VAR_db_password: ${{ secrets.RENDER_POSTGRESQL_DB_PASSWORD }} # GitHub Secretsからパスワードを設定
+        run: terraform init
+
+      - name: Apply Terraform configuration
+        env:
+          TF_VAR_db_password: ${{ secrets.RENDER_POSTGRESQL_DB_PASSWORD }}
+        run: terraform apply -auto-approve
