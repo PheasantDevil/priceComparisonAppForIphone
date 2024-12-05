@@ -2,6 +2,7 @@ services:
   - name: official_prices_app
     type: web
     runtime: python
+    plan: free # 無料プランを明示
     buildCommand: ''
     startCommand: 'python app.py'
     envVars:
