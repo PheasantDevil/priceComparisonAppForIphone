@@ -4,10 +4,14 @@ import os
 import re
 from pathlib import Path
 
+import psycopg2
+from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, send_from_directory
 from playwright.sync_api import sync_playwright
 
 from config import config
+
+load_dotenv()  # .envファイルをロード
 
 def create_app():
     app = Flask(__name__)
@@ -43,16 +47,6 @@ def create_app():
 
 # アプリケーションインスタンスの作成
 app = create_app()
-
-def load_official_prices():
-    """公式価格データをJSONファイルから読み込む"""
-    try:
-        json_path = Path(__file__).parent / 'data' / 'official_prices.json'
-        with open(json_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        app.logger.error(f"公式価格データの読み込みエラー: {str(e)}")
-        return {}
 
 def price_text_to_int(price_text):
     """価格テキストを整数に変換する"""
@@ -142,36 +136,80 @@ def get_kaitori_prices():
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    try:
+        # データベース接続
+        conn = psycopg2.connect(
+            host="dpg-ct8or1a3esus7384jdbg-a.oregon-postgres.render.com",
+            database="official_prices_db_gop6",
+            user="official_prices_db_gop6_user",
+            password="ngVU5yXdsM8AMyt0Jy2FdC2fOtfL9Rc0"
+        )
+        cursor = conn.cursor()
+
+        # データベースから公式価格を取得
+        cursor.execute("SELECT product_name, capacity, color, price FROM official_prices;")
+        official_prices = cursor.fetchall()
+
+        # データベース接続を閉じる
+        cursor.close()
+        conn.close()
+
+        # テンプレートにデータを渡して表示
+        return render_template('index.html', prices=official_prices)
+    except Exception as e:
+        app.logger.error(f"価格取得エラー: {str(e)}")
+        return render_template('error.html', error_message=str(e))
 
 @app.route('/get_prices')
 def get_prices():
     try:
         kaitori_prices = get_kaitori_prices()
-        official_prices = load_official_prices()
         
-        # 買取価格と公式価格を組み合わせる
+        # データベースから公式価格を取得（colorも含める）
+        conn = psycopg2.connect(
+            host="dpg-ct8or1a3esus7384jdbg-a.oregon-postgres.render.com",
+            database="official_prices_db_gop6",
+            user="official_prices_db_gop6_user",
+            password="ngVU5yXdsM8AMyt0Jy2FdC2fOtfL9Rc0"
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT product_name, capacity, color, price FROM official_prices;")
+        official_prices = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        # 公式価格をディクショナリに変換（色ごとの価格を保持）
+        official_prices_dict = {}
+        for row in official_prices:
+            product_name, capacity, color, price = row
+            if product_name not in official_prices_dict:
+                official_prices_dict[product_name] = {}
+            if capacity not in official_prices_dict[product_name]:
+                official_prices_dict[product_name][capacity] = {}
+            official_prices_dict[product_name][capacity][color] = price
+
+        # 買取価格データに公式価格を追加
         for series in kaitori_prices:
-            if series in official_prices:
-                for capacity, details in kaitori_prices[series].items():
-                    if capacity in official_prices[series]:
-                        # 最安値の公式価格を取得
-                        official_price = min(official_prices[series][capacity].values())
-                        details['official_price'] = official_price
-                        # 最大収益と最小収益を計算
-                        details['profit_min'] = details['kaitori_price_min'] - official_price
-                        details['profit_max'] = details['kaitori_price_max'] - official_price
-                    else:
-                        details['official_price'] = None
-                        details['profit_min'] = None
-                        details['profit_max'] = None
+            for capacity, details in kaitori_prices[series].items():
+                # 各容量の全色の価格を取得
+                color_prices = official_prices_dict.get(series, {}).get(capacity, {})
+                if color_prices:
+                    # 最も一般的な価格を公式価格として使用
+                    official_price = list(color_prices.values())[0]
+                    details['official_price'] = official_price
+
+                    # 収支（最小～最大）を計算
+                    details['profit_min'] = details['kaitori_price_min'] - official_price
+                    details['profit_max'] = details['kaitori_price_max'] - official_price
+                else:
+                    details['official_price'] = None
+                    details['profit_min'] = None
+                    details['profit_max'] = None
         
-        app.logger.debug(f"取得した価格データ: {kaitori_prices}")
         return jsonify(kaitori_prices)
     except Exception as e:
         app.logger.error(f"価格取得エラー: {str(e)}")
         return jsonify({"error": str(e)}), 500
-
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
 
