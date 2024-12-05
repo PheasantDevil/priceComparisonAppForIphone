@@ -1,19 +1,9 @@
-# デプロイの設定を詳細に指定するためのファイルで、以下のような情報を設定可能
-# ・ サービスの種類（web service、background jobなど）
-# ・ 環境変数
-# ・ ビルドコマンドやスタートコマンド
-# ・ 自動デプロイの有無など
-
 services:
-  - type: web
-    name: priceComparisonAppForIphone
+  - name: official_prices_app
+    type: web
     runtime: python
-    buildCommand: |
-      pip install -r requirements.txt
-      playwright install
-      playwright install chromium  # 必要なブラウザをインストール
-      playwright install-deps      # 依存ライブラリをインストール
-    startCommand: gunicorn app:app
+    buildCommand: ''
+    startCommand: 'python app.py'
     envVars:
-      - key: PLAYWRIGHT_BROWSERS_PATH
-        value: /opt/render/.cache/ms-playwright
+      - key: DATABASE_URL
+        value: postgresql://official_prices_db_gop6_user:ngVU5yXdsM8AMyt0Jy2FdC2fOtfL9Rc0@dpg-ct8or1a3esus7384jdbg-a.oregon-postgres.render.com/official_prices_db_gop6
