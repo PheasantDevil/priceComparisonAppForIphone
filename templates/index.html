@@ -47,7 +47,8 @@
         font-size: 1.2em;
       }
 
-      .price-table th, .price-table td {
+      .price-table th,
+      .price-table td {
         padding: 8px 15px;
         border: 1px solid #ddd;
         text-align: left;
@@ -61,11 +62,11 @@
         text-align: right;
       }
 
-      .price-table td[style*="color: green"] {
+      .price-table td[style*='color: green'] {
         font-weight: bold;
       }
 
-      .price-table td[style*="color: red"] {
+      .price-table td[style*='color: red'] {
         font-weight: bold;
       }
     </style>
@@ -83,110 +84,75 @@
     <div id="error-message" style="display: none; color: red"></div>
 
     <!-- 価格テーブル -->
-    <div id="priceTablesContainer" class="tables-container" style="display: none;"></div>
+    <div
+      id="priceTablesContainer"
+      class="tables-container"
+      style="display: none"
+    ></div>
 
     <script>
       // ページが読み込まれた時に価格データを取得する
       document.addEventListener('DOMContentLoaded', function () {
+        const API_ENDPOINT =
+          'https://qow3wyg1nj.execute-api.ap-northeast-1.amazonaws.com/prod/get_prices';
+
         // ローディング表示
         document.getElementById('loading').style.display = 'block';
         document.getElementById('priceTablesContainer').style.display = 'none';
 
         // データを非同期で取得
-        fetch('/get_prices')
+        fetch(`${API_ENDPOINT}?series=iPhone 16`)
           .then(response => response.json())
           .then(data => {
             if (data.error) {
               console.error('Error:', data.error);
-              document.getElementById('loading').innerHTML = 'エラーが発生しました。詳細はコンソールを確認してください。';
+              document.getElementById('loading').innerHTML =
+                'エラーが発生しました。詳細はコンソールを確認してください。';
             } else {
               const container = document.getElementById('priceTablesContainer');
               container.innerHTML = '';
 
-              // シリーズの順序を指定
-              const seriesOrder = ['iPhone 16', 'iPhone 16 Pro', 'iPhone 16 Pro Max'];
-              
-              // 指定された順序でテーブルを作成
-              seriesOrder.forEach(seriesName => {
-                if (data[seriesName]) {
-                  const table = document.createElement('table');
-                  table.className = 'price-table';
-                  
-                  // テーブルのキャプション（シリーズ名）を追加
-                  const caption = table.createCaption();
-                  caption.textContent = seriesName;
+              // データ描画ロジックは以前の内容と同じ
+              data.forEach(item => {
+                const table = document.createElement('table');
+                table.className = 'price-table';
 
-                  // ヘッダー行を更新
-                  const headerRow = table.insertRow();
-                  headerRow.innerHTML = `
-                    <th>容量</th>
-                    <th>カラー別買取価格</th>
-                    <th>公式価格</th>
-                    <th>収支（最小～最大）</th>
-                  `;
+                const caption = table.createCaption();
+                caption.textContent = item.series;
 
-                  // データ行を作成
-                  for (const [capacity, details] of Object.entries(data[seriesName])) {
-                    const row = table.insertRow();
-                    
-                    // 価格をフォーマットする関数
-                    const formatPrice = (price) => {
-                      if (price === null || price === undefined) return '-';
-                      return new Intl.NumberFormat('ja-JP', {
-                        style: 'currency',
-                        currency: 'JPY'
-                      }).format(price);
-                    };
+                const headerRow = table.insertRow();
+                headerRow.innerHTML = `
+                  <th>容量</th>
+                  <th>カラー別買取価格</th>
+                `;
 
-                    // 収支の色を決定する関数
-                    const getProfitColor = (profit) => {
-                      if (profit === null || profit === undefined) return '';
-                      return profit >= 0 ? 'color: green;' : 'color: red;';
-                    };
+                const row = table.insertRow();
+                row.innerHTML = `
+                  <td>${item.capacity}</td>
+                  <td>${Object.entries(item.color_prices)
+                    .map(
+                      ([color, price]) =>
+                        `${color}: ${new Intl.NumberFormat('ja-JP', {
+                          style: 'currency',
+                          currency: 'JPY',
+                        }).format(price)}`
+                    )
+                    .join('<br>')}</td>
+                `;
 
-                    // カラー別価格のHTML生成
-                    const colorPricesHtml = Object.entries(details.colors)
-                      .map(([color, colorDetails]) => `${color}: ${colorDetails.price_text}`)
-                      .join('<br>');
-
-                    // 収支範囲の表示を生成
-                    const profitRangeHtml = details.profit_min !== null && details.profit_max !== null
-                      ? `<span style="${getProfitColor(details.profit_min)}">${formatPrice(details.profit_min)}</span>
-                         ～
-                         <span style="${getProfitColor(details.profit_max)}">${formatPrice(details.profit_max)}</span>`
-                      : '-';
-
-                    row.innerHTML = `
-                      <td>${capacity}</td>
-                      <td>${colorPricesHtml}</td>
-                      <td>${formatPrice(details.official_price)}</td>
-                      <td>${profitRangeHtml}</td>
-                    `;
-                  }
-
-                  container.appendChild(table);
-                }
+                container.appendChild(table);
               });
 
-              // ローディングを非表示にしてテーブルを表示
               document.getElementById('loading').style.display = 'none';
-              document.getElementById('priceTablesContainer').style.display = 'flex';
+              document.getElementById('priceTablesContainer').style.display =
+                'flex';
             }
           })
           .catch(error => {
             console.error('Fetch error:', error);
-            document.getElementById('loading').innerHTML = 'データの取得中にエラーが発生しました。';
+            document.getElementById('loading').innerHTML =
+              'データの取得中にエラーが発生しました。';
           });
-      });
-
-      // ブラウザ拡張機能のエラーハンドリング
-      window.addEventListener('error', function (event) {
-        if (event.error && event.error.message.includes('runtime.lastError')) {
-          console.warn('Browser extension error:', event.error.message);
-          document.getElementById('error-message').textContent =
-            'ブラウザ拡張機能の動作に問題が発生しています。拡張機能を無効にしてみてください。';
-          document.getElementById('error-message').style.display = 'block';
-        }
       });
     </script>
   </body>
