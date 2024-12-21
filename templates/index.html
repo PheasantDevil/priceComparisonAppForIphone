@@ -101,7 +101,12 @@
         document.getElementById('priceTablesContainer').style.display = 'none';
 
         // データを非同期で取得
-        fetch(`${API_ENDPOINT}?series=iPhone 16`)
+        fetch(`${API_ENDPOINT}?series=iPhone 16`, {
+          headers: {
+            Accept: 'application/json',
+          },
+          mode: 'cors', // CORSを有効にする
+        })
           .then(response => response.json())
           .then(data => {
             if (data.error) {

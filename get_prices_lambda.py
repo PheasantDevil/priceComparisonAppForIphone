@@ -20,33 +20,36 @@ class DecimalEncoder(json.JSONEncoder):
         return super(DecimalEncoder, self).default(obj)
 
 def lambda_handler(event, context):
-    logger.info(f"Received event: {json.dumps(event)}")
     try:
-        # クエリパラメータの取得
-        query_params = event.get("queryStringParameters", {})
-        series = query_params.get("series", "iPhone 16")
-        logger.info(f"Querying series: {series}")
+        # クエリパラメータを取得
+        query_parameters = event.get('queryStringParameters', {})
+        series = query_parameters.get('series')
 
-        # DynamoDBクエリ
-        response = table.query(
-            KeyConditionExpression="series = :series",
-            ExpressionAttributeValues={":series": series}
-        )
-        
-        # データ整形
-        items = response.get('Items', [])
-        logger.info(f"Query result: {items}")
+        if not series:
+            return {
+                "statusCode": 400,
+                "headers": {
+                    "Access-Control-Allow-Origin": "*"
+                },
+                "body": json.dumps({"error": "Missing 'series' query parameter"})
+            }
 
-        # JSONレスポンスの生成
+        # データ取得処理
+        prices = get_prices_from_dynamodb(series)
+
         return {
             "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps(items, cls=DecimalEncoder, ensure_ascii=False)
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"
+            },
+            "body": json.dumps(prices)
         }
-
     except Exception as e:
-        logger.error(f"Error occurred: {str(e)}")
         return {
             "statusCode": 500,
-            "body": json.dumps({"error": str(e)}, ensure_ascii=False)
+            "headers": {
+                "Access-Control-Allow-Origin": "*"
+            },
+            "body": json.dumps({"error": str(e)})
         }
