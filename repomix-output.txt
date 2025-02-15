@@ -1130,8 +1130,8 @@ File: templates/index.html
       }
 
       .price-table {
+        min-width: 300px;
         width: 100%;
-        margin: 0 auto;
         border-collapse: collapse;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
       }
@@ -1147,6 +1147,7 @@ File: templates/index.html
         padding: 8px 15px;
         border: 1px solid #ddd;
         text-align: left;
+        white-space: nowrap;
       }
 
       .price-table th {
@@ -1166,7 +1167,7 @@ File: templates/index.html
       }
 
       .series-section {
-        flex: 0 1 calc(33.333% - 40px);
+        flex: 1 1 100%;
         margin: 0;
         display: flex;
         flex-direction: column;
@@ -1191,53 +1192,31 @@ File: templates/index.html
       }
 
       /* ブレークポイントの調整 */
-      @media (min-width: 1016px) {
+      @media (min-width: 576px) {
         .series-section {
-          flex: 0 1 calc(33.333% - 40px);
-          margin: 0 10px;
+          padding: 0 10px;
         }
       }
 
-      @media (min-width: 993px) and (max-width: 1015px) {
-        .series-section {
-          flex: 0 1 calc(50% - 30px);
-        }
-      }
-
-      @media (min-width: 874px) and (max-width: 992px) {
+      @media (min-width: 768px) {
         .series-section {
           flex: 0 1 calc(50% - 20px);
         }
-        .tables-container {
-          justify-content: space-evenly;
+      }
+
+      @media (min-width: 992px) {
+        .series-section {
+          flex: 0 1 calc(33.333% - 20px);
         }
       }
 
-      @media (min-width: 827px) and (max-width: 873px) {
-        .series-section {
-          flex: 0 1 calc(50% - 25px);
-          min-width: 320px;
-        }
-        .tables-container {
-          justify-content: space-between;
-          padding: 0 15px;
-        }
+      @media (max-width: 576px) {
         .price-table {
-          width: 100%;
-          font-size: 0.9em;
+          font-size: 0.85em;
         }
-      }
-
-      @media (max-width: 826px) {
-        .series-section {
-          flex: 1 1 100%;
-          max-width: 500px;
-        }
-        .tables-container {
-          gap: 30px;
-        }
-        .price-table {
-          width: 100%;
+        .price-table th,
+        .price-table td {
+          padding: 6px 10px;
         }
       }
 
@@ -1323,6 +1302,7 @@ File: templates/index.html
                   <th>公式価格</th>
                   <th>買取価格</th>
                   <th>収支</th>
+                  <th>楽天錬金時収支</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -1333,33 +1313,39 @@ File: templates/index.html
         <!-- iPhone 16 Pro -->
         <div class="series-section">
           <h2>iPhone 16 Pro</h2>
-          <table id="iPhone16Pro-prices" class="price-table">
-            <thead>
-              <tr>
-                <th>容量</th>
-                <th>公式価格</th>
-                <th>買取価格</th>
-                <th>収支</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <div class="table-wrapper">
+            <table id="iPhone16Pro-prices" class="price-table">
+              <thead>
+                <tr>
+                  <th>容量</th>
+                  <th>公式価格</th>
+                  <th>買取価格</th>
+                  <th>収支</th>
+                  <th>楽天錬金時収支</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
 
         <!-- iPhone 16 Pro Max -->
         <div class="series-section">
           <h2>iPhone 16 Pro Max</h2>
-          <table id="iPhone16ProMax-prices" class="price-table">
-            <thead>
-              <tr>
-                <th>容量</th>
-                <th>公式価格</th>
-                <th>買取価格</th>
-                <th>収支</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <div class="table-wrapper">
+            <table id="iPhone16ProMax-prices" class="price-table">
+              <thead>
+                <tr>
+                  <th>容量</th>
+                  <th>公式価格</th>
+                  <th>買取価格</th>
+                  <th>収支</th>
+                  <th>楽天錬金時収支</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -1400,7 +1386,6 @@ File: templates/index.html
             console.log('Raw response data from Lambda:', results);
 
             results.forEach((data, index) => {
-              console.log(`Series ${index} data:`, data);
               if (data && Object.keys(data).length > 0) {
                 const seriesName = Object.keys(data)[0];
                 const priceData = data[seriesName];
@@ -1409,28 +1394,26 @@ File: templates/index.html
                 const tableBody = document.querySelector(`#${tableId} tbody`);
 
                 if (tableBody && priceData) {
-                  tableBody.innerHTML = '';
+                  // DocumentFragment を使用
+                  const fragment = document.createDocumentFragment();
 
-                  // 容量を配列に変換してソート
+                  // 容量配列の作成（既存のソートロジックを維持）
                   const capacities = Array.from(
                     new Set([
                       ...Object.keys(priceData.official || {}),
                       ...Object.keys(priceData.kaitori || {}),
                     ])
                   ).sort((a, b) => {
-                    // 数値と単位（GB/TB）を分離
                     const [aNum, aUnit] = a.match(/(\d+)(GB|TB)/).slice(1);
                     const [bNum, bUnit] = b.match(/(\d+)(GB|TB)/).slice(1);
-
-                    // TBとGBの変換（TBを1024GBとして計算）
                     const aValue =
                       aUnit === 'TB' ? parseInt(aNum) * 1024 : parseInt(aNum);
                     const bValue =
                       bUnit === 'TB' ? parseInt(bNum) * 1024 : parseInt(bNum);
-
                     return aValue - bValue;
                   });
 
+                  // 一度のループで全ての行を生成
                   capacities.forEach(capacity => {
                     const row = document.createElement('tr');
                     const officialPrice = parseInt(
@@ -1440,27 +1423,33 @@ File: templates/index.html
                       priceData.kaitori?.[capacity]?.replace(/,/g, '') || '0'
                     );
                     const priceDiff = kaitoriPrice - officialPrice;
+                    const rakutenPriceDiff = kaitoriPrice - officialPrice * 0.9;
 
                     row.innerHTML = `
-                          <td>${capacity}</td>
-                          <td>¥${officialPrice.toLocaleString()}</td>
-                          <td>¥${kaitoriPrice.toLocaleString()}</td>
-                          <td class="${
-                            priceDiff > 0
-                              ? 'price-diff-positive'
-                              : 'price-diff-negative'
-                          }">
-                              ¥${priceDiff.toLocaleString()}
-                          </td>
-                      `;
-                    tableBody.appendChild(row);
+                      <td>${capacity}</td>
+                      <td>¥${officialPrice.toLocaleString()}</td>
+                      <td>¥${kaitoriPrice.toLocaleString()}</td>
+                      <td class="${
+                        priceDiff > 0
+                          ? 'price-diff-positive'
+                          : 'price-diff-negative'
+                      }">
+                        ¥${priceDiff.toLocaleString()}
+                      </td>
+                      <td class="${
+                        rakutenPriceDiff > 0
+                          ? 'price-diff-positive'
+                          : 'price-diff-negative'
+                      }">
+                        ¥${Math.round(rakutenPriceDiff).toLocaleString()}
+                      </td>
+                    `;
+                    fragment.appendChild(row);
                   });
 
-                  console.log(
-                    `Added ${capacities.size} rows to table for ${
-                      Object.keys(priceData)[0]
-                    }`
-                  );
+                  // まとめてDOM更新
+                  tableBody.innerHTML = '';
+                  tableBody.appendChild(fragment);
                 }
               }
             });
