@@ -1122,10 +1122,10 @@ File: templates/index.html
       .tables-container {
         display: flex;
         flex-wrap: wrap;
-        justify-content: space-between;
-        gap: 30px;
+        justify-content: center;
+        gap: 20px;
         margin: 20px auto;
-        max-width: 1200px;
+        max-width: 1400px;
         padding: 0 20px;
       }
 
@@ -1166,9 +1166,11 @@ File: templates/index.html
       }
 
       .series-section {
-        flex: 0 1 calc(33.333% - 20px);
-        min-width: 300px;
+        flex: 0 1 calc(33.333% - 40px);
         margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
       }
 
       .series-section h2 {
@@ -1188,19 +1190,109 @@ File: templates/index.html
         font-weight: bold;
       }
 
-      /* スマートフォン向けのスタイル */
-      @media (max-width: 992px) {
+      /* ブレークポイントの調整 */
+      @media (min-width: 1016px) {
         .series-section {
-          flex: 0 1 calc(50% - 15px);
+          flex: 0 1 calc(33.333% - 40px);
+          margin: 0 10px;
         }
       }
 
-      @media (max-width: 768px) {
+      @media (min-width: 993px) and (max-width: 1015px) {
         .series-section {
-          flex: 1 1 100%;
+          flex: 0 1 calc(50% - 30px);
+        }
+      }
+
+      @media (min-width: 874px) and (max-width: 992px) {
+        .series-section {
+          flex: 0 1 calc(50% - 20px);
         }
         .tables-container {
+          justify-content: space-evenly;
+        }
+      }
+
+      @media (min-width: 827px) and (max-width: 873px) {
+        .series-section {
+          flex: 0 1 calc(50% - 25px);
+          min-width: 320px;
+        }
+        .tables-container {
+          justify-content: space-between;
+          padding: 0 15px;
+        }
+        .price-table {
+          width: 100%;
+          font-size: 0.9em;
+        }
+      }
+
+      @media (max-width: 826px) {
+        .series-section {
+          flex: 1 1 100%;
+          max-width: 500px;
+        }
+        .tables-container {
+          gap: 30px;
+        }
+        .price-table {
+          width: 100%;
+        }
+      }
+
+      /* テーブルラッパーを追加 */
+      .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch; /* iOSでのスムーズスクロール */
+        margin-bottom: 15px;
+      }
+
+      /* スマートフォン向けの調整 */
+      @media (max-width: 414px) {
+        .series-section {
+          flex: 1 1 100%;
+          max-width: 100%;
+          padding: 0 10px;
+        }
+
+        .tables-container {
           gap: 20px;
+          padding: 0 5px;
+        }
+
+        .table-wrapper {
+          max-width: calc(100vw - 20px); /* 画面幅からパディングを引いた幅 */
+        }
+
+        .price-table {
+          min-width: 300px; /* テーブルの最小幅を設定 */
+          font-size: 0.85em; /* フォントサイズを縮小 */
+        }
+
+        .price-table th,
+        .price-table td {
+          padding: 6px 10px; /* セルのパディングを縮小 */
+          white-space: nowrap; /* テキストの折り返しを防止 */
+        }
+
+        /* テーブルのキャプションスタイルを調整 */
+        .series-section h2 {
+          font-size: 1.1em;
+          margin-bottom: 10px;
+        }
+      }
+
+      /* さらに小さい画面向けの微調整 */
+      @media (max-width: 374px) {
+        .price-table {
+          font-size: 0.8em;
+        }
+
+        .price-table th,
+        .price-table td {
+          padding: 5px 8px;
         }
       }
     </style>
@@ -1223,17 +1315,19 @@ File: templates/index.html
         <!-- iPhone 16 -->
         <div class="series-section">
           <h2>iPhone 16</h2>
-          <table id="iPhone16-prices" class="price-table">
-            <thead>
-              <tr>
-                <th>容量</th>
-                <th>公式価格</th>
-                <th>買取価格</th>
-                <th>収支</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <div class="table-wrapper">
+            <table id="iPhone16-prices" class="price-table">
+              <thead>
+                <tr>
+                  <th>容量</th>
+                  <th>公式価格</th>
+                  <th>買取価格</th>
+                  <th>収支</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
 
         <!-- iPhone 16 Pro -->
@@ -2230,17 +2324,17 @@ def create_app():
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    @app.route("/static/favicon.ico")
+    @app.route("/favicon.ico")
     def favicon():
         try:
-            favicon_path = os.path.join(app.root_path, "static")
-            app.logger.debug(f"Favicon path: {favicon_path}")  # パスを確認
             return send_from_directory(
-                favicon_path, "favicon.ico", mimetype="image/vnd.microsoft.icon"
+                os.path.join(app.root_path, "static"),
+                "favicon.ico",
+                mimetype="image/vnd.microsoft.icon"
             )
         except Exception as e:
-            app.logger.error(f"Favicon error: {str(e)}")  # エラーの詳細を確認
-            return "", 204
+            app.logger.error(f"Favicon error: {str(e)}")
+            return "", 204  # No Content
 
     return app
 
@@ -2574,6 +2668,64 @@ priceComparisonAppForIphone/
 ├── requirements.txt
 └── README.md
 ```
+
+# ローカル環境での実行手順
+
+1. まず、必要な環境変数を設定します。`.env.example`をコピーして`.env`ファイルを作成：
+
+```bash
+cp .env.example .env
+```
+
+2. 必要な Python パッケージをインストール：
+
+```bash
+pip install -r requirements.txt
+```
+
+3. Playwright のブラウザをインストール：
+
+```bash
+playwright install chromium
+```
+
+4. アプリケーションの実行：
+
+開発モード（デバッグ有効）での実行：
+
+```bash
+python app.py
+```
+
+または、本番モードでの実行（Gunicorn を使用）：
+
+```bash
+gunicorn app:app --bind 0.0.0.0:5000 --workers=3 --timeout=60
+```
+
+Docker を使用する場合：
+
+```bash
+# イメージのビルド
+docker build -t price-comparison-app:latest .
+
+# コンテナの実行
+docker run -p 5000:5000 price-comparison-app:latest
+```
+
+アプリケーションが起動したら、ブラウザで以下の URL にアクセスできます：
+
+```
+http://localhost:5000
+```
+
+注意点：
+
+- AWS 関連の機能を使用する場合は、AWS 認証情報の設定が必要です
+- DynamoDB を使用する場合は、`~/.aws/credentials`の設定が必要です
+- 開発環境では`config/config.development.yaml`の設定が使用されます
+
+エラーが発生した場合は、ログを確認することで詳細な情報を得ることができます。
 
 ================
 File: renovate.json
