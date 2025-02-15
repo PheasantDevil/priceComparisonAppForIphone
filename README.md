@@ -97,3 +97,61 @@ priceComparisonAppForIphone/
 ├── requirements.txt
 └── README.md
 ```
+
+# ローカル環境での実行手順
+
+1. まず、必要な環境変数を設定します。`.env.example`をコピーして`.env`ファイルを作成：
+
+```bash
+cp .env.example .env
+```
+
+2. 必要な Python パッケージをインストール：
+
+```bash
+pip install -r requirements.txt
+```
+
+3. Playwright のブラウザをインストール：
+
+```bash
+playwright install chromium
+```
+
+4. アプリケーションの実行：
+
+開発モード（デバッグ有効）での実行：
+
+```bash
+python app.py
+```
+
+または、本番モードでの実行（Gunicorn を使用）：
+
+```bash
+gunicorn app:app --bind 0.0.0.0:5000 --workers=3 --timeout=60
+```
+
+Docker を使用する場合：
+
+```bash
+# イメージのビルド
+docker build -t price-comparison-app:latest .
+
+# コンテナの実行
+docker run -p 5000:5000 price-comparison-app:latest
+```
+
+アプリケーションが起動したら、ブラウザで以下の URL にアクセスできます：
+
+```
+http://localhost:5000
+```
+
+注意点：
+
+- AWS 関連の機能を使用する場合は、AWS 認証情報の設定が必要です
+- DynamoDB を使用する場合は、`~/.aws/credentials`の設定が必要です
+- 開発環境では`config/config.development.yaml`の設定が使用されます
+
+エラーが発生した場合は、ログを確認することで詳細な情報を得ることができます。
