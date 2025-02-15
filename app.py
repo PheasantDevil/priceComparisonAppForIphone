@@ -25,17 +25,17 @@ def create_app():
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    @app.route("/static/favicon.ico")
+    @app.route("/favicon.ico")
     def favicon():
         try:
-            favicon_path = os.path.join(app.root_path, "static")
-            app.logger.debug(f"Favicon path: {favicon_path}")  # パスを確認
             return send_from_directory(
-                favicon_path, "favicon.ico", mimetype="image/vnd.microsoft.icon"
+                os.path.join(app.root_path, "static"),
+                "favicon.ico",
+                mimetype="image/vnd.microsoft.icon"
             )
         except Exception as e:
-            app.logger.error(f"Favicon error: {str(e)}")  # エラーの詳細を確認
-            return "", 204
+            app.logger.error(f"Favicon error: {str(e)}")
+            return "", 204  # No Content
 
     return app
 
