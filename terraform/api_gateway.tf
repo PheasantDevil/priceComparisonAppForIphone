@@ -22,8 +22,8 @@ resource "aws_api_gateway_integration" "lambda" {
   http_method = aws_api_gateway_method.get_prices.http_method
 
   integration_http_method = "POST"
-  type                   = "AWS_PROXY"
-  uri                    = aws_lambda_function.get_prices.invoke_arn
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.get_prices.invoke_arn
 }
 
 resource "aws_api_gateway_deployment" "api" {
