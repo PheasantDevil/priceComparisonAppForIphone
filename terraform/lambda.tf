@@ -13,7 +13,7 @@ resource "aws_lambda_function" "get_prices" {
   source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
   runtime          = "python3.9"
   timeout          = 30
-  memory_size      = 512  # メモリサイズを増やす
+  memory_size      = 512 # メモリサイズを増やす
 
   environment {
     variables = {
