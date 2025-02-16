@@ -296,3 +296,36 @@ cython_debug/
 artifacts/lambda/*
 !artifacts/lambda/function_latest.zip
 # ... existing code ...
+# Python Lambda dependencies
+terraform/lambda/*/
+!terraform/lambda/*/*.py
+!terraform/lambda/*/requirements.txt
+
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+.terraform.lock.hcl
+
+# Lambda
+terraform/lambda/*/
+!terraform/lambda/*/*.py
+!terraform/lambda/*/requirements.txt
+*.zip
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
