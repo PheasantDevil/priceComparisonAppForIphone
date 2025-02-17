@@ -24,10 +24,14 @@ jobs:
       - name: Initialize Terraform
         env:
           TF_VAR_db_password: ${{ secrets.RENDER_POSTGRESQL_DB_PASSWORD }}  # GitHub Secretsからパスワードを取得
-        run: terraform init
+        run: |
+          cd terraform
+          terraform init
 
       # Terraform構成の適用
       - name: Apply Terraform configuration
         env:
           TF_VAR_db_password: ${{ secrets.RENDER_POSTGRESQL_DB_PASSWORD }}  # GitHub Secretsからパスワードを取得
-        run: terraform apply -auto-approve -input=false  # `input=false`を追加して自動承認
+        run: |
+          cd terraform
+          terraform apply -auto-approve -input=false  # `input=false`を追加して自動承認
