@@ -68,6 +68,21 @@ jobs:
     - name: Terraform Init
       run: terraform init
 
+    - name: Import existing resources
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        # DynamoDBテーブルのインポート
+        terraform import aws_dynamodb_table.iphone_prices iphone_prices || true
+        terraform import aws_dynamodb_table.official_prices official_prices || true
+        
+        # IAMロールのインポート
+        terraform import aws_iam_role.lambda_role get_prices_lambda_role || true
+        
+        # 既存のポリシーのインポート
+        ROLE_ARN=$(aws iam get-role --role-name get_prices_lambda_role --query 'Role.Arn' --output text)
+        terraform import aws_iam_role_policy.dynamodb_access get_prices_lambda_role:dynamodb_access || true
+        terraform import aws_iam_role_policy_attachment.lambda_basic get_prices_lambda_role/arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole || true
+
     - name: Terraform Plan
       run: terraform plan
       if: github.event_name == 'pull_request'
