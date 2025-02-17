@@ -85,4 +85,11 @@ jobs:
 
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: terraform apply -auto-approve
+      run: |
+        # テーブルの存在確認
+        if aws dynamodb describe-table --table-name iphone_prices &> /dev/null; then
+          echo "Table iphone_prices already exists, skipping creation"
+        fi
+        
+        # Terraform適用
+        terraform apply -auto-approve
