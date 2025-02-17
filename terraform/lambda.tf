@@ -8,7 +8,10 @@ data "archive_file" "lambda_get_prices" {
 resource "aws_lambda_function" "get_prices" {
   filename         = data.archive_file.lambda_get_prices.output_path
   function_name    = "get_prices"
-  role             = aws_iam_role.lambda_role.arn
+  role             = try(
+    data.aws_iam_role.existing_lambda_role[0].arn,
+    try(aws_iam_role.lambda_role[0].arn, "")
+  )
   handler          = "lambda_function.lambda_handler"
   source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
   runtime          = "python3.9"
