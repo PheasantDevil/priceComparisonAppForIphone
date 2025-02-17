@@ -38,6 +38,13 @@ resource "aws_dynamodb_table" "iphone_prices" {
     type = "S"
   }
 
+  global_secondary_index {
+    name            = "CapacityIndex"
+    hash_key        = "series"
+    range_key       = "capacity"
+    projection_type = "ALL"
+  }
+
   lifecycle {
     prevent_destroy = true
     ignore_changes = [
@@ -62,6 +69,13 @@ resource "aws_dynamodb_table" "official_prices" {
   attribute {
     name = "capacity"
     type = "S"
+  }
+
+  global_secondary_index {
+    name            = "CapacityIndex"
+    hash_key        = "series"
+    range_key       = "capacity"
+    projection_type = "ALL"
   }
 }
 
