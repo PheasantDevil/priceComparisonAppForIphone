@@ -16,14 +16,11 @@ provider "aws" {
 # 既存のテーブルの存在確認
 data "aws_dynamodb_table" "existing_iphone_prices" {
   name = "iphone_prices"
-
-  # テーブルが存在しない場合はスキップ
   count = try(data.aws_dynamodb_table.existing_iphone_prices[0].name, "") != "" ? 1 : 0
 }
 
 # テーブルが存在しない場合のみ作成
 resource "aws_dynamodb_table" "iphone_prices" {
-  # 既存のテーブルが見つからない場合のみ作成
   count = try(data.aws_dynamodb_table.existing_iphone_prices[0].name, "") == "" ? 1 : 0
 
   name         = "iphone_prices"
@@ -42,10 +39,11 @@ resource "aws_dynamodb_table" "iphone_prices" {
   }
 
   lifecycle {
-    prevent_destroy = true  # 誤削除防止
+    prevent_destroy = true
     ignore_changes = [
       read_capacity,
-      write_capacity
+      write_capacity,
+      range_key  # 既存の設定との競合を防ぐ
     ]
   }
 }
@@ -67,7 +65,7 @@ resource "aws_dynamodb_table" "official_prices" {
   }
 }
 
-# テーブルのARNを出力（既存または新規作成）
+# テーブルのARNを出力
 output "dynamodb_table_arn" {
   value = try(
     data.aws_dynamodb_table.existing_iphone_prices[0].arn,
