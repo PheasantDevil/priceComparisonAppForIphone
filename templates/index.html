@@ -257,6 +257,25 @@
             </table>
           </div>
         </div>
+
+        <!-- iPhone 16e -->
+        <div class="series-section">
+          <h2>iPhone 16e</h2>
+          <div class="table-wrapper">
+            <table id="iPhone16e-prices" class="price-table">
+              <thead>
+                <tr>
+                  <th>容量</th>
+                  <th>公式価格</th>
+                  <th>買取価格</th>
+                  <th>収支</th>
+                  <th>楽天錬金時収支</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -264,7 +283,12 @@
       document.addEventListener('DOMContentLoaded', function () {
         const API_ENDPOINT =
           'https://qow3wyg1nj.execute-api.ap-northeast-1.amazonaws.com/prod/get_prices';
-        const series = ['iPhone 16', 'iPhone 16 Pro', 'iPhone 16 Pro Max'];
+        const series = [
+          'iPhone 16',
+          'iPhone 16 Pro',
+          'iPhone 16 Pro Max',
+          'iPhone 16 e',
+        ];
 
         // ローディング状態を管理する要素
         const loadingElement = document.getElementById('loading');

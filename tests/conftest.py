@@ -28,6 +28,7 @@ scraper:
     - https://kaitori-rudeya.com/category/detail/183  # iPhone 16
     - https://kaitori-rudeya.com/category/detail/185  # iPhone 16 Pro
     - https://kaitori-rudeya.com/category/detail/186  # iPhone 16 Pro Max
+    - https://kaitori-rudeya.com/category/detail/205  # iPhone 16 e
   apple_store_url: https://test.example.com/apple
   request_timeout: 30
   retry_count: 3
