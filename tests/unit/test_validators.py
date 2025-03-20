@@ -176,6 +176,7 @@ def test_scraper_config_with_iphone16_pro_url():
             "https://kaitori-rudeya.com/category/detail/183",  # iPhone 16
             "https://kaitori-rudeya.com/category/detail/185",  # iPhone 16 Pro
             "https://kaitori-rudeya.com/category/detail/186"   # iPhone 16 Pro Max
+            "https://kaitori-rudeya.com/category/detail/205"   # iPhone 16 e
         ],
         APPLE_STORE_URL="https://example.com/apple",
         REQUEST_TIMEOUT=30,
@@ -198,6 +199,7 @@ def test_config_manager_loads_iphone16_pro_url(mock_env_vars, tmp_path):
         - https://kaitori-rudeya.com/category/detail/183
         - https://kaitori-rudeya.com/category/detail/185
         - https://kaitori-rudeya.com/category/detail/186
+        - https://kaitori-rudeya.com/category/detail/205
       apple_store_url: https://example.com/apple
       request_timeout: 30
       retry_count: 3

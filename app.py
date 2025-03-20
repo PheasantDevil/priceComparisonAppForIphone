@@ -56,6 +56,7 @@ def get_kaitori_prices():
         "iPhone 16": {},
         "iPhone 16 Pro": {},
         "iPhone 16 Pro Max": {},
+        "iPhone 16e": {},
     }
 
     with sync_playwright() as p:
@@ -80,6 +81,8 @@ def get_kaitori_prices():
                         series = "iPhone 16 Pro"
                     elif "16" in model_name:
                         series = "iPhone 16"
+                    elif "16" in model_name:
+                        series = "iPhone 16 e"
                     else:
                         continue
 

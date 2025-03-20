@@ -67,5 +67,19 @@
       "natural 灰 MYWU3J/A 未開封 SIMフリー": 249800,
       "white 白 MYWR3J/A 未開封 SIMフリー": 249800
     }
+  },
+  "iPhone 16e": {
+    "128GB": {
+      "black 黒": 99800,
+      "white 白": 99800
+    },
+    "256GB": {
+      "black 黒": 114800,
+      "white 白": 114800
+    },
+    "512GB": {
+      "black 黒": 144800,
+      "white 白": 144800
+    }
   }
 }
