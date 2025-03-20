@@ -55,7 +55,8 @@ def get_kaitori_prices(series):
         series_url_map = {
             'iPhone 16': config['scraper']['kaitori_rudea_urls'][0],
             'iPhone 16 Pro': config['scraper']['kaitori_rudea_urls'][1],
-            'iPhone 16 Pro Max': config['scraper']['kaitori_rudea_urls'][2]
+            'iPhone 16 Pro Max': config['scraper']['kaitori_rudea_urls'][2],
+            'iPhone 16e': config['scraper']['kaitori_rudea_urls'][3]
         }
         
         if series not in series_url_map:
