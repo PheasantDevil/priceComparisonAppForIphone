@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+from decimal import Decimal
 from pathlib import Path
 
 import boto3
@@ -11,6 +12,13 @@ from bs4 import BeautifulSoup
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+# Decimalを処理するJSONエンコーダを追加
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return int(obj) if obj % 1 == 0 else float(obj)
+        return super(DecimalEncoder, self).default(obj)
 
 def load_config():
     try:
@@ -26,16 +34,39 @@ def get_official_prices(series):
         dynamodb = boto3.resource('dynamodb')
         table = dynamodb.Table('iphone_prices')
         
+        # Handle both "iPhone 16e" and "iPhone 16 e" formats
+        lookup_series = series
+        if series == 'iPhone 16 e':
+            lookup_series = 'iPhone 16e'
+            
+        logger.info(f"Looking up official prices for {lookup_series} (original request: {series})")
+        
         response = table.get_item(
-            Key={'series': series}
+            Key={'series': lookup_series}
         )
         
         if 'Item' in response:
-            logger.info(f"Found official prices for {series}: {response['Item']}")
+            logger.info(f"Found official prices for {lookup_series}: {response['Item']}")
             # pricesマップから価格データを取得
-            return response['Item'].get('prices', {})
+            prices = response['Item'].get('prices', {})
+
+            # iPhone 16eのデータ形式を他のモデルと合わせる
+            if lookup_series == 'iPhone 16e':
+                formatted_prices = {}
+                for capacity, color_prices in prices.items():
+                    # 各容量の最初の色の価格を取得（黒か白）
+                    if isinstance(color_prices, dict) and len(color_prices) > 0:
+                        first_color = list(color_prices.keys())[0]
+                        price_value = color_prices.get(first_color)
+                        if isinstance(price_value, (int, Decimal)):
+                            formatted_prices[capacity] = str(int(price_value))
+                        else:
+                            formatted_prices[capacity] = str(price_value)
+                return formatted_prices
+            
+            return prices
         else:
-            logger.warning(f"No official prices found for {series}")
+            logger.warning(f"No official prices found for {lookup_series}")
             return {}
             
     except Exception as e:
@@ -56,12 +87,22 @@ def get_kaitori_prices(series):
             'iPhone 16': config['scraper']['kaitori_rudea_urls'][0],
             'iPhone 16 Pro': config['scraper']['kaitori_rudea_urls'][1],
             'iPhone 16 Pro Max': config['scraper']['kaitori_rudea_urls'][2],
-            'iPhone 16e': config['scraper']['kaitori_rudea_urls'][3]
+            'iPhone 16 e': config['scraper']['kaitori_rudea_urls'][3],
+            'iPhone 16e': config['scraper']['kaitori_rudea_urls'][3]  # Add support for both formats
         }
+        
+        # シリーズに対応するURLを取得する前にログ出力
+        logger.info(f"Looking up URL for series: {series}, Available mappings: {list(series_url_map.keys())}")
         
         if series not in series_url_map:
             logger.warning(f"No URL configured for series: {series}")
-            return {}
+            # エラーを返す代わりに、空のデータと公式価格のみを返す
+            return {
+                series: {
+                    'kaitori': {},
+                    'official': get_official_prices(series)
+                }
+            }
 
         url = series_url_map[series]
         headers = {'User-Agent': config['scraper']['user_agent']}
@@ -137,7 +178,7 @@ def get_kaitori_prices(series):
                 }
             }
             
-            logger.info(f"Returning data for {series}: {json.dumps(result, indent=4)}")
+            logger.info(f"Returning data for {series}: {json.dumps(result, indent=4, cls=DecimalEncoder)}")
             return result
             
         except requests.RequestException as e:
