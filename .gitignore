@@ -328,4 +328,60 @@ terraform/lambda/*/
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
 
+# Lambda related
+lambda/get_prices_lambda/*.dist-info/
+lambda/get_prices_lambda/boto3/
+lambda/get_prices_lambda/botocore/
+lambda/get_prices_lambda/s3transfer/
+lambda/get_prices_lambda/bs4/
+lambda/get_prices_lambda/requests/
+lambda/get_prices_lambda/certifi/
+lambda/get_prices_lambda/charset_normalizer/
+lambda/get_prices_lambda/dateutil/
+lambda/get_prices_lambda/idna/
+lambda/get_prices_lambda/jmespath/
+lambda/get_prices_lambda/soupsieve/
+lambda/get_prices_lambda/urllib3/
+lambda/get_prices_lambda/yaml/
+lambda/get_prices_lambda/_yaml/
+lambda/get_prices_lambda/bin/
+lambda/get_prices_lambda/six.py
+lambda/get_prices_lambda/typing_extensions.py
+lambda/get_prices_lambda/README.rst
+lambda/get_prices_lambda/src/
+lambda/get_prices_lambda/config/
+lambda/get_prices_lambda_backup/
+
+# Artifacts
+artifacts/lambda/function_*.zip
+!artifacts/lambda/.gitkeep
+
+# Editor related
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS related
+.DS_Store
+Thumbs.db
