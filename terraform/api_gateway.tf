@@ -23,7 +23,10 @@ resource "aws_api_gateway_integration" "lambda" {
 
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.get_prices.invoke_arn
+  uri                     = try(
+    data.aws_lambda_function.existing_get_prices.invoke_arn,
+    try(aws_lambda_function.get_prices[0].invoke_arn, "")
+  )
 }
 
 resource "aws_api_gateway_deployment" "api" {
@@ -48,7 +51,10 @@ resource "aws_api_gateway_stage" "prod" {
 resource "aws_lambda_permission" "api_gateway" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.get_prices.function_name
+  function_name = try(
+    data.aws_lambda_function.existing_get_prices.function_name,
+    try(aws_lambda_function.get_prices[0].function_name, "")
+  )
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.price_comparison.execution_arn}/*/*"
 }
