@@ -4,7 +4,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "5.93.0"
+      version = "5.92.0"
     }
   }
 }
@@ -24,7 +24,7 @@ data "aws_dynamodb_table" "official_prices" {
 
 # DynamoDBテーブル（存在しない場合のみ作成）
 resource "aws_dynamodb_table" "iphone_prices" {
-  count = try(data.aws_dynamodb_table.iphone_prices.table_name, "") == "" ? 1 : 0
+  count = try(data.aws_dynamodb_table.iphone_prices.name, "") == "" ? 1 : 0
 
   name           = "iphone_prices"
   billing_mode   = "PAY_PER_REQUEST"
@@ -56,7 +56,7 @@ resource "aws_dynamodb_table" "iphone_prices" {
 }
 
 resource "aws_dynamodb_table" "official_prices" {
-  count = try(data.aws_dynamodb_table.official_prices.table_name, "") == "" ? 1 : 0
+  count = try(data.aws_dynamodb_table.official_prices.name, "") == "" ? 1 : 0
 
   name         = "official_prices"
   billing_mode = "PAY_PER_REQUEST"
@@ -83,5 +83,5 @@ resource "aws_dynamodb_table" "official_prices" {
 
 # テーブルのARNを出力（既存または新規作成）
 output "dynamodb_table_arn" {
-  value = try(data.aws_dynamodb_table.iphone_prices.arn, aws_dynamodb_table.iphone_prices[0].arn)
+  value = try(data.aws_dynamodb_table.iphone_prices.arn, try(aws_dynamodb_table.iphone_prices[0].arn, ""))
 }
