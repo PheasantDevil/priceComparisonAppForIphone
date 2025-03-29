@@ -4,7 +4,7 @@ data "aws_iam_role" "existing_lambda_role" {
   name = "get_prices_lambda_role"
 }
 
-# Lambda実行用のIAMロール（存在しない場合のみ作成）
+# IAMロール（存在しない場合のみ作成）
 resource "aws_iam_role" "lambda_role" {
   count = try(data.aws_iam_role.existing_lambda_role.name, "") == "" ? 1 : 0
 
@@ -35,16 +35,16 @@ locals {
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
   count = try(data.aws_iam_role.existing_lambda_role.name, "") == "" ? 1 : 0
 
+  role       = try(data.aws_iam_role.existing_lambda_role.name, aws_iam_role.lambda_role[0].name)
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-  role       = aws_iam_role.lambda_role[0].name
 }
 
-# DynamoDB アクセス用のポリシー
+# DynamoDBアクセスポリシー
 resource "aws_iam_role_policy" "dynamodb_access" {
   count = try(data.aws_iam_role.existing_lambda_role.name, "") == "" ? 1 : 0
 
   name = "dynamodb_access"
-  role = aws_iam_role.lambda_role[0].id
+  role = try(data.aws_iam_role.existing_lambda_role.name, aws_iam_role.lambda_role[0].name)
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -53,20 +53,22 @@ resource "aws_iam_role_policy" "dynamodb_access" {
         Effect = "Allow"
         Action = [
           "dynamodb:GetItem",
-          "dynamodb:Query",
-          "dynamodb:Scan",
           "dynamodb:PutItem",
-          "dynamodb:UpdateItem"
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query",
+          "dynamodb:Scan"
         ]
         Resource = [
-          try(data.aws_dynamodb_table.iphone_prices.arn, aws_dynamodb_table.iphone_prices[0].arn)
+          try(data.aws_dynamodb_table.iphone_prices.arn, aws_dynamodb_table.iphone_prices[0].arn),
+          try(data.aws_dynamodb_table.official_prices.arn, aws_dynamodb_table.official_prices[0].arn)
         ]
       }
     ]
   })
 }
 
-# IAMロールのARNを出力（既存または新規作成）
+# IAMロールのARNを出力
 output "lambda_role_arn" {
-  value = try(data.aws_iam_role.existing_lambda_role.arn, aws_iam_role.lambda_role[0].arn)
+  value = try(data.aws_iam_role.existing_lambda_role.arn, "")
 }
