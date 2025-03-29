@@ -79,6 +79,14 @@ resource "aws_dynamodb_table" "official_prices" {
   }
 }
 
+data "aws_dynamodb_table" "iphone_prices" {
+  name = "iphone_prices"
+}
+
+data "aws_dynamodb_table" "official_prices" {
+  name = "official_prices"
+}
+
 # テーブルのARNを出力
 output "dynamodb_table_arn" {
   value = try(
