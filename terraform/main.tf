@@ -43,45 +43,51 @@ resource "aws_dynamodb_table" "iphone_prices" {
 
   global_secondary_index {
     name               = "TimestampIndex"
-    hash_key           = "timestamp"
+    hash_key           = "id"
+    range_key          = "timestamp"
     projection_type    = "ALL"
-    write_capacity     = 0
-    read_capacity      = 0
+    write_capacity     = 5
+    read_capacity      = 5
   }
 
   tags = {
     Environment = "production"
-    Project     = "iphone_price_tracker"
   }
 }
 
 resource "aws_dynamodb_table" "official_prices" {
   count = try(data.aws_dynamodb_table.official_prices.name, "") == "" ? 1 : 0
 
-  name         = "official_prices"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "series"
-  range_key    = "capacity"
+  name           = "official_prices"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "id"
+  range_key      = "timestamp"
 
   attribute {
-    name = "series"
+    name = "id"
     type = "S"
   }
 
   attribute {
-    name = "capacity"
+    name = "timestamp"
     type = "S"
   }
 
   global_secondary_index {
-    name            = "CapacityIndex"
-    hash_key        = "series"
-    range_key       = "capacity"
-    projection_type = "ALL"
+    name               = "TimestampIndex"
+    hash_key           = "id"
+    range_key          = "timestamp"
+    projection_type    = "ALL"
+    write_capacity     = 5
+    read_capacity      = 5
+  }
+
+  tags = {
+    Environment = "production"
   }
 }
 
-# テーブルのARNを出力（既存または新規作成）
+# DynamoDBテーブルのARNを出力
 output "dynamodb_table_arn" {
-  value = try(data.aws_dynamodb_table.iphone_prices.arn, try(aws_dynamodb_table.iphone_prices[0].arn, ""))
+  value = try(data.aws_dynamodb_table.iphone_prices.arn, "")
 }
