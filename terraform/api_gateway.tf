@@ -47,8 +47,10 @@ resource "aws_api_gateway_stage" "prod" {
   stage_name    = "prod"
 }
 
-# Lambda関数のAPI Gateway呼び出し許可
+# Lambda関数のAPI Gateway呼び出し許可（存在しない場合のみ作成）
 resource "aws_lambda_permission" "api_gateway" {
+  count = try(data.aws_lambda_function.existing_get_prices.function_name, "") != "" ? 0 : 1
+
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = try(
