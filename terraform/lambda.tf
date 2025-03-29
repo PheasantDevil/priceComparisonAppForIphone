@@ -16,10 +16,7 @@ resource "aws_lambda_function" "get_prices" {
 
   filename         = data.archive_file.lambda_get_prices.output_path
   function_name    = "get_prices"
-  role             = try(
-    data.aws_iam_role.existing_lambda_role.arn,
-    try(aws_iam_role.lambda_role[0].arn, "")
-  )
+  role             = try(data.aws_iam_role.existing_lambda_role.arn, "")
   handler          = "lambda_function.lambda_handler"
   source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
   runtime          = "python3.9"
@@ -33,15 +30,11 @@ resource "aws_lambda_function" "get_prices" {
   }
 
   depends_on = [
-    aws_iam_role_policy_attachment.lambda_basic,
-    aws_iam_role_policy.dynamodb_access
+    aws_iam_role.lambda_role
   ]
 }
 
 # Lambda関数のARNを出力（既存または新規作成）
 output "lambda_function_name" {
-  value = try(
-    data.aws_lambda_function.existing_get_prices.function_name,
-    try(aws_lambda_function.get_prices[0].function_name, "")
-  )
+  value = try(data.aws_lambda_function.existing_get_prices.function_name, "")
 }
