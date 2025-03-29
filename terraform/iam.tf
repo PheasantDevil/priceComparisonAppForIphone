@@ -1,5 +1,5 @@
 # terraform/iam.tf
-# 既存のIAMロールの存在確認
+# 既存のIAMロールを確認
 data "aws_iam_role" "existing_lambda_role" {
   name = "get_prices_lambda_role"
 }
@@ -33,18 +33,18 @@ locals {
 
 # 基本的なLambda実行権限
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  count = local.is_new_role ? 1 : 0
+  count = try(data.aws_iam_role.existing_lambda_role.name, "") == "" ? 1 : 0
 
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-  role       = local.lambda_role_name
+  role       = aws_iam_role.lambda_role[0].name
 }
 
 # DynamoDB アクセス用のポリシー
 resource "aws_iam_role_policy" "dynamodb_access" {
-  count = local.is_new_role ? 1 : 0
+  count = try(data.aws_iam_role.existing_lambda_role.name, "") == "" ? 1 : 0
 
   name = "dynamodb_access"
-  role = local.lambda_role_id
+  role = aws_iam_role.lambda_role[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -59,7 +59,7 @@ resource "aws_iam_role_policy" "dynamodb_access" {
           "dynamodb:UpdateItem"
         ]
         Resource = [
-          data.aws_dynamodb_table.iphone_prices.arn
+          try(data.aws_dynamodb_table.iphone_prices.arn, aws_dynamodb_table.iphone_prices[0].arn)
         ]
       }
     ]
@@ -68,5 +68,5 @@ resource "aws_iam_role_policy" "dynamodb_access" {
 
 # IAMロールのARNを出力（既存または新規作成）
 output "lambda_role_arn" {
-  value = try(data.aws_iam_role.existing_lambda_role.arn, "")
+  value = try(data.aws_iam_role.existing_lambda_role.arn, aws_iam_role.lambda_role[0].arn)
 }
