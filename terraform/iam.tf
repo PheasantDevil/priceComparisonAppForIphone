@@ -2,9 +2,6 @@
 # 既存のIAMロールの存在確認
 data "aws_iam_role" "existing_lambda_role" {
   name = "get_prices_lambda_role"
-  
-  # ロールが存在しない場合はスキップ
-  count = try(data.aws_iam_role.existing_lambda_role[0].name, "") != "" ? 1 : 0
 }
 
 # Lambda実行用のIAMロール（存在しない場合のみ作成）
