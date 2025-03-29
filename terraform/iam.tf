@@ -22,10 +22,6 @@ resource "aws_iam_role" "lambda_role" {
       }
     ]
   })
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 # ロール名の取得（既存または新規作成）
