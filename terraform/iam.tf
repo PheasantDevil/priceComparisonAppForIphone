@@ -63,7 +63,7 @@ resource "aws_iam_role_policy" "dynamodb_access" {
           "dynamodb:UpdateItem"
         ]
         Resource = [
-          aws_dynamodb_table.iphone_prices[0].arn
+          data.aws_dynamodb_table.iphone_prices.arn
         ]
       }
     ]
