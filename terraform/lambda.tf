@@ -5,23 +5,25 @@ data "archive_file" "lambda_get_prices" {
   excludes    = ["__pycache__", "*.pyc"]
 }
 
-# 既存のLambda関数の存在確認
+# 既存のLambda関数を確認
 data "aws_lambda_function" "existing_get_prices" {
+  count = 1
   function_name = "get_prices"
 }
 
 # Lambda関数（存在しない場合のみ作成）
 resource "aws_lambda_function" "get_prices" {
-  count = try(data.aws_lambda_function.existing_get_prices.function_name, "") == "" ? 1 : 0
+  count = try(data.aws_lambda_function.existing_get_prices[0].function_name, "") == "" ? 1 : 0
 
   filename         = data.archive_file.lambda_get_prices.output_path
   function_name    = "get_prices"
-  role             = try(data.aws_iam_role.existing_lambda_role.arn, "")
+  role             = try(data.aws_iam_role.existing_lambda_role[0].arn, aws_iam_role.lambda_role[0].arn)
   handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.11"
+  timeout          = 300
+  memory_size      = 256
   source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
-  runtime          = "python3.9"
-  timeout          = 30
-  memory_size      = 512 # メモリサイズを増やす
+  publish          = true
 
   environment {
     variables = {
@@ -36,5 +38,5 @@ resource "aws_lambda_function" "get_prices" {
 
 # Lambda関数のARNを出力（既存または新規作成）
 output "lambda_function_name" {
-  value = try(data.aws_lambda_function.existing_get_prices.function_name, "")
+  value = try(data.aws_lambda_function.existing_get_prices[0].function_name, "")
 }
