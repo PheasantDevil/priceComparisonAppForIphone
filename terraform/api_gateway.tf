@@ -3,22 +3,22 @@ resource "aws_api_gateway_rest_api" "api" {
   description = "API for iPhone price comparison"
 }
 
-resource "aws_api_gateway_resource" "prices" {
+resource "aws_api_gateway_resource" "get_prices" {
   rest_api_id = aws_api_gateway_rest_api.api.id
   parent_id   = aws_api_gateway_rest_api.api.root_resource_id
-  path_part   = "prices"
+  path_part   = "get_prices"
 }
 
 resource "aws_api_gateway_method" "get" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.prices.id
+  resource_id   = aws_api_gateway_resource.get_prices.id
   http_method   = "GET"
   authorization = "NONE"
 }
 
 resource "aws_api_gateway_integration" "lambda" {
   rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_resource.prices.id
+  resource_id = aws_api_gateway_resource.get_prices.id
   http_method = aws_api_gateway_method.get.http_method
 
   integration_http_method = "POST"
