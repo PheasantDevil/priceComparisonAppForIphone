@@ -1,14 +1,17 @@
 import json
 import logging
+import traceback
 from decimal import Decimal
 
-from src.apple_scraper_for_rudea import DecimalEncoder, get_kaitori_prices
+from apple_scraper_for_rudea import DecimalEncoder, get_kaitori_prices
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     try:
+        logger.info(f"Received event: {json.dumps(event)}")
+        
         # クエリパラメータからseriesを取得
         query_params = event.get('queryStringParameters', {})
         if not query_params:
@@ -38,8 +41,8 @@ def lambda_handler(event, context):
 
         logger.info(f"Fetching prices for series: {series}")
         
-        # 価格データを取得（seriesパラメータを明示的に渡す）
-        prices = get_kaitori_prices(series=series)  # キーワード引数として渡す
+        # 価格データを取得
+        prices = get_kaitori_prices(series=series)
         
         logger.info(f"Retrieved prices: {prices}")
         
@@ -54,7 +57,8 @@ def lambda_handler(event, context):
         }
 
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
+        error_traceback = traceback.format_exc()
+        logger.error(f"Error: {str(e)}\nTraceback: {error_traceback}")
         return {
             'statusCode': 500,
             'headers': {
@@ -64,6 +68,7 @@ def lambda_handler(event, context):
             },
             'body': json.dumps({
                 'error': str(e),
-                'detail': 'An error occurred while processing your request'
+                'detail': 'An error occurred while processing your request',
+                'traceback': error_traceback
             }, cls=DecimalEncoder)
         }
