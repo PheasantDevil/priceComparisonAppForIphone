@@ -1,9 +1,9 @@
-# .github/workflows/terraform.yml
 name: 'Terraform CI/CD'
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
     paths:
       - 'terraform/**'
       - '.github/workflows/terraform.yml'
