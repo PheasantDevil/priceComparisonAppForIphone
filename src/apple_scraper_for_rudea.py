@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import traceback
 from decimal import Decimal
 from pathlib import Path
 
@@ -22,56 +23,74 @@ class DecimalEncoder(json.JSONEncoder):
 
 def load_config():
     try:
-        config_path = Path(__file__).parent.parent / 'config' / 'config.production.yaml'
-        with open(config_path, 'r') as f:
-            return yaml.safe_load(f)
+        # Lambda環境での設定ファイルのパスを確認
+        lambda_config_path = '/var/task/config/config.production.yaml'
+        local_config_path = Path(__file__).parent.parent / 'config' / 'config.production.yaml'
+        
+        if os.path.exists(lambda_config_path):
+            logger.info(f"Loading config from Lambda path: {lambda_config_path}")
+            with open(lambda_config_path, 'r') as f:
+                return yaml.safe_load(f)
+        elif os.path.exists(local_config_path):
+            logger.info(f"Loading config from local path: {local_config_path}")
+            with open(local_config_path, 'r') as f:
+                return yaml.safe_load(f)
+        else:
+            logger.error("Config file not found in either Lambda or local path")
+            return None
     except Exception as e:
         logger.error(f"Error loading config: {e}")
+        logger.error(f"Current working directory: {os.getcwd()}")
+        logger.error(f"Directory contents: {os.listdir()}")
         return None
 
 def get_official_prices(series):
     try:
         dynamodb = boto3.resource('dynamodb')
-        table = dynamodb.Table('iphone_prices')
+        table = dynamodb.Table('official_prices')
         
         # Handle both "iPhone 16e" and "iPhone 16 e" formats
-        lookup_series = series
-        if series == 'iPhone 16 e':
-            lookup_series = 'iPhone 16e'
-            
+        lookup_series = series.replace(' e', 'e') if ' e' in series else series
         logger.info(f"Looking up official prices for {lookup_series} (original request: {series})")
         
-        response = table.get_item(
-            Key={'series': lookup_series}
-        )
+        # 各容量の価格を取得
+        formatted_prices = {}
+        capacities = ['128GB', '256GB', '512GB', '1TB']
         
-        if 'Item' in response:
-            logger.info(f"Found official prices for {lookup_series}: {response['Item']}")
-            # pricesマップから価格データを取得
-            prices = response['Item'].get('prices', {})
-
-            # iPhone 16eのデータ形式を他のモデルと合わせる
-            if lookup_series == 'iPhone 16e':
-                formatted_prices = {}
-                for capacity, color_prices in prices.items():
-                    # 各容量の最初の色の価格を取得（黒か白）
-                    if isinstance(color_prices, dict) and len(color_prices) > 0:
-                        first_color = list(color_prices.keys())[0]
-                        price_value = color_prices.get(first_color)
-                        if isinstance(price_value, (int, Decimal)):
-                            formatted_prices[capacity] = str(int(price_value))
-                        else:
-                            formatted_prices[capacity] = str(price_value)
-                return formatted_prices
-            
-            return prices
-        else:
+        for capacity in capacities:
+            try:
+                response = table.get_item(
+                    Key={
+                        'series': lookup_series,
+                        'capacity': capacity
+                    }
+                )
+                
+                if 'Item' in response:
+                    # 各色の価格から最小値を取得
+                    colors = response['Item'].get('colors', {})
+                    if colors:
+                        min_price = min(Decimal(str(price)) for price in colors.values())
+                        formatted_prices[capacity] = str(min_price)
+                        logger.info(f"Found price for {lookup_series} {capacity}: {min_price}")
+                    else:
+                        logger.warning(f"No color prices found for {lookup_series} {capacity}")
+                else:
+                    logger.warning(f"No data found for {lookup_series} {capacity}")
+            except Exception as e:
+                logger.error(f"Error getting price for {capacity}: {e}")
+                logger.error(f"Stack trace: {traceback.format_exc()}")
+                continue
+        
+        if not formatted_prices:
             logger.warning(f"No official prices found for {lookup_series}")
-            return {}
+        else:
+            logger.info(f"Found official prices for {lookup_series}: {formatted_prices}")
+        return formatted_prices
             
     except Exception as e:
         logger.error(f"Error getting official prices: {e}")
-        logger.error(f"Error details: {str(e)}")  # より詳細なエラー情報
+        logger.error(f"Stack trace: {traceback.format_exc()}")
         return {}
 
 def get_kaitori_prices(series):
@@ -80,23 +99,29 @@ def get_kaitori_prices(series):
         config = load_config()
         
         if not config:
-            raise Exception("Failed to load configuration")
-
-        # シリーズに対応するURLを取得
-        series_url_map = {
-            'iPhone 16': config['scraper']['kaitori_rudea_urls'][0],
-            'iPhone 16 Pro': config['scraper']['kaitori_rudea_urls'][1],
-            'iPhone 16 Pro Max': config['scraper']['kaitori_rudea_urls'][2],
-            'iPhone 16 e': config['scraper']['kaitori_rudea_urls'][3],
-            'iPhone 16e': config['scraper']['kaitori_rudea_urls'][3]  # Add support for both formats
-        }
+            logger.error("Failed to load configuration, using fallback URLs")
+            # フォールバックURLを使用
+            fallback_urls = {
+                'iPhone 16': 'https://www.rudea.net/iphone16',
+                'iPhone 16 Pro': 'https://www.rudea.net/iphone16pro',
+                'iPhone 16 Pro Max': 'https://www.rudea.net/iphone16promax',
+                'iPhone 16 e': 'https://www.rudea.net/iphone16e',
+                'iPhone 16e': 'https://www.rudea.net/iphone16e'
+            }
+            series_url_map = fallback_urls
+        else:
+            series_url_map = {
+                'iPhone 16': config['scraper']['kaitori_rudea_urls'][0],
+                'iPhone 16 Pro': config['scraper']['kaitori_rudea_urls'][1],
+                'iPhone 16 Pro Max': config['scraper']['kaitori_rudea_urls'][2],
+                'iPhone 16 e': config['scraper']['kaitori_rudea_urls'][3],
+                'iPhone 16e': config['scraper']['kaitori_rudea_urls'][3]
+            }
         
-        # シリーズに対応するURLを取得する前にログ出力
         logger.info(f"Looking up URL for series: {series}, Available mappings: {list(series_url_map.keys())}")
         
         if series not in series_url_map:
             logger.warning(f"No URL configured for series: {series}")
-            # エラーを返す代わりに、空のデータと公式価格のみを返す
             return {
                 series: {
                     'kaitori': {},
@@ -105,68 +130,70 @@ def get_kaitori_prices(series):
             }
 
         url = series_url_map[series]
-        headers = {'User-Agent': config['scraper']['user_agent']}
+        headers = {
+            'User-Agent': config.get('scraper', {}).get('user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36')
+        }
+        timeout = config.get('scraper', {}).get('request_timeout', 10)
         
-        logger.info(f"Fetching data from URL: {url}")
+        logger.info(f"Fetching data from URL: {url} with timeout: {timeout}")
         
         try:
-            response = requests.get(
-                url,
-                headers=headers,
-                timeout=config['scraper']['request_timeout']
-            )
+            response = requests.get(url, headers=headers, timeout=timeout)
             response.raise_for_status()
             
             soup = BeautifulSoup(response.text, 'html.parser')
             logger.info(f"HTML content length: {len(response.text)}")
             
-            # デバッグ用にHTML�造を解析
+            # デバッグ用にHTML構造を解析
             main_content = soup.find('div', class_='main-content')
             if main_content:
                 logger.info("Found main-content div")
-                logger.info(f"Main content first 500 chars: {str(main_content)[:500]}")
+                logger.info(f"Main content structure: {[elem.name for elem in main_content.children if elem.name]}")
+            else:
+                logger.warning("Main content div not found")
+                logger.info(f"Available top-level divs: {[div.get('class', []) for div in soup.find_all('div', recursive=False)]}")
             
             # 買取価格データを抽出
             kaitori_prices = {}
             
-            # 価格情報を含む要素を探す（実際のサイトの構造に合わせて修正）
-            price_elements = soup.find_all('div', class_='tr') # idは"product4898"のように最後の4桁が行ごとに違ったため使用できず
+            # 価格情報を含む要素を探す
+            price_elements = soup.find_all('div', class_='tr')
             if price_elements:
+                logger.info(f"Found {len(price_elements)} price elements")
                 for elem in price_elements:
-                    # 容量を探す（例: "128GB"などのテキストを含む要素）
-                    capacity_elem = elem.find('h2') or \
-                                  elem.find('div', class_='ttl')
-                    # 価格を探す
-                    price_elem = elem.find('div', class_='td2wrap') or \
-                               elem.find('div', class_='td td2')
-                    
-                    if capacity_elem and price_elem:
-                        capacity_text = capacity_elem.text.strip()
-                        # 容量のフォーマットを統一（GB/TB両方に対応）
-                        capacity_match = re.search(r'(\d+)\s*(GB|TB)', capacity_text, re.IGNORECASE)
-                        if capacity_match:
-                            # 容量の数値と単位を取得
-                            capacity_num = capacity_match.group(1)
-                            capacity_unit = capacity_match.group(2).upper()
-                            capacity = f"{capacity_num}{capacity_unit}"
-                            # 価格から不要な文字を削除
-                            price = re.sub(r'[^\d]', '', price_elem.text.strip())
-                            kaitori_prices[capacity] = price
-                            logger.info(f"Found price for {capacity}: {price}")
+                    try:
+                        # 容量を探す
+                        capacity_elem = elem.find('h2') or elem.find('div', class_='ttl')
+                        # 価格を探す
+                        price_elem = elem.find('div', class_='td2wrap') or elem.find('div', class_='td td2')
+                        
+                        if capacity_elem and price_elem:
+                            capacity_text = capacity_elem.text.strip()
+                            capacity_match = re.search(r'(\d+)\s*(GB|TB)', capacity_text, re.IGNORECASE)
+                            if capacity_match:
+                                capacity_num = capacity_match.group(1)
+                                capacity_unit = capacity_match.group(2).upper()
+                                capacity = f"{capacity_num}{capacity_unit}"
+                                price = re.sub(r'[^\d]', '', price_elem.text.strip())
+                                if price:
+                                    kaitori_prices[capacity] = price
+                                    logger.info(f"Found price for {capacity}: {price}")
+                                else:
+                                    logger.warning(f"Empty price found for {capacity}")
+                            else:
+                                logger.warning(f"Could not extract capacity from: {capacity_text}")
                         else:
-                            logger.warning(f"Could not extract capacity from: {capacity_text}")
+                            logger.warning(f"Missing capacity or price element in: {elem}")
+                    except Exception as e:
+                        logger.error(f"Error processing price element: {e}")
+                        logger.error(f"Element content: {elem}")
+                        continue
                 
                 if not kaitori_prices:
                     logger.warning("No valid price data found in elements")
-                    logger.info(f"Found {len(price_elements)} price elements")
-                    # 最初の要素の構造をログ出力
-                    if price_elements:
-                        logger.info(f"First price element structure: {str(price_elements[0])}")
             else:
                 logger.warning("No price elements found")
-                # ページ構造の確認のため、主要な要素をログ出力
-                main_elements = soup.find_all('div', class_=['main', 'content', 'product-list'])
-                logger.info(f"Found main elements: {[elem.get('class', []) for elem in main_elements]}")
+                logger.info(f"Page title: {soup.title.string if soup.title else 'No title'}")
             
             # 公式価格を取得
             official_prices = get_official_prices(series)
@@ -194,7 +221,7 @@ def get_kaitori_prices(series):
             
     except Exception as e:
         logger.error(f"Error in get_kaitori_prices: {e}")
-        logger.error(f"Error details: {str(e)}")
+        logger.error(f"Stack trace: {traceback.format_exc()}")
         return {
             series: {
                 'kaitori': {},

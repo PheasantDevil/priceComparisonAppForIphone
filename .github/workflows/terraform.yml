@@ -1,92 +1,98 @@
 # .github/workflows/terraform.yml
-name: 'Terraform CI/CD'
+name: Terraform Deploy
 
 on:
   push:
-    branches: [ main ]
     paths:
       - 'terraform/**'
+      - 'src/**'
+      - 'lambda/**'
       - '.github/workflows/terraform.yml'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'terraform/**'
-      - '.github/workflows/terraform.yml'
+
+env:
+  AWS_REGION: ap-northeast-1
+  TF_WORKSPACE: default
 
 jobs:
-  terraform:
-    name: 'Terraform'
+  deploy:
+    name: Deploy Infrastructure
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./terraform
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: 1.0.0
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActionsSession
 
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.13'
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-    - name: Prepare Lambda Function
-      run: |
-        # Lambda関数のディレクトリ作成
-        mkdir -p lambda/get_prices
-        
-        # Lambda関数のコードをコピー
-        cp ../src/apple_scraper_for_rudea.py lambda/get_prices/lambda_function.py
-        
-        # requirements.txtの作成
-        cat > lambda/get_prices/requirements.txt << 'EOF'
-        requests
-        boto3
-        beautifulsoup4
-        playwright
-        EOF
-        
-        # 依存関係のインストール
-        cd lambda/get_prices
-        pip install -r requirements.txt -t .
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r terraform/requirements.txt
 
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ap-northeast-1
+      - name: Terraform Init
+        working-directory: terraform
+        run: |
+          terraform init -input=false
 
-    - name: Terraform Format
-      run: terraform fmt
+      - name: Terraform Plan
+        working-directory: terraform
+        run: |
+          terraform plan -input=false
 
-    - name: Terraform Init
-      run: terraform init
+      - name: Terraform Apply
+        working-directory: terraform
+        run: |
+          terraform apply -auto-approve
 
-    - name: Import existing resources
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: |
-        # DynamoDBテーブルのインポート
-        if aws dynamodb describe-table --table-name iphone_prices &> /dev/null; then
-          echo "Importing existing iphone_prices table..."
-          terraform import 'aws_dynamodb_table.iphone_prices[0]' iphone_prices || true
-        fi
-        
-        # IAMロールのインポート
-        if aws iam get-role --role-name get_prices_lambda_role &> /dev/null; then
-          echo "Importing existing lambda role..."
-          terraform import 'aws_iam_role.lambda_role[0]' get_prices_lambda_role || true
-        fi
+      - name: Update DynamoDB Data
+        run: |
+          cd terraform
+          python3 scripts/migrate_to_dynamodb.py
 
-    - name: Terraform Plan
-      run: terraform plan
-      if: github.event_name == 'pull_request'
+      - name: Cleanup API Gateway
+        run: |
+          cd terraform
+          python3 scripts/cleanup_api_gateway.py
 
-    - name: Terraform Apply
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: terraform apply -auto-approve
+      - name: Cleanup Python cache
+        run: |
+          find . -type d -name "__pycache__" -exec rm -rf {} +
+          find . -type f -name "*.pyc" -delete
+
+      - name: Cleanup temporary files
+        run: |
+          # Remove Terraform state files
+          rm -f terraform/terraform.tfstate*
+          rm -f terraform/.terraform.lock.hcl
+          
+          # Remove Lambda deployment packages
+          rm -f terraform/lambda_function.zip
+          rm -f terraform/layer.zip
+          
+          # Remove backup files
+          rm -f terraform/*.bak
+          rm -f terraform/*.backup
+          
+          # Remove empty directories
+          find . -type d -empty -delete
+
+      - name: Commit and push cleanup changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: cleanup temporary files [skip ci]" && git push)
