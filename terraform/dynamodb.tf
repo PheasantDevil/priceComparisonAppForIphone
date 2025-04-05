@@ -44,6 +44,10 @@ resource "aws_dynamodb_table" "iphone_prices" {
     projection_type = "ALL"
   }
 
+  point_in_time_recovery {
+    enabled = true
+  }
+
   tags = {
     Environment = "production"
     Project     = "iphone_price_tracker"
