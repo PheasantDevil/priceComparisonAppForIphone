@@ -4,28 +4,34 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "5.93.0"
+      version = "5.31.0"
     }
   }
 }
 
 provider "aws" {
   region = "ap-northeast-1"
+  
+  # 本番環境ではこれらの設定を削除する
+  skip_credentials_validation = false
+  skip_metadata_api_check    = false
+  skip_requesting_account_id = false
+
+  max_retries = 10
+  
+  default_tags {
+    tags = {
+      Environment = "production"
+      Project     = "iphone_price_tracker"
+    }
+  }
 }
 
-# 既存のテーブルの存在確認
-data "aws_dynamodb_table" "iphone_prices" {
-  name = "iphone_prices"
-}
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
 
-data "aws_dynamodb_table" "official_prices" {
-  name = "official_prices"
-}
-
-# テーブルが存在しない場合のみ作成
+# DynamoDBテーブル
 resource "aws_dynamodb_table" "iphone_prices" {
-  count = try(data.aws_dynamodb_table.iphone_prices.name, "") == "" ? 1 : 0
-
   name           = "iphone_prices"
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "id"
@@ -53,11 +59,16 @@ resource "aws_dynamodb_table" "iphone_prices" {
     Environment = "production"
     Project     = "iphone_price_tracker"
   }
+
+  lifecycle {
+    ignore_changes = [
+      read_capacity,
+      write_capacity
+    ]
+  }
 }
 
 resource "aws_dynamodb_table" "official_prices" {
-  count = try(data.aws_dynamodb_table.official_prices.name, "") == "" ? 1 : 0
-
   name         = "official_prices"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "series"
@@ -80,20 +91,15 @@ resource "aws_dynamodb_table" "official_prices" {
     projection_type = "ALL"
   }
 
+  tags = {
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
+
   lifecycle {
-    prevent_destroy = true
     ignore_changes = [
       read_capacity,
-      write_capacity,
-      range_key
+      write_capacity
     ]
   }
-}
-
-# テーブルのARNを出力（既存または新規作成）
-output "dynamodb_table_arn" {
-  value = try(
-    data.aws_dynamodb_table.iphone_prices.arn,
-    try(aws_dynamodb_table.iphone_prices[0].arn, "")
-  )
 }

@@ -1,3 +1,9 @@
+# terraform/iam.tf
+# 既存のIAMロールの存在確認
+data "aws_iam_role" "existing_lambda_role" {
+  name = "get_prices_lambda_role"
+}
+
 # Lambda実行用のIAMロール
 resource "aws_iam_role" "lambda_role" {
   name = "get_prices_lambda_role"
@@ -46,4 +52,9 @@ resource "aws_iam_role_policy" "dynamodb_access" {
       }
     ]
   })
-} 
+}
+
+# IAMロールのARNを出力
+output "lambda_role_arn" {
+  value = aws_iam_role.lambda_role.arn
+}
