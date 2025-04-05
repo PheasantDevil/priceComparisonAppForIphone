@@ -282,7 +282,7 @@
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         const API_ENDPOINT =
-          'https://qow3wyg1nj.execute-api.ap-northeast-1.amazonaws.com/prod/get_prices';
+          'https://l8l7v5xw9d.execute-api.ap-northeast-1.amazonaws.com/prod/get_prices';
         const series = [
           'iPhone 16',
           'iPhone 16 Pro',
@@ -320,9 +320,9 @@
             console.log('Raw response data from Lambda:', results);
 
             results.forEach((data, index) => {
-              if (data && Object.keys(data).length > 0) {
-                const seriesName = Object.keys(data)[0];
-                const priceData = data[seriesName];
+              if (data && data.data) {
+                const seriesName = Object.keys(data.data)[0];
+                const priceData = data.data[seriesName];
 
                 const tableId = seriesName.replace(/\s+/g, '') + '-prices';
                 const tableBody = document.querySelector(`#${tableId} tbody`);

@@ -7,5 +7,5 @@ variable "environment" {
 variable "project" {
   description = "Project name"
   type        = string
-  default     = "price-comparison"
+  default     = "iphone_price_tracker"
 }
