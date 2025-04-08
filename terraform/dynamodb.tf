@@ -215,10 +215,10 @@ resource "aws_dynamodb_table_item" "official_prices_data" {
 }
 
 resource "aws_dynamodb_table" "price_history" {
-  name           = "price_history"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "model"
-  range_key      = "timestamp"
+  name         = "price_history"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "model"
+  range_key    = "timestamp"
 
   attribute {
     name = "model"
@@ -227,11 +227,11 @@ resource "aws_dynamodb_table" "price_history" {
 
   attribute {
     name = "timestamp"
-    type = "N"
+    type = "S"
   }
 
   ttl {
-    attribute_name = "expiration_time"
+    attribute_name = "ttl"
     enabled        = true
   }
 

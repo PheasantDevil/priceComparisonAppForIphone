@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>iPhone 16シリーズ 買取価格比較</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
       /* ローディングスピナーのスタイル */
       .loader {
@@ -183,6 +184,38 @@
         .price-table td {
           padding: 5px 8px;
         }
+      }
+
+      /* グラフコンテナのスタイル */
+      .graph-container {
+        width: 100%;
+        height: 200px;
+        margin-top: 20px;
+        margin-bottom: 30px;
+      }
+
+      .graph-toggle {
+        background-color: #f2f2f2;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-top: 10px;
+        font-size: 0.9em;
+      }
+
+      .graph-toggle:hover {
+        background-color: #e0e0e0;
+      }
+
+      .graph-wrapper {
+        display: none;
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      .graph-wrapper.active {
+        display: block;
       }
     </style>
   </head>
@@ -409,6 +442,114 @@
         // 初期データ取得
         fetchPrices();
       });
+
+      // 価格履歴グラフの実装
+      const priceHistoryCharts = {};
+
+      function formatDate(timestamp) {
+        const date = new Date(timestamp * 1000);
+        return `${date.getMonth() + 1}/${date.getDate()}`;
+      }
+
+      function createPriceHistoryGraph(series, capacity, color) {
+        const modelId = `${series}-${capacity}-${color}`;
+        const graphContainer = document.createElement('div');
+        graphContainer.className = 'graph-wrapper';
+        graphContainer.id = `graph-${modelId}`;
+
+        const canvas = document.createElement('canvas');
+        graphContainer.appendChild(canvas);
+
+        const table = document.getElementById(`${series}-prices`);
+        const row = table.querySelector(
+          `tr[data-capacity="${capacity}"][data-color="${color}"]`
+        );
+        if (row) {
+          row.parentNode.insertBefore(graphContainer, row.nextSibling);
+        }
+
+        const ctx = canvas.getContext('2d');
+        priceHistoryCharts[modelId] = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: '買取価格',
+                data: [],
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: false,
+              },
+            },
+          },
+        });
+
+        return graphContainer;
+      }
+
+      async function fetchPriceHistory(series, capacity, color) {
+        const modelId = `${series}-${capacity}-${color}`;
+        try {
+          const response = await fetch(`/price-history?model=${modelId}`);
+          const data = await response.json();
+
+          const chart = priceHistoryCharts[modelId];
+          if (chart) {
+            chart.data.labels = data.map(item => formatDate(item.timestamp));
+            chart.data.datasets[0].data = data.map(item => item.price);
+            chart.update();
+          }
+        } catch (error) {
+          console.error('Error fetching price history:', error);
+        }
+      }
+
+      function addGraphToggle(series, capacity, color) {
+        const modelId = `${series}-${capacity}-${color}`;
+        const table = document.getElementById(`${series}-prices`);
+        const row = table.querySelector(
+          `tr[data-capacity="${capacity}"][data-color="${color}"]`
+        );
+
+        if (row) {
+          const toggleButton = document.createElement('button');
+          toggleButton.className = 'graph-toggle';
+          toggleButton.textContent = '価格推移を表示';
+          toggleButton.onclick = () => {
+            const graphWrapper = document.getElementById(`graph-${modelId}`);
+            if (!graphWrapper) {
+              createPriceHistoryGraph(series, capacity, color);
+              fetchPriceHistory(series, capacity, color);
+            }
+            graphWrapper.classList.toggle('active');
+            toggleButton.textContent = graphWrapper.classList.contains('active')
+              ? '価格推移を隠す'
+              : '価格推移を表示';
+          };
+          row.insertCell(-1).appendChild(toggleButton);
+        }
+      }
+
+      // 既存のテーブル作成処理を修正
+      function createTable(series, data) {
+        // ... existing table creation code ...
+
+        // 各行にグラフトグルを追加
+        Object.entries(data).forEach(([capacity, colors]) => {
+          Object.entries(colors).forEach(([color, price]) => {
+            addGraphToggle(series, capacity, color);
+          });
+        });
+      }
     </script>
   </body>
 </html>
