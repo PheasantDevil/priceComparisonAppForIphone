@@ -12,6 +12,15 @@ def lambda_handler(event, context):
         # Get query parameters
         query_params = event.get('queryStringParameters', {})
         model = query_params.get('model')
+        if not model:
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Credentials': True
+                },
+                'body': json.dumps('Missing required parameter: model')
+            }
         days = int(query_params.get('days', 30))  # Default to 30 days
         
         # Calculate timestamp for the start date
