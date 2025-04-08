@@ -81,10 +81,37 @@ resource "aws_iam_role" "github_actions" {
   })
 }
 
-# GitHub Actionsロールに必要なポリシーをアタッチ
-resource "aws_iam_role_policy_attachment" "github_actions_terraform" {
+# GitHub Actions用のカスタムポリシー
+resource "aws_iam_policy" "github_actions_policy" {
+  name        = "github_actions_policy"
+  description = "Policy for GitHub Actions to manage infrastructure"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:*",
+          "lambda:*",
+          "apigateway:*",
+          "iam:*",
+          "cloudwatch:*",
+          "logs:*",
+          "s3:*",
+          "ec2:*",
+          "sts:GetCallerIdentity"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# GitHub Actionsロールにカスタムポリシーをアタッチ
+resource "aws_iam_role_policy_attachment" "github_actions_custom" {
   role       = aws_iam_role.github_actions.name
-  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"  # 必要に応じてより制限的なポリシーに変更
+  policy_arn = aws_iam_policy.github_actions_policy.arn
 }
 
 # 変数の定義
