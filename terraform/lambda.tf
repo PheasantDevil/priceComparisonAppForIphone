@@ -180,3 +180,39 @@ resource "aws_lambda_function" "smoke_test" {
     }
   }
 }
+
+resource "aws_lambda_function" "save_price_history" {
+  filename         = "lambda_function.zip"
+  function_name    = "save_price_history"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "save_price_history.lambda_handler"
+  runtime          = "python3.9"
+  timeout          = 300
+  memory_size      = 128
+
+  environment {
+    variables = {
+      DYNAMODB_TABLE = "price_history"
+    }
+  }
+}
+
+resource "aws_cloudwatch_event_rule" "save_price_history_schedule" {
+  name                = "save_price_history_schedule"
+  description         = "Schedule for saving price history"
+  schedule_expression = "cron(0 1,13 * * ? *)"  # 10:00 and 22:00 JST
+}
+
+resource "aws_cloudwatch_event_target" "save_price_history_target" {
+  rule      = aws_cloudwatch_event_rule.save_price_history_schedule.name
+  target_id = "SavePriceHistory"
+  arn       = aws_lambda_function.save_price_history.arn
+}
+
+resource "aws_lambda_permission" "allow_cloudwatch" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.save_price_history.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.save_price_history_schedule.arn
+}

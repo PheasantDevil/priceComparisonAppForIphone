@@ -1,9 +1,7 @@
-# IAMロールとポリシーの設定
+# Lambda実行用のIAMロール
+resource "aws_iam_role" "lambda_role" {
+  name = "get_prices_lambda_role"
 
-# Lambda関数の実行ロール
-resource "aws_iam_role" "lambda_execution_role" {
-  name               = "lambda-execution-role"
-  description        = "IAM role for Lambda function execution"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -18,40 +16,16 @@ resource "aws_iam_role" "lambda_execution_role" {
   })
 }
 
-# Lambda関数の実行ロールに必要なポリシーをアタッチ
-resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
-  role       = aws_iam_role.lambda_execution_role.name
+# 基本的なLambda実行権限
+resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  role       = aws_iam_role.lambda_role.name
 }
 
-# DynamoDBアクセスポリシー
-resource "aws_iam_role_policy_attachment" "lambda_dynamodb_access" {
-  role       = aws_iam_role.lambda_execution_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
-}
-
-# API Gatewayの実行ロール
-resource "aws_iam_role" "api_gateway_role" {
-  name = "price_comparison_api_gateway_role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "apigateway.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-# API Gatewayの実行ロールに必要なポリシーをアタッチ
-resource "aws_iam_role_policy" "api_gateway_policy" {
-  name = "api_gateway_policy"
-  role = aws_iam_role.api_gateway_role.id
+# DynamoDB アクセス用のポリシー
+resource "aws_iam_role_policy" "dynamodb_access" {
+  name = "dynamodb_access"
+  role = aws_iam_role.lambda_role.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -59,10 +33,15 @@ resource "aws_iam_role_policy" "api_gateway_policy" {
       {
         Effect = "Allow"
         Action = [
-          "lambda:InvokeFunction"
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+          "dynamodb:Scan",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem"
         ]
         Resource = [
-          "arn:aws:lambda:${var.aws_region}:*:function:get_prices"
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/iphone_prices",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/official_prices"
         ]
       }
     ]
@@ -103,122 +82,41 @@ resource "aws_iam_role" "github_actions" {
 }
 
 # GitHub Actionsロールに必要なポリシーをアタッチ
-resource "aws_iam_role_policy" "github_actions_terraform" {
-  name = "github_actions_terraform"
-  role = aws_iam_role.github_actions.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "lambda:*",
-          "apigateway:*",
-          "dynamodb:*",
-          "iam:*",
-          "logs:*"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:RequestedRegion" = var.aws_region
-          }
-        }
-      }
-    ]
-  })
-}
-
-# デプロイメント検証用のIAMロール
-resource "aws_iam_role" "deployment_verification" {
-  name = "deployment-verification-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "lambda.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-# デプロイメント検証用のポリシー
-resource "aws_iam_role_policy" "deployment_verification_policy" {
-  name = "deployment-verification-policy"
-  role = aws_iam_role.deployment_verification.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "lambda:GetFunction",
-          "lambda:GetFunctionConfiguration",
-          "dynamodb:DescribeTable",
-          "apigateway:GET",
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-# スモークテスト用のIAMロール
-resource "aws_iam_role" "smoke_test" {
-  name = "smoke-test-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "lambda.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-# スモークテスト用のIAMポリシー
-resource "aws_iam_role_policy" "smoke_test" {
-  name = "smoke-test-policy"
-  role = aws_iam_role.smoke_test.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "lambda:InvokeFunction",
-          "dynamodb:DescribeTable",
-          "dynamodb:Scan",
-          "dynamodb:Query",
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
+resource "aws_iam_role_policy_attachment" "github_actions_terraform" {
+  role       = aws_iam_role.github_actions.name
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"  # 必要に応じてより制限的なポリシーに変更
 }
 
 # 変数の定義
-variable "aws_region" {
-  description = "AWS region"
+variable "github_org" {
+  description = "GitHub organization name"
   type        = string
-  default     = "ap-northeast-1"
+}
+
+variable "github_repo" {
+  description = "GitHub repository name"
+  type        = string
+}
+
+resource "aws_iam_role_policy" "price_history_dynamodb_policy" {
+  name = "price_history_dynamodb_policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+          "dynamodb:Scan"
+        ]
+        Resource = [
+          aws_dynamodb_table.price_history.arn
+        ]
+      }
+    ]
+  })
 } 
