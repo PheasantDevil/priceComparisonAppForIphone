@@ -3,6 +3,7 @@ locals {
   lambda_files = [
     "lambda/get_prices_lambda/lambda_function.py",
     "lambda/save_price_history_lambda/save_price_history.py",
+    "lambda/get_price_history_lambda/get_price_history.py",
     "src/apple_scraper_for_rudea.py",
     "config/config.production.yaml"
   ]
@@ -226,4 +227,30 @@ resource "aws_lambda_permission" "allow_cloudwatch" {
   function_name = aws_lambda_function.save_price_history.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.save_price_history_schedule.arn
+}
+
+resource "aws_lambda_function" "get_price_history" {
+  filename         = data.archive_file.lambda_get_prices.output_path
+  function_name    = "get_price_history"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "get_price_history.lambda_handler"
+  source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
+  runtime          = "python3.9"
+  timeout          = 30
+  memory_size      = 128
+  layers           = [aws_lambda_layer_version.dependencies.arn]
+
+  environment {
+    variables = {
+      DYNAMODB_TABLE = "price_history"
+      PYTHONPATH     = "/opt/python:/var/task"
+    }
+  }
+
+  depends_on = [
+    aws_iam_role.lambda_role,
+    aws_iam_role_policy_attachment.lambda_basic,
+    aws_iam_role_policy.dynamodb_access,
+    aws_iam_role_policy.price_history_dynamodb_policy
+  ]
 }
