@@ -212,4 +212,42 @@ resource "aws_dynamodb_table_item" "official_prices_data" {
       }
     }
   })
+}
+
+resource "aws_dynamodb_table" "price_history" {
+  name           = "price_history"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "model"
+  range_key      = "timestamp"
+
+  attribute {
+    name = "model"
+    type = "S"
+  }
+
+  attribute {
+    name = "timestamp"
+    type = "N"
+  }
+
+  ttl {
+    attribute_name = "expiration_time"
+    enabled        = true
+  }
+
+  global_secondary_index {
+    name            = "TimestampIndex"
+    hash_key        = "model"
+    range_key       = "timestamp"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  tags = {
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
 } 
