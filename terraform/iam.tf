@@ -96,4 +96,27 @@ variable "github_org" {
 variable "github_repo" {
   description = "GitHub repository name"
   type        = string
+}
+
+resource "aws_iam_role_policy" "price_history_dynamodb_policy" {
+  name = "price_history_dynamodb_policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+          "dynamodb:Scan"
+        ]
+        Resource = [
+          aws_dynamodb_table.price_history.arn
+        ]
+      }
+    ]
+  })
 } 
