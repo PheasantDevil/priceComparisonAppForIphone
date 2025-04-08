@@ -1,4 +1,28 @@
 # Lambda実行用のIAMロール
+resource "aws_iam_role" "lambda_execution_role" {
+  name = "lambda_execution_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+# Lambda実行ロールに基本的な権限を付与
+resource "aws_iam_role_policy_attachment" "lambda_execution_basic" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  role       = aws_iam_role.lambda_execution_role.name
+}
+
+# Lambda実行用のIAMロール
 resource "aws_iam_role" "lambda_role" {
   name = "get_prices_lambda_role"
 
@@ -114,15 +138,50 @@ resource "aws_iam_role_policy_attachment" "github_actions_custom" {
   policy_arn = aws_iam_policy.github_actions_policy.arn
 }
 
-# 変数の定義
-variable "github_org" {
-  description = "GitHub organization name"
-  type        = string
+# GitHub Actionsロールに必要なポリシーをアタッチ
+resource "aws_iam_role_policy" "github_actions_terraform" {
+  name = "github_actions_terraform"
+  role = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:*",
+          "apigateway:*",
+          "dynamodb:*",
+          "iam:*",
+          "logs:*"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestedRegion" = var.aws_region
+          }
+        }
+      }
+    ]
+  })
 }
 
-variable "github_repo" {
-  description = "GitHub repository name"
-  type        = string
+# デプロイメント検証用のIAMロール
+resource "aws_iam_role" "deployment_verification" {
+  name = "deployment-verification-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
 }
 
 resource "aws_iam_role_policy" "price_history_dynamodb_policy" {
@@ -146,4 +205,28 @@ resource "aws_iam_role_policy" "price_history_dynamodb_policy" {
       }
     ]
   })
+}
+
+# スモークテスト用のIAMロール
+resource "aws_iam_role" "smoke_test" {
+  name = "smoke-test-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+# スモークテストロールに基本的な権限を付与
+resource "aws_iam_role_policy_attachment" "smoke_test_basic" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  role       = aws_iam_role.smoke_test.name
 } 

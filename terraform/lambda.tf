@@ -52,16 +52,34 @@ data "archive_file" "lambda_get_prices" {
   }
 }
 
-# Lambda関数のメモリとタイムアウトの最適化
-resource "aws_lambda_function" "price_comparison" {
-  filename         = "lambda_function.zip"
-  function_name    = "price-comparison-function"
-  description      = "Lambda function for price comparison"
-  role             = aws_iam_role.lambda_execution_role.arn
-  handler          = "lambda_function.lambda_handler"
+# Get Prices Lambda Function
+resource "aws_lambda_function" "get_prices" {
+  filename         = data.archive_file.lambda_get_prices.output_path
+  function_name    = "get_prices"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "get_prices.lambda_handler"
   runtime          = "python3.9"
   timeout          = 30
   memory_size      = 128
+  source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
+
+  environment {
+    variables = {
+      DYNAMODB_TABLE = aws_dynamodb_table.iphone_prices.name
+    }
+  }
+}
+
+# Lambda関数のメモリとタイムアウトの最適化
+resource "aws_lambda_function" "price_comparison" {
+  filename      = "lambda_function.zip"
+  function_name = "price-comparison-function"
+  description   = "Lambda function for price comparison"
+  role          = aws_iam_role.lambda_execution_role.arn
+  handler       = "lambda_function.lambda_handler"
+  runtime       = "python3.9"
+  timeout       = 30
+  memory_size   = 128
 
   environment {
     variables = {
@@ -183,44 +201,38 @@ resource "aws_lambda_function" "smoke_test" {
   }
 }
 
+# 価格履歴保存用のLambda関数
 resource "aws_lambda_function" "save_price_history" {
-  filename         = data.archive_file.lambda_get_prices.output_path
-  function_name    = "save_price_history"
-  role             = aws_iam_role.lambda_role.arn
-  handler          = "save_price_history.lambda_handler"
-  source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
-  runtime          = "python3.9"
-  timeout          = 300
-  memory_size      = 128
-  layers           = [aws_lambda_layer_version.dependencies.arn]
+  filename      = "save_price_history.zip"
+  function_name = "save-price-history"
+  role          = aws_iam_role.lambda_execution_role.arn
+  handler       = "save_price_history.lambda_handler"
+  runtime       = "python3.9"
+  timeout       = 300
+  memory_size   = 128
 
   environment {
     variables = {
-      DYNAMODB_TABLE = "price_history"
-      PYTHONPATH     = "/opt/python:/var/task"
+      DYNAMODB_TABLE = aws_dynamodb_table.iphone_prices.name
     }
   }
-
-  depends_on = [
-    aws_iam_role.lambda_role,
-    aws_iam_role_policy_attachment.lambda_basic,
-    aws_iam_role_policy.dynamodb_access,
-    aws_iam_role_policy.price_history_dynamodb_policy
-  ]
 }
 
+# 価格履歴保存用のCloudWatchイベントルール
 resource "aws_cloudwatch_event_rule" "save_price_history_schedule" {
-  name                = "save_price_history_schedule"
+  name                = "save-price-history-schedule"
   description         = "Schedule for saving price history"
-  schedule_expression = "cron(0 1,13 * * ? *)"  # 10:00 and 22:00 JST
+  schedule_expression = "rate(1 hour)"
 }
 
+# 価格履歴保存用のCloudWatchイベントターゲット
 resource "aws_cloudwatch_event_target" "save_price_history_target" {
   rule      = aws_cloudwatch_event_rule.save_price_history_schedule.name
   target_id = "SavePriceHistory"
   arn       = aws_lambda_function.save_price_history.arn
 }
 
+# 価格履歴保存用のLambdaパーミッション
 resource "aws_lambda_permission" "allow_cloudwatch" {
   statement_id  = "AllowExecutionFromCloudWatch"
   action        = "lambda:InvokeFunction"
@@ -229,28 +241,19 @@ resource "aws_lambda_permission" "allow_cloudwatch" {
   source_arn    = aws_cloudwatch_event_rule.save_price_history_schedule.arn
 }
 
+# 価格履歴取得用のLambda関数
 resource "aws_lambda_function" "get_price_history" {
-  filename         = data.archive_file.lambda_get_prices.output_path
-  function_name    = "get_price_history"
-  role             = aws_iam_role.lambda_role.arn
-  handler          = "get_price_history.lambda_handler"
-  source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
-  runtime          = "python3.9"
-  timeout          = 30
-  memory_size      = 128
-  layers           = [aws_lambda_layer_version.dependencies.arn]
+  filename      = "get_price_history.zip"
+  function_name = "get-price-history"
+  role          = aws_iam_role.lambda_execution_role.arn
+  handler       = "get_price_history.lambda_handler"
+  runtime       = "python3.9"
+  timeout       = 300
+  memory_size   = 128
 
   environment {
     variables = {
-      DYNAMODB_TABLE = "price_history"
-      PYTHONPATH     = "/opt/python:/var/task"
+      DYNAMODB_TABLE = aws_dynamodb_table.iphone_prices.name
     }
   }
-
-  depends_on = [
-    aws_iam_role.lambda_role,
-    aws_iam_role_policy_attachment.lambda_basic,
-    aws_iam_role_policy.dynamodb_access,
-    aws_iam_role_policy.price_history_dynamodb_policy
-  ]
 }
