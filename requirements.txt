@@ -20,7 +20,7 @@ packaging==24.1
 playwright==1.51.0
 pyee==12.1.1
 PySocks==1.7.1
-pytest-cov==6.0.0
+pytest-cov==6.1.1
 pytest==7.4.4
 python-dotenv==1.1.0
 PyYAML==6.0.1
