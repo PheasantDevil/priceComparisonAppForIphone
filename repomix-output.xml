@@ -50,6 +50,8 @@ The content is organized as follows:
     renovate.yaml
     terraform.yml
   pull_request_template.md
+artifacts/
+  .gitkeep
 config/
   __init__.py
   config.development.yaml
@@ -58,10 +60,15 @@ config/
 data/
   official_prices.json
 lambda/
+  get_price_history_lambda/
+    get_price_history.py
   get_prices_lambda/
     lambda_function.py
+  save_price_history_lambda/
+    save_price_history.py
   get_prices_lambda.py
 scripts/
+  cleanup_api_gateway.py
   debug_check.sh
   deploy_lambda.sh
   migrate_to_dynamodb.py
@@ -69,20 +76,16 @@ services/
   dynamodb_service.py
 src/
   apple_scraper_for_rudea.py
-  apple_scraper.py
 templates/
   index.html
 terraform/
-  backup/
-    api_gateway.tf
-    bk-lambda.tf
-    main.tf
-    variables.tf
   api_gateway.tf
+  dynamodb.tf
   iam.tf
   lambda.tf
   main.tf
   outputs.tf
+  requirements.txt
   variables.tf
 terraform-render/
   main.tf
@@ -105,52 +108,79 @@ options-integration-template.json
 Procfile
 README.md
 renovate.json
+repomix-output.txt
 requirements.txt
 </directory_structure>
 
 <files>
 This section contains the contents of the repository's files.
 
+<file path=".github/workflows/docker-build-and-push.yml">
+name: Build, Push, and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    name: Build, Push, and Deploy to Render
+    runs-on: ubuntu-latest
+
+    steps:
+      # リポジトリをチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Dockerにログイン
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Dockerイメージをビルド＆プッシュ
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: |
+            koninji/price-comparison-app:latest
+
+      # Renderのサービス一覧からサービスIDを取得
+      - name: Fetch Render Service ID
+        id: fetch-service-id
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          SERVICE_ID=$(curl -s -X GET \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            https://api.render.com/v1/services \
+            | jq -r '.[] | select(.service.name=="price-comparison-app:latest") | .service.id')
+
+          if [ -z "$SERVICE_ID" ]; then
+            echo "Service ID not found for 'price-comparison-app:latest'."
+            exit 1
+          fi
+
+          echo "SERVICE_ID=$SERVICE_ID" >> $GITHUB_ENV
+
+      # Renderでデプロイをトリガー
+      - name: Trigger Render Deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            https://api.render.com/v1/services/$SERVICE_ID/deploys
+</file>
+
 <file path="config/__init__.py">
 from .manager import AppConfig, ConfigManager, ScraperConfig, config
 
 __all__ = ['AppConfig', 'ConfigManager', 'ScraperConfig', 'config']
-</file>
-
-<file path="config/config.development.yaml">
-app:
-  debug: true
-  log_level: DEBUG
-  secret_key: dev-secret-key
-
-scraper:
-  kaitori_rudea_urls:
-    - https://kaitori-rudeya.com/category/detail/183 # iPhone 16
-    - https://kaitori-rudeya.com/category/detail/185 # iPhone 16 Pro
-    - https://kaitori-rudeya.com/category/detail/186 # iPhone 16 Pro Max
-    - https://kaitori-rudeya.com/category/detail/205 # iPhone 16 e
-  apple_store_url: https://www.apple.com/jp/shop/buy-iphone
-  request_timeout: 30
-  retry_count: 3
-  user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-</file>
-
-<file path="config/config.production.yaml">
-app:
-  debug: false
-  log_level: INFO
-  # secret_keyは環境変数から取得するため、ここには記載しない
-
-scraper:
-  kaitori_rudea_urls:
-    - https://kaitori-rudeya.com/category/detail/183 # iPhone 16
-    - https://kaitori-rudeya.com/category/detail/185 # iPhone 16 Pro
-    - https://kaitori-rudeya.com/category/detail/186 # iPhone 16 Pro Max
-    - https://kaitori-rudeya.com/category/detail/205 # iPhone 16 e
-  apple_store_url: https://www.apple.com/jp/shop/buy-iphone
-  request_timeout: 60
-  retry_count: 5
-  user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 </file>
 
 <file path="config/manager.py">
@@ -294,6 +324,557 @@ class ConfigManager:
 config = ConfigManager()
 </file>
 
+<file path="lambda/get_prices_lambda.py">
+import json
+import logging
+
+from src.apple_scraper_for_rudea import get_kaitori_prices
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+def lambda_handler(event, context):
+    try:
+        # クエリパラメータからseriesを取得
+        query_params = event.get('queryStringParameters', {})
+        if not query_params:
+            logger.error("No query parameters found")
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET,OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
+                },
+                'body': json.dumps({'error': 'Query parameters are required'})
+            }
+
+        series = query_params.get('series')
+        if not series:
+            logger.error("Series parameter is missing")
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET,OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
+                },
+                'body': json.dumps({'error': 'series parameter is required'})
+            }
+
+        logger.info(f"Fetching prices for series: {series}")
+        
+        # 価格データを取得（seriesパラメータを明示的に渡す）
+        prices = get_kaitori_prices(series=series)  # キーワード引数として渡す
+        
+        logger.info(f"Retrieved prices: {prices}")
+        
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET,OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
+            },
+            'body': json.dumps(prices)
+        }
+
+    except Exception as e:
+        logger.error(f"Error: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET,OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
+            },
+            'body': json.dumps({
+                'error': str(e),
+                'detail': 'An error occurred while processing your request'
+            })
+        }
+</file>
+
+<file path="scripts/debug_check.sh">
+read -p "スクリプトを開始しますか？ (yes/no): " response
+if [[ $response =~ ^([yY][eE][sS]|[yY])$ ]]
+then
+    read -p "ログを残しますか？ (yes/no): " log_response
+    if [[ $log_response =~ ^([yY][eE][sS]|[yY])$ ]]
+    then
+        script lambda-deploy.log
+    else
+        script ex-log.log
+    fi
+    ls -la artifacts/lambda/
+    ls -la artifacts/lambda/function_latest.zip
+    # スクリプトに実行権限を付与（初回のみ）
+    chmod +x scripts/deploy_lambda.sh
+
+    # デプロイパッケージを作成
+    if ./scripts/deploy_lambda.sh; then
+        aws lambda update-function-code \
+            --function-name get_prices_lambda \
+            --zip-file fileb://artifacts/lambda/function_latest
+    else
+        echo "デプロイパッケージの作成に失敗しました。処理を終了します。"
+        exit 1
+    fi
+else
+    echo "スクリプトを開始しない"
+fi
+</file>
+
+<file path="scripts/deploy_lambda.sh">
+<<COMMENT 
+# ディレクトリ構造
+project/
+├── src/
+│   ├── apple_scraper_for_rudea.py
+│   └── apple_scraper.py
+├── services/
+│   └── dynamodb_service.py
+├── lambda/
+│   ├── get_prices_lambda.py
+│   └── lambda_handler.py
+├── scripts/
+│   └── deploy_lambda.sh
+├── artifacts/
+│   └── lambda/
+│       ├── function_20240318_123456.zip
+│       ├── function_20240318_234567.zip
+│       └── function_latest.zip -> function_20240318_234567.zip
+└── requirements.txt
+
+# デプロイスクリプト
+
+## デプロイパッケージを作成してアップロード
+./scripts/deploy_lambda.sh
+
+COMMENT
+
+#!/bin/bash
+
+# スクリプトのディレクトリを取得
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+
+# プロジェクトのルートディレクトリに移動
+cd "$PROJECT_ROOT"
+
+# デプロイパッケージの保存ディレクトリ
+ARTIFACTS_DIR="artifacts/lambda"
+mkdir -p $ARTIFACTS_DIR
+
+# タイムスタンプ付きのファイル名を生成
+TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+FUNCTION_ZIP="function_${TIMESTAMP}.zip"
+FUNCTION_PATH="$ARTIFACTS_DIR/$FUNCTION_ZIP"
+
+# デプロイ用の一時ディレクトリを作成
+DEPLOY_DIR="deploy_tmp"
+rm -rf $DEPLOY_DIR
+mkdir -p $DEPLOY_DIR
+
+echo "必要なファイルをコピー中..."
+# Lambda関数のコードをコピー
+cp lambda/get_prices_lambda/lambda_function.py $DEPLOY_DIR/
+cp -r src $DEPLOY_DIR/
+cp -r services $DEPLOY_DIR/
+cp -r config $DEPLOY_DIR/  # 設定ファイルをコピー
+
+echo "依存関係をインストール中..."
+# 依存関係をインストール
+pip3 install requests beautifulsoup4 boto3 pyyaml -t $DEPLOY_DIR/
+
+echo "デプロイパッケージを作成中..."
+# デプロイパッケージを作成
+cd $DEPLOY_DIR
+zip -r ../$FUNCTION_PATH .
+
+# プロジェクトルートに戻る
+cd "$PROJECT_ROOT"
+
+# 一時ディレクトリを削除
+rm -rf $DEPLOY_DIR
+
+echo "デプロイパッケージ $FUNCTION_PATH が作成されました"
+
+# 最新のzipファイルへのシンボリックリンクを作成
+cd $ARTIFACTS_DIR
+ln -sf $FUNCTION_ZIP function_latest.zip
+cd "$PROJECT_ROOT"
+
+echo "シンボリックリンク $ARTIFACTS_DIR/function_latest.zip が更新されました"
+
+# IAMロールの作成（存在しない場合）
+aws iam create-role \
+    --role-name get_prices_lambda_role \
+    --assume-role-policy-document '{
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "lambda.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+        }]
+    }' || true
+
+# DynamoDB アクセス権限の追加
+aws iam put-role-policy \
+    --role-name get_prices_lambda_role \
+    --policy-name dynamodb-access \
+    --policy-document '{
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:Query"
+            ],
+            "Resource": "arn:aws:dynamodb:ap-northeast-1:*:table/iphone_prices"
+        }]
+    }' || true
+
+# CloudWatch Logs アクセス権限の追加
+aws iam attach-role-policy \
+    --role-name get_prices_lambda_role \
+    --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole || true
+
+# Lambda関数の更新
+aws lambda update-function-code \
+    --function-name get_prices_lambda \
+    --zip-file fileb://$ARTIFACTS_DIR/function_latest.zip
+
+# Lambda関数の設定更新
+aws lambda update-function-configuration \
+    --function-name get_prices_lambda \
+    --handler lambda_function.lambda_handler \
+    --role "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/get_prices_lambda_role" \
+    --timeout 30 \
+    --memory-size 256
+
+echo "Lambda関数が更新されました"
+
+# DynamoDBテーブルの作成（存在しない場合）
+aws dynamodb create-table \
+    --table-name iphone_prices \
+    --attribute-definitions \
+        AttributeName=series,AttributeType=S \
+    --key-schema \
+        AttributeName=series,KeyType=HASH \
+    --billing-mode PAY_PER_REQUEST || true
+
+# テーブルが作成されるのを待機
+aws dynamodb wait table-exists --table-name iphone_prices
+
+# サンプルデータの投入
+aws dynamodb put-item \
+    --table-name iphone_prices \
+    --item '{
+        "series": {"S": "iPhone 16"},
+        "prices": {"M": {
+            "128GB": {"S": "124800"},
+            "256GB": {"S": "139800"},
+            "512GB": {"S": "169800"}
+        }}
+    }'
+
+aws dynamodb put-item \
+    --table-name iphone_prices \
+    --item '{
+        "series": {"S": "iPhone 16 Pro"},
+        "prices": {"M": {
+            "128GB": {"S": "159800"},
+            "256GB": {"S": "174800"},
+            "512GB": {"S": "204800"},
+            "1TB": {"S": "234800"}
+        }}
+    }'
+
+aws dynamodb put-item \
+    --table-name iphone_prices \
+    --item '{
+        "series": {"S": "iPhone 16 Pro Max"},
+        "prices": {"M": {
+            "256GB": {"S": "189800"},
+            "512GB": {"S": "219800"},
+            "1TB": {"S": "249800"}
+        }}
+    }'
+</file>
+
+<file path="scripts/migrate_to_dynamodb.py">
+import json
+
+import boto3
+
+# AWS DynamoDBクライアントの初期化
+dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')
+table = dynamodb.Table('official_prices')
+
+# JSONファイルの読み込み
+with open('data/official_prices.json', 'r', encoding='utf-8') as file:
+    data = json.load(file)
+
+# DynamoDBにデータを挿入
+for series, capacities in data.items():
+    for capacity, colors in capacities.items():
+        item = {
+            'series': series,
+            'capacity': capacity,
+            'color_prices': colors  # 各カラーの価格情報を保存
+        }
+        table.put_item(Item=item)
+        print(f"Inserted: {series} - {capacity}")
+
+print("データ移行完了！")
+</file>
+
+<file path="services/dynamodb_service.py">
+import boto3
+from boto3.dynamodb.conditions import Key
+
+# DynamoDBテーブル名を指定
+DYNAMODB_TABLE_NAME = "official_prices"
+
+def get_prices_by_series(series_name):
+    """指定されたシリーズの買取価格を取得"""
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(DYNAMODB_TABLE_NAME)
+
+        # クエリ実行
+        response = table.query(
+            KeyConditionExpression=Key("series").eq(series_name)
+        )
+        return response.get("Items", [])
+    except Exception as e:
+        print(f"Error querying DynamoDB: {str(e)}")
+        raise
+</file>
+
+<file path="terraform-render/main.tf">
+resource "render_postgresql" "price-comparison-app" {
+  name     = var.db_name
+  database = var.db_name
+  user     = var.db_user
+  password = var.db_password
+  region   = var.db_region
+  version  = var.db_version
+}
+
+output "database_url" {
+  value = render_postgresql.price-comparison-app.connection_string
+}
+</file>
+
+<file path="terraform-render/variables.tf">
+variable "db_name" {
+  default     = "price-comparison-app"
+  description = "The name of the PostgreSQL database"
+}
+
+variable "db_user" {
+  default     = "app_user"
+  description = "The username for the PostgreSQL database"
+}
+
+variable "db_password" {
+  description = "The password for the PostgreSQL user"
+  type        = string
+}
+
+variable "db_region" {
+  default     = "oregon"
+  description = "The region where the database will be hosted"
+}
+
+variable "db_version" {
+  default     = "16"
+  description = "The PostgreSQL version"
+}
+</file>
+
+<file path="tests/pytest.ini">
+[pytest]
+pythonpath = .
+testpaths = tests
+python_files = test_*.py
+addopts = -v -s --cov=config --cov-report=term-missing
+</file>
+
+<file path=".env.example">
+FLASK_ENV=development
+SECRET_KEY=your-secret-key-here
+</file>
+
+<file path=".python-version">
+3.13.2
+</file>
+
+<file path="create_patch.py">
+import json
+import subprocess
+
+patch_data = {
+    "op": "replace",
+    "path": "/accessLogSettings/format",
+    "value": json.dumps({  # Convert value to string here
+        "requestId": "$context.requestId",
+        "ip": "$context.identity.sourceIp",
+        "requestTime": "$context.requestTime",
+        "httpMethod": "$context.httpMethod",
+        "resourcePath": "$context.resourcePath",
+        "status": "$context.status",
+        "protocol": "$context.protocol",
+        "responseLength": "$context.responseLength"
+    })
+}
+
+json_patch_string = json.dumps([patch_data])
+
+try:
+    result = subprocess.run(
+        [
+            "aws",
+            "apigateway",
+            "update-stage",
+            "--rest-api-id",
+            "qow3wyg1nj",
+            "--stage-name",
+            "prod",
+            "--patch-operations",
+            json_patch_string,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    print("API Gateway stage updated successfully!")
+    print(result.stdout)
+except subprocess.CalledProcessError as e:
+    print(f"Error updating API Gateway stage: {e.stderr}")
+    print(f"Return code: {e.returncode}")
+except json.JSONEncoderError as e:
+    print(f"Error encoding JSON: {e}")
+except Exception as e:
+    print(f"An unexpected error occurred: {e}")
+</file>
+
+<file path="Dockerfile">
+# Dockerのイメージ名: price-comparison-app:latest
+
+# ベースイメージ
+FROM python:3.13-slim
+
+# 必要なシステムパッケージとPlaywrightの依存ライブラリをインストール
+RUN apt-get update && apt-get install -y \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libatspi2.0-0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libxkbcommon0 \
+    libgdk-pixbuf2.0-0 \
+    libgtk-3-0 \
+    libpango-1.0-0 \
+    libxshmfence1 \
+    libgbm1 \
+    libasound2 \
+    libcurl4 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# 作業ディレクトリを設定
+WORKDIR /app
+
+# プロジェクトのファイルをコピー
+COPY . /app
+
+# Pythonパッケージのインストール
+RUN pip install -r requirements.txt
+
+# Playwrightの環境変数を設定
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright
+
+# Playwrightブラウザのインストール
+RUN playwright install chromium
+
+# アプリケーションを起動
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers=3", "--timeout=60"]
+</file>
+
+<file path="options-integration-template.json">
+{
+  "application/json": "{\"statusCode\": 200}"
+}
+</file>
+
+<file path="Procfile">
+web: gunicorn app:app
+</file>
+
+<file path=".github/pull_request_template.md">
+## Issue
+
+close #{IssueNumber}
+
+### 作成内容
+
+- [Issue](https://github.com/KonishiKenji/test-various-tools/issues/{IssueNumber})
+
+## 確認事項
+
+〜特になければ項目自体削除
+
+## 備考
+</file>
+
+<file path="artifacts/.gitkeep">
+# gitkeepファイル - artifactsディレクトリを維持するためのもの
+# function_latest.zipのシンボリックリンクを保持するためのディレクトリ
+</file>
+
+<file path="config/config.development.yaml">
+app:
+  debug: true
+  log_level: DEBUG
+  secret_key: dev-secret-key
+
+scraper:
+  kaitori_rudea_urls:
+    - https://kaitori-rudeya.com/category/detail/183 # iPhone 16
+    - https://kaitori-rudeya.com/category/detail/185 # iPhone 16 Pro
+    - https://kaitori-rudeya.com/category/detail/186 # iPhone 16 Pro Max
+    - https://kaitori-rudeya.com/category/detail/205 # iPhone 16 e
+  apple_store_url: https://www.apple.com/jp/shop/buy-iphone
+  request_timeout: 30
+  retry_count: 3
+  user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+</file>
+
+<file path="config/config.production.yaml">
+app:
+  debug: false
+  log_level: INFO
+  # secret_keyは環境変数から取得するため、ここには記載しない
+
+scraper:
+  kaitori_rudea_urls:
+    - https://kaitori-rudeya.com/category/detail/183 # iPhone 16
+    - https://kaitori-rudeya.com/category/detail/185 # iPhone 16 Pro
+    - https://kaitori-rudeya.com/category/detail/186 # iPhone 16 Pro Max
+    - https://kaitori-rudeya.com/category/detail/205 # iPhone 16 e
+  apple_store_url: https://www.apple.com/jp/shop/buy-iphone
+  request_timeout: 60
+  retry_count: 5
+  user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+</file>
+
 <file path="data/official_prices.json">
 {
   "iPhone 16": {
@@ -382,44 +963,84 @@ config = ConfigManager()
 }
 </file>
 
-<file path="src/apple_scraper.py">
-import requests
-from bs4 import BeautifulSoup
+<file path="scripts/cleanup_api_gateway.py">
+import logging
+import time
 
-# iPhone 16, iPhone 16 Plusの購入ページURL
-url_iphone16 = 'https://www.apple.com/jp/shop/buy-iphone/iphone-16'
-# iPhone 16 Pro, iPhone 16 Pro Maxの購入ページURL
-url_iphone16_pro = 'https://www.apple.com/jp/shop/buy-iphone/iphone-16-pro'
+import boto3
+from botocore.exceptions import ClientError
 
-# ページから価格情報を取得する関数
-def get_prices(url):
-    # ページを取得
-    response = requests.get(url)
+# ロガーの設定
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def delete_api_with_retry(apigw, api, max_retries=5, initial_wait=5):
+    """指数バックオフを使用してAPIを削除する"""
+    for attempt in range(max_retries):
+        try:
+            apigw.delete_rest_api(restApiId=api['id'])
+            logger.info(f"Successfully deleted API: {api['name']}")
+            return True
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'TooManyRequestsException':
+                wait_time = initial_wait * (2 ** attempt)  # 指数バックオフ
+                if attempt < max_retries - 1:
+                    logger.warning(f"Rate limit reached. Waiting {wait_time} seconds before retry {attempt + 1}/{max_retries}...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Failed to delete API {api['name']} after {max_retries} retries")
+                    return False
+            else:
+                logger.error(f"Error deleting API {api['name']}: {str(e)}")
+                return False
+        except Exception as e:
+            logger.error(f"Unexpected error deleting API {api['name']}: {str(e)}")
+            return False
+    return False
+
+def cleanup_api_gateway():
+    try:
+        # API Gatewayクライアントの作成
+        apigw = boto3.client('apigateway')
+        
+        # 既存のAPIを取得
+        apis = apigw.get_rest_apis()['items']
+        logger.info(f"Found {len(apis)} APIs")
+        
+        # 現在使用中のAPIを除外
+        current_api_id = 'l8l7v5xw9d'  # 現在使用中のAPI ID
+        apis_to_delete = [api for api in apis if api['id'] != current_api_id]
+        
+        logger.info(f"Deleting {len(apis_to_delete)} old APIs")
+        
+        # 各APIを削除
+        success_count = 0
+        failed_apis = []
+        
+        for api in apis_to_delete:
+            logger.info(f"Deleting API: {api['name']} (ID: {api['id']})")
+            if delete_api_with_retry(apigw, api):
+                success_count += 1
+                time.sleep(3)  # 成功後も少し待機
+            else:
+                failed_apis.append(api)
+        
+        # 結果の表示
+        logger.info(f"Cleanup completed. Successfully deleted {success_count} APIs.")
+        if failed_apis:
+            logger.warning(f"Failed to delete {len(failed_apis)} APIs:")
+            for api in failed_apis:
+                logger.warning(f"  - {api['name']} (ID: {api['id']})")
     
-    # レスポンスの内容を確認
-    print(response.text)  # ここでHTMLの内容を表示
-    
-    # BeautifulSoupでHTML解析
-    soup = BeautifulSoup(response.text, 'html.parser')
+    except Exception as e:
+        logger.error(f"Error during API Gateway cleanup: {str(e)}")
 
-    # 価格情報を取得するためのセレクタ
-    prices = soup.select('span.price-point.price-point-fullPrice > span.nowrap')
+if __name__ == "__main__":
+    cleanup_api_gateway()
+</file>
 
-    # 取得した価格情報をリストに格納
-    price_list = [price.get_text() for price in prices]
-    return price_list
+<file path="terraform/requirements.txt">
 
-# iPhone 16シリーズの価格取得
-print("iPhone 16シリーズの価格:")
-iphone16_prices = get_prices(url_iphone16)
-for price in iphone16_prices:
-    print(price)
-
-# iPhone 16 Proシリーズの価格取得
-print("\niPhone 16 Proシリーズの価格:")
-iphone16_pro_prices = get_prices(url_iphone16_pro)
-for price in iphone16_pro_prices:
-    print(price)
 </file>
 
 <file path="tests/integration/test_config_integration.py">
@@ -763,14 +1384,6 @@ scraper:
     dest_file.unlink()
 </file>
 
-<file path="tests/pytest.ini">
-[pytest]
-pythonpath = .
-testpaths = tests
-python_files = test_*.py
-addopts = -v -s --cov=config --cov-report=term-missing
-</file>
-
 <file path="tests/test_config_manager.py">
 import sys
 from pathlib import Path
@@ -870,32 +1483,894 @@ def test_scraper_config_multiple_urls(mock_env_vars, test_config_file):
     assert "https://kaitori-rudeya.com/category/detail/205" in config.scraper.KAITORI_RUDEA_URLS
 </file>
 
-<file path=".env.example">
-FLASK_ENV=development
-SECRET_KEY=your-secret-key-here
+<file path="app.py">
+import logging
+import os
+import re
+
+from flask import Flask, jsonify, render_template, send_from_directory
+from playwright.sync_api import sync_playwright
+
+from config import config
+from services.dynamodb_service import get_prices_by_series
+
+
+def create_app():
+    app = Flask(__name__)
+
+    # アプリケーション設定の適用
+    app.config['DEBUG'] = config.app.DEBUG
+    app.config['SECRET_KEY'] = config.app.SECRET_KEY
+
+    # Playwrightのタイムアウト設定
+    app.config['PLAYWRIGHT_TIMEOUT'] = config.scraper.REQUEST_TIMEOUT * 1000  # ミリ秒単位に変換
+
+    # ログ設定
+    logging.basicConfig(
+        level=getattr(logging, config.app.LOG_LEVEL),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
+    @app.route("/favicon.ico")
+    def favicon():
+        try:
+            return send_from_directory(
+                os.path.join(app.root_path, "static"),
+                "favicon.ico",
+                mimetype="image/vnd.microsoft.icon"
+            )
+        except Exception as e:
+            app.logger.error(f"Favicon error: {str(e)}")
+            return "", 204  # No Content
+
+    return app
+
+# アプリケーションインスタンスの作成
+app = create_app()
+
+def price_text_to_int(price_text):
+    """価格テキストを整数に変換する"""
+    try:
+        # "123,456円" → 123456
+        return int(price_text.replace("円", "").replace(",", ""))
+    except (ValueError, AttributeError):
+        return 0
+
+def get_kaitori_prices():
+    """買取価格データをスクレイピングで取得"""
+    all_product_details = {
+        "iPhone 16": {},
+        "iPhone 16 Pro": {},
+        "iPhone 16 Pro Max": {},
+        "iPhone 16e": {},
+    }
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(chromium_sandbox=False)
+        page = browser.new_page()
+
+        for url in config.scraper.KAITORI_RUDEA_URLS:
+            page.goto(url)
+            page.wait_for_load_state("networkidle")
+
+            items = page.query_selector_all(".tr")
+
+            for item in items:
+                try:
+                    model_element = item.query_selector(".ttl h2")
+                    model_name = model_element.inner_text().strip() if model_element else ""
+
+                    # モデル名からシリーズを判定
+                    if "Pro Max" in model_name:
+                        series = "iPhone 16 Pro Max"
+                    elif "Pro" in model_name:
+                        series = "iPhone 16 Pro"
+                    elif "16" in model_name:
+                        series = "iPhone 16"
+                    elif "16" in model_name:
+                        series = "iPhone 16 e"
+                    else:
+                        continue
+
+                    # 容量を抽出（例: "128GB" または "1TB"）
+                    capacity_match = re.search(r"(\d+)(GB|TB)", model_name)
+                    if not capacity_match:
+                        continue
+                    capacity = capacity_match.group(0)  # "128GB" or "1TB"
+
+                    price_element = item.query_selector(".td.td2 .td2wrap")
+                    price_text = price_element.inner_text().strip() if price_element else ""
+
+                    if model_name and price_text and "円" in price_text:
+                        # カラーを抽出
+                        color_match = re.search(r"(黒|白|桃|緑|青|金|灰)", model_name)
+                        color = color_match.group(1) if color_match else "不明"
+
+                        # 容量ごとのデータを初期化・更新
+                        if capacity not in all_product_details[series]:
+                            all_product_details[series][capacity] = {
+                                "colors": {},
+                                "kaitori_price_min": None,
+                                "kaitori_price_max": None,
+                            }
+
+                        # 色ごとの価格を保存
+                        price_value = price_text_to_int(price_text)
+                        all_product_details[series][capacity]["colors"][color] = {
+                            "price_text": price_text,
+                            "price_value": price_value,
+                        }
+
+                        # 最小・最大価格を更新
+                        current_min = all_product_details[series][capacity]["kaitori_price_min"]
+                        current_max = all_product_details[series][capacity]["kaitori_price_max"]
+
+                        if current_min is None or price_value < current_min:
+                            all_product_details[series][capacity]["kaitori_price_min"] = price_value
+                        if current_max is None or price_value > current_max:
+                            all_product_details[series][capacity]["kaitori_price_max"] = price_value
+
+                except Exception as e:
+                    app.logger.error(f"データ取得エラー: {str(e)}")
+                    continue
+
+        browser.close()
+
+    return all_product_details
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+@app.route("/get_prices")
+def get_prices():
+    """買取価格と公式価格を取得して統合"""
+    try:
+        kaitori_prices = get_kaitori_prices()
+        official_prices = get_prices_by_series()  # DynamoDBから公式価格を取得
+
+        # データ統合処理
+        for series, capacities in kaitori_prices.items():
+            if series in official_prices:
+                for capacity, details in capacities.items():
+                    if capacity in official_prices[series]:
+                        official_price = min(official_prices[series][capacity].values())
+                        details["official_price"] = official_price
+                        details["profit_min"] = details["kaitori_price_min"] - official_price
+                        details["profit_max"] = details["kaitori_price_max"] - official_price
+
+        return jsonify(kaitori_prices), 200
+
+    except Exception as e:
+        app.logger.error(f"エラー: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
 </file>
 
-<file path="Procfile">
-web: gunicorn app:app
+<file path="README.md">
+# **`priceComparisonAppForIphone`リポジトリについて**
+
+# Claude や ChatGPT にリポジトリを丸ごと読み込ませるコマンド
+
+以下のコマンドを実行することでリポジトリ一式をテキストファイル（`repomix-output.txt`, 旧：`repopack-output.txt`）を出力することができます。
+
+```
+npx repomix
+// 2024/12/20 `repopack`からupgrade
+```
+
+chat へ最初に取り込ませることでコード修正に役立ちます。
+
+### 読み込ませるポイント
+
+ファイルと合わせて以下のプロンプトで始めるとスムーズに改修を始めやすい
+
+```
+このファイルはリポジトリのファイルを1つにしたものです。コードのリファクタなどをしたいのでまず添付のコードを確認してください。
+```
+
+# About setting to "Renovate"
+
+## 説明:
+
+- extends: ["config:base"]: デフォルト設定に基づきます。
+- labels: ["dependencies"]: すべての PR に "dependencies" ラベルが付与されます。
+- packageRules:
+  - minor と patch の自動マージ: 自動的に PR がマージされます（automergeType: "pr"）。
+  - 大規模なマイナー変更（特定のパッケージ）やメジャーアップデートは自動マージされません\*\*。
+- prConcurrentLimit: 一度に開かれる PR の上限(number)。
+
+この設定で、メジャーアップデートと大規模なマイナー変更は手動でマージすることができ、それ以外の更新は自動的にマージされます。
+
+# `AWS`の設定について
+
+## credentials について
+
+以下`~/.aws/credentials`のサンプルになります(2024/12/20 時点のもの。セキュリティ面から 2,3 週間ごとに変更予定のため流用はほぼ不可)
+
+```
+[default]
+aws_access_key_id = ********************
+aws_secret_access_key = ****************************************
+# 格納方法は別途検討中
+```
+
+※ MFA を有効にする場合、`aws cli`は追加対応が必要になるため注意が必要（AI に聞くなり「aws-cli mfa」などで調べてください。大体は「一時的なアクセス情報を発行する」や`aws sts`コマンドに行き着くかと思います）
+
+※ `aws configure` は `--profile`オプションを追加して名前つきのプロファイルを設定することができます（上記同様 AI に聞くなりして調べてください）
+
+## config について
+
+以下`~/.aws/config`のサンプルになります。こちらは管理者が日本以外に帰化しない限りは以下のままかと思います。
+
+```
+[default]
+region = ap-northeast-1
+output = json
+# outputについて、`yaml`等が良ければ必要に応じて変更してください
+```
+
+## DynamoDB create command
+
+上記`aws configure`の設定は前提
+
+```
+aws dynamodb create-table \
+  --table-name official_prices \
+  --attribute-definitions \
+      AttributeName=series,AttributeType=S \
+      AttributeName=capacity,AttributeType=S \
+  --key-schema \
+      AttributeName=series,KeyType=HASH \
+      AttributeName=capacity,KeyType=RANGE \
+  --billing-mode PAY_PER_REQUEST
+```
+
+実際に保存したい情報（`2024/12/20`時点のもの）は`data/official_prices.json`に残っていたりもする（以前は`json`ファイルから描写していた名残）
+
+## ディレクトリ構成について（`2024/12/20`時点）
+
+```
+priceComparisonAppForIphone/
+│
+├── scripts/  # スクリプト関連
+│   ├── migrate_to_dynamodb.py  # データ移行用
+│
+├── services/  # AWSサービスごとの処理
+│   ├── dynamodb_service.py  # DynamoDB操作
+│   ├── lambda_handler.py  # Lambda関数のエントリーポイント
+│
+├── templates/  # HTMLテンプレート
+│   ├── index.html  # フロントエンド
+│
+├── app.py  # Flaskサーバー
+├── requirements.txt
+└── README.md
+```
+
+# ローカル環境での実行手順
+
+1. まず、必要な環境変数を設定します。`.env.example`をコピーして`.env`ファイルを作成：
+
+```bash
+cp .env.example .env
+```
+
+2. 必要な Python パッケージをインストール：
+
+```bash
+pip install -r requirements.txt
+```
+
+3. Playwright のブラウザをインストール：
+
+```bash
+playwright install chromium
+```
+
+4. アプリケーションの実行：
+
+開発モード（デバッグ有効）での実行：
+
+```bash
+python app.py
+```
+
+または、本番モードでの実行（Gunicorn を使用）：
+
+```bash
+gunicorn app:app --bind 0.0.0.0:5000 --workers=3 --timeout=60
+```
+
+Docker を使用する場合：
+
+```bash
+# イメージのビルド
+docker build -t price-comparison-app:latest .
+
+# コンテナの実行
+docker run -p 5000:5000 price-comparison-app:latest
+```
+
+アプリケーションが起動したら、ブラウザで以下の URL にアクセスできます：
+
+```
+http://localhost:5000
+```
+
+注意点：
+
+- AWS 関連の機能を使用する場合は、AWS 認証情報の設定が必要です
+- DynamoDB を使用する場合は、`~/.aws/credentials`の設定が必要です
+- 開発環境では`config/config.development.yaml`の設定が使用されます
+
+エラーが発生した場合は、ログを確認することで詳細な情報を得ることができます。
+
+# 仮想環境の作成
+
+venv モジュールを使用して仮想環境を作成します。以下のコマンドを実行します。
+
+```
+python -m venv venv
+```
+
+これにより、venv という名前の仮想環境が作成されます。後半の'venv'の部分は任意の名前に変更できます。
+
+# 仮想環境の有効化
+
+仮想環境を作成したら、その環境を有効化します。OS によってコマンドが異なります。
+
+### Windows の場合
+
+```
+venv\Scripts\activate
+```
+
+### macOS/Linux の場合
+
+```
+source venv/bin/activate
+```
+
+仮想環境が有効化されると、ターミナルのプロンプトが以下のように変わります。
+
+```
+(venv) $
+```
 </file>
 
-<file path=".github/pull_request_template.md">
-## Issue
-
-close #{IssueNumber}
-
-### 作成内容
-
-- [Issue](https://github.com/KonishiKenji/test-various-tools/issues/{IssueNumber})
-
-## 確認事項
-
-〜特になければ項目自体削除
-
-## 備考
+<file path="renovate.json">
+{
+  "extends": ["config:recommended", ":timezone(Asia/Tokyo)"],
+  "labels": ["dependencies", "renovate"],
+  "automerge": true,
+  "pin": {
+    "automerge": true
+  },
+  "packageRules": [
+    {
+      "packagePatterns": ["^@types/"],
+      "automerge": true,
+      "major": {
+        "automerge": false
+      }
+    },
+    {
+      "groupName": "jest",
+      "automerge": true,
+      "sourceUrlPrefixes": [
+        "https://github.com/facebook/jest",
+        "https://github.com/kulshekhar/ts-jest"
+      ]
+    },
+    {
+      "groupName": "linters",
+      "automerge": true,
+      "extends": ["packages:linters"],
+      "packageNames": ["prettier"],
+      "packagePatterns": ["^@typescript-eslint/"]
+    },
+    {
+      "matchDepTypes": ["githubActionsForWorkflows"],
+      "groupName": "actions for github actions workflows",
+      "automerge": true,
+      "groupSlug": "actions-update-for-github-actions-workflows"
+    },
+    {
+      "matchDepTypes": ["dockerImageForWorkflows"],
+      "groupName": "docker image for github actions workflows",
+      "automerge": true,
+      "groupSlug": "docker-image-update-for-github-actions-workflows"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "prConcurrentLimit": 10,
+      "prPriority": -1,
+      "matchPackageNames": [
+        "!/@*/",
+        "!/some-risky-package/",
+        "!/another-risky-package/"
+      ]
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "prConcurrentLimit": 5,
+      "prPriority": 1
+    }
+  ],
+  "prConcurrentLimit": 10
+}
 </file>
 
-<file path="lambda/get_prices_lambda/lambda_function.py">
+<file path="repomix-output.txt">
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+
+Additional Info:
+----------------
+
+================================================================
+Directory Structure
+================================================================
+.github/
+  workflows/
+    deploy.yml
+    docker-build-and-push.yml
+config/
+  __init__.py
+  config.development.yaml
+  config.production.yaml
+  manager.py
+data/
+  official_prices.json
+lambda/
+  get_prices_lambda/
+    lambda_function.py
+  get_prices_lambda.py
+scripts/
+  debug_check.sh
+  deploy_lambda.sh
+  migrate_to_dynamodb.py
+services/
+  dynamodb_service.py
+src/
+  apple_scraper_for_rudea.py
+  apple_scraper.py
+templates/
+  index.html
+terraform-render/
+  main.tf
+  variables.tf
+tests/
+  integration/
+    test_config_integration.py
+  unit/
+    test_validators.py
+  conftest.py
+  pytest.ini
+  test_config_manager.py
+.env.example
+.gitignore
+.python-version
+app.py
+create_patch.py
+Dockerfile
+options-integration-template.json
+Procfile
+README.md
+renovate.json
+requirements.txt
+
+================================================================
+Files
+================================================================
+
+================
+File: .github/workflows/deploy.yml
+================
+name: Deploy to Render
+
+on:
+  push:
+    branches:
+      - main  # `main`ブランチへのプッシュをトリガー
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # コードをチェックアウト
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Terraformのセットアップ
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      # Terraformの初期化
+      - name: Initialize Terraform
+        env:
+          TF_VAR_db_password: ${{ secrets.RENDER_POSTGRESQL_DB_PASSWORD }}  # GitHub Secretsからパスワードを取得
+        run: terraform init
+
+      # Terraform構成の適用
+      - name: Apply Terraform configuration
+        env:
+          TF_VAR_db_password: ${{ secrets.RENDER_POSTGRESQL_DB_PASSWORD }}  # GitHub Secretsからパスワードを取得
+        run: terraform apply -auto-approve -input=false  # `input=false`を追加して自動承認
+
+================
+File: .github/workflows/docker-build-and-push.yml
+================
+name: Build, Push, and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    name: Build, Push, and Deploy to Render
+    runs-on: ubuntu-latest
+
+    steps:
+      # リポジトリをチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Dockerにログイン
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Dockerイメージをビルド＆プッシュ
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: |
+            koninji/price-comparison-app:latest
+
+      # Renderのサービス一覧からサービスIDを取得
+      - name: Fetch Render Service ID
+        id: fetch-service-id
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          SERVICE_ID=$(curl -s -X GET \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            https://api.render.com/v1/services \
+            | jq -r '.[] | select(.service.name=="price-comparison-app:latest") | .service.id')
+
+          if [ -z "$SERVICE_ID" ]; then
+            echo "Service ID not found for 'price-comparison-app:latest'."
+            exit 1
+          fi
+
+          echo "SERVICE_ID=$SERVICE_ID" >> $GITHUB_ENV
+
+      # Renderでデプロイをトリガー
+      - name: Trigger Render Deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            https://api.render.com/v1/services/$SERVICE_ID/deploys
+
+================
+File: config/__init__.py
+================
+from .manager import AppConfig, ConfigManager, ScraperConfig, config
+
+__all__ = ['AppConfig', 'ConfigManager', 'ScraperConfig', 'config']
+
+================
+File: config/config.development.yaml
+================
+app:
+  debug: true
+  log_level: DEBUG
+  secret_key: dev-secret-key
+
+scraper:
+  kaitori_rudea_urls:
+    - https://kaitori-rudeya.com/category/detail/183 # iPhone 16
+    - https://kaitori-rudeya.com/category/detail/185 # iPhone 16 Pro
+    - https://kaitori-rudeya.com/category/detail/186 # iPhone 16 Pro Max
+  apple_store_url: https://www.apple.com/jp/shop/buy-iphone
+  request_timeout: 30
+  retry_count: 3
+  user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+
+================
+File: config/config.production.yaml
+================
+app:
+  debug: false
+  log_level: INFO
+  # secret_keyは環境変数から取得するため、ここには記載しない
+
+scraper:
+  kaitori_rudea_urls:
+    - https://kaitori-rudeya.com/category/detail/183 # iPhone 16
+    - https://kaitori-rudeya.com/category/detail/185 # iPhone 16 Pro
+    - https://kaitori-rudeya.com/category/detail/186 # iPhone 16 Pro Max
+  apple_store_url: https://www.apple.com/jp/shop/buy-iphone
+  request_timeout: 60
+  retry_count: 5
+  user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+
+================
+File: config/manager.py
+================
+import os
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Literal, Optional, Union
+from urllib.parse import urlparse
+
+import yaml
+from dotenv import load_dotenv
+
+
+@dataclass(frozen=True)
+class ScraperConfig:
+    """スクレイピング関連の設定を管理するデータクラス"""
+    KAITORI_RUDEA_URLS: list  # 複数形に変更し、型をlistに
+    APPLE_STORE_URL: str
+    REQUEST_TIMEOUT: int
+    RETRY_COUNT: int
+    USER_AGENT: str
+
+    # ScraperConfig 型検証を __post_init__ メソッド内で実装
+    def __post_init__(self):
+        self._validate_urls()
+        self._validate_timeout()
+        self._validate_retry_count()
+        # 型チェック
+        if not isinstance(self.KAITORI_RUDEA_URLS, list):
+            raise TypeError("KAITORI_RUDEA_URLS must be a list of strings")
+        if not isinstance(self.APPLE_STORE_URL, str):
+            raise TypeError("APPLE_STORE_URL must be a string")
+        if not isinstance(self.REQUEST_TIMEOUT, int):
+            raise TypeError("REQUEST_TIMEOUT must be an integer")
+        if not isinstance(self.RETRY_COUNT, int):
+            raise TypeError("RETRY_COUNT must be an integer")
+        if not isinstance(self.USER_AGENT, str):
+            raise TypeError("USER_AGENT must be a string")
+
+    def _validate_urls(self) -> None:
+        """URLの形式を検証"""
+        for url in self.KAITORI_RUDEA_URLS + [self.APPLE_STORE_URL]:
+            parsed = urlparse(url)
+            if not all([parsed.scheme, parsed.netloc]):
+                raise ValueError(f"Invalid URL format: {url}")
+
+    def _validate_timeout(self) -> None:
+        """タイムアウト値の検証"""
+        if not isinstance(self.REQUEST_TIMEOUT, int) or self.REQUEST_TIMEOUT <= 0:
+            raise ValueError(f"REQUEST_TIMEOUT must be a positive integer, got {self.REQUEST_TIMEOUT}")
+
+    def _validate_retry_count(self) -> None:
+        """リトライ回数の検証"""
+        if not isinstance(self.RETRY_COUNT, int) or self.RETRY_COUNT < 0:
+            raise ValueError(f"RETRY_COUNT must be a non-negative integer, got {self.RETRY_COUNT}")
+
+@dataclass(frozen=True)
+class AppConfig:
+    """アプリケーション全体の設定を管理するデータクラス"""
+    DEBUG: bool
+    SECRET_KEY: str
+    LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+    # AppConfig 型検証を __post_init__ メソッド内で実装
+    def __post_init__(self):
+        self._validate_secret_key()
+        self._validate_log_level()
+        # 型チェック
+        if not isinstance(self.DEBUG, bool):
+            raise TypeError("DEBUG must be a boolean")
+        if not isinstance(self.SECRET_KEY, str):
+            raise TypeError("SECRET_KEY must be a string")
+        if not isinstance(self.LOG_LEVEL, str):
+            raise TypeError("LOG_LEVEL must be a string")
+
+    def _validate_secret_key(self) -> None:
+        """シークレットキーの検証"""
+        if not self.SECRET_KEY or len(self.SECRET_KEY) < 16:
+            raise ValueError("SECRET_KEY must be at least 16 characters long")
+
+    def _validate_log_level(self) -> None:
+        """ログレベルの検証"""
+        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if self.LOG_LEVEL not in valid_levels:
+            raise ValueError(f"LOG_LEVEL must be one of {valid_levels}")
+
+class ConfigManager:
+    """設定を一元管理するクラス"""
+    def __init__(self, config_dir=None):
+        self._config: Optional[dict] = None
+        self._scraper_config: Optional[ScraperConfig] = None
+        self._app_config: Optional[AppConfig] = None
+        
+        self.load_environment()
+        self.load_config_file(config_dir)
+
+    def load_environment(self) -> None:
+        """環境変数を読み込む"""
+        load_dotenv()
+        self.env: str = os.getenv('FLASK_ENV', 'development')
+        
+    def load_config_file(self, config_dir=None) -> None:
+        """設定ファイルを読み込む"""
+        if config_dir is None:
+            config_dir = Path(__file__).parent
+        else:
+            config_dir = Path(config_dir)
+        
+        config_file = config_dir / f'config.{self.env}.yaml'
+        
+        if not config_file.exists():
+            raise FileNotFoundError(f"Configuration file not found: {config_file}")
+            
+        with open(config_file, 'r') as f:
+            self._config = yaml.safe_load(f)
+
+    @property
+    def scraper(self) -> ScraperConfig:
+        """スクレイピング設定を取得"""
+        if self._scraper_config is None:
+            self._scraper_config = ScraperConfig(
+                KAITORI_RUDEA_URLS=self._config['scraper']['kaitori_rudea_urls'],
+                APPLE_STORE_URL=self._config['scraper']['apple_store_url'],
+                REQUEST_TIMEOUT=self._config['scraper']['request_timeout'],
+                RETRY_COUNT=self._config['scraper']['retry_count'],
+                USER_AGENT=self._config['scraper']['user_agent']
+            )
+        return self._scraper_config
+
+    @property
+    def app(self) -> AppConfig:
+        """アプリケーション設定を取得"""
+        if self._app_config is None:
+            self._app_config = AppConfig(
+                DEBUG=self._config['app']['debug'],
+                SECRET_KEY=os.getenv('SECRET_KEY', 'default-secret-key'),
+                LOG_LEVEL=self._config['app']['log_level']
+            )
+        return self._app_config
+
+# シングルトンインスタンスを作成
+config = ConfigManager()
+
+================
+File: data/official_prices.json
+================
+{
+  "iPhone 16": {
+    "128GB": {
+      "black 黒 MYDQ3J/A 未開封 SIMフリー": 124800,
+      "pink 桃 MYDT3J/A 未開封 SIMフリー": 124800,
+      "teal 緑 MYDV3J/A 未開封 SIMフリー": 124800,
+      "ultramarine 青 MYDU3J/A 未開封 SIMフリー": 124800,
+      "white 白 MYDR3J/A 未開封 SIMフリー": 124800
+    },
+    "256GB": {
+      "black 黒 MYDW3J/A 未開封 SIMフリー": 139800,
+      "pink 桃 MYDY3J/A 未開封 SIMフリー": 139800,
+      "teal 緑 MYDZ3J/A 未開封 SIMフリー": 139800,
+      "ultramarine 青 MYDX3J/A 未開封 SIMフリー": 139800,
+      "white 白 MYDW3J/A 未開封 SIMフリー": 139800
+    },
+    "512GB": {
+      "black 黒 MYDQ3J/A 未開封 SIMフリー": 169800,
+      "pink 桃 MYDT3J/A 未開封 SIMフリー": 169800,
+      "teal 緑 MYDV3J/A 未開封 SIMフリー": 169800,
+      "ultramarine 青 MYDU3J/A 未開封 SIMフリー": 169800,
+      "white 白 MYDR3J/A 未開封 SIMフリー": 169800
+    }
+  },
+  "iPhone 16 Pro": {
+    "128GB": {
+      "black 黒 MYWG3J/A 未開封 SIMフリー": 161000,
+      "desert 金 MYWH3J/A 未開封 SIMフリー": 161000,
+      "natural 灰 MYWJ3J/A 未開封 SIMフリー": 161000,
+      "white 白 MYWK3J/A 未開封 SIMフリー": 161000
+    },
+    "256GB": {
+      "black 黒 MYWG3J/A 未開封 SIMフリー": 177500,
+      "desert 金 MYWH3J/A 未開封 SIMフリー": 177500,
+      "natural 灰 MYWJ3J/A 未開封 SIMフリー": 177500,
+      "white 白 MYWK3J/A 未開封 SIMフリー": 177500
+    },
+    "512GB": {
+      "black 黒 MYWQ3J/A 未開封 SIMフリー": 204000,
+      "desert 金 MYWT3J/A 未開封 SIMフリー": 204000,
+      "natural 灰 MYWU3J/A 未開封 SIMフリー": 204000,
+      "white 白 MYWR3J/A 未開封 SIMフリー": 204000
+    },
+    "1TB": {
+      "black 黒 MYWQ3J/A 未開封 SIMフリー": 234000,
+      "desert 金 MYWT3J/A 未開封 SIMフリー": 234000,
+      "natural 灰 MYWU3J/A 未開封 SIMフリー": 234000,
+      "white 白 MYWR3J/A 未開封 SIMフリー": 234000
+    }
+  },
+  "iPhone 16 Pro Max": {
+    "256GB": {
+      "black 黒 MYWG3J/A 未開封 SIMフリー": 189800,
+      "desert 金 MYWH3J/A 未開封 SIMフリー": 189800,
+      "natural 灰 MYWJ3J/A 未開封 SIMフリー": 189800,
+      "white 白 MYWK3J/A 未開封 SIMフリー": 189800
+    },
+    "512GB": {
+      "black 黒 MYWQ3J/A 未開封 SIMフリー": 219800,
+      "desert 金 MYWT3J/A 未開封 SIMフリー": 219800,
+      "natural 灰 MYWU3J/A 未開封 SIMフリー": 219800,
+      "white 白 MYWR3J/A 未開封 SIMフリー": 219800
+    },
+    "1TB": {
+      "black 黒 MYWQ3J/A 未開封 SIMフリー": 249800,
+      "desert 金 MYWT3J/A 未開封 SIMフリー": 249800,
+      "natural 灰 MYWU3J/A 未開封 SIMフリー": 249800,
+      "white 白 MYWR3J/A 未開封 SIMフリー": 249800
+    }
+  }
+}
+
+================
+File: lambda/get_prices_lambda/lambda_function.py
+================
 import json
 import logging
 import os
@@ -977,9 +2452,10 @@ def lambda_handler(event, context):
                 'detail': 'An error occurred while processing your request'
             })
         }
-</file>
 
-<file path="lambda/get_prices_lambda.py">
+================
+File: lambda/get_prices_lambda.py
+================
 import json
 import logging
 
@@ -1048,9 +2524,10 @@ def lambda_handler(event, context):
                 'detail': 'An error occurred while processing your request'
             })
         }
-</file>
 
-<file path="scripts/debug_check.sh">
+================
+File: scripts/debug_check.sh
+================
 read -p "スクリプトを開始しますか？ (yes/no): " response
 if [[ $response =~ ^([yY][eE][sS]|[yY])$ ]]
 then
@@ -1078,9 +2555,10 @@ then
 else
     echo "スクリプトを開始しない"
 fi
-</file>
 
-<file path="scripts/deploy_lambda.sh">
+================
+File: scripts/deploy_lambda.sh
+================
 <<COMMENT 
 # ディレクトリ構造
 project/
@@ -1258,9 +2736,10 @@ aws dynamodb put-item \
             "1TB": {"S": "249800"}
         }}
     }'
-</file>
 
-<file path="scripts/migrate_to_dynamodb.py">
+================
+File: scripts/migrate_to_dynamodb.py
+================
 import json
 
 import boto3
@@ -1285,9 +2764,10 @@ for series, capacities in data.items():
         print(f"Inserted: {series} - {capacity}")
 
 print("データ移行完了！")
-</file>
 
-<file path="services/dynamodb_service.py">
+================
+File: services/dynamodb_service.py
+================
 import boto3
 from boto3.dynamodb.conditions import Key
 
@@ -1308,9 +2788,10 @@ def get_prices_by_series(series_name):
     except Exception as e:
         print(f"Error querying DynamoDB: {str(e)}")
         raise
-</file>
 
-<file path="src/apple_scraper_for_rudea.py">
+================
+File: src/apple_scraper_for_rudea.py
+================
 import json
 import logging
 import os
@@ -1368,8 +2849,7 @@ def get_kaitori_prices(series):
         series_url_map = {
             'iPhone 16': config['scraper']['kaitori_rudea_urls'][0],
             'iPhone 16 Pro': config['scraper']['kaitori_rudea_urls'][1],
-            'iPhone 16 Pro Max': config['scraper']['kaitori_rudea_urls'][2],
-            'iPhone 16e': config['scraper']['kaitori_rudea_urls'][3]
+            'iPhone 16 Pro Max': config['scraper']['kaitori_rudea_urls'][2]
         }
         
         if series not in series_url_map:
@@ -1473,221 +2953,1413 @@ def get_kaitori_prices(series):
                 'official': get_official_prices(series)
             }
         }
-</file>
 
-<file path="terraform/backup/api_gateway.tf">
-resource "aws_api_gateway_rest_api" "price_comparison" {
-  name        = "price-comparison-api-${var.environment}"
-  description = "Price Comparison API"
-}
+================
+File: src/apple_scraper.py
+================
+import requests
+from bs4 import BeautifulSoup
 
-resource "aws_api_gateway_resource" "prices" {
-  rest_api_id = aws_api_gateway_rest_api.price_comparison.id
-  parent_id   = aws_api_gateway_rest_api.price_comparison.root_resource_id
-  path_part   = "get_prices"
-}
+# iPhone 16, iPhone 16 Plusの購入ページURL
+url_iphone16 = 'https://www.apple.com/jp/shop/buy-iphone/iphone-16'
+# iPhone 16 Pro, iPhone 16 Pro Maxの購入ページURL
+url_iphone16_pro = 'https://www.apple.com/jp/shop/buy-iphone/iphone-16-pro'
 
-resource "aws_api_gateway_method" "get_prices" {
-  rest_api_id   = aws_api_gateway_rest_api.price_comparison.id
-  resource_id   = aws_api_gateway_resource.prices.id
-  http_method   = "GET"
-  authorization = "NONE"
-}
+# ページから価格情報を取得する関数
+def get_prices(url):
+    # ページを取得
+    response = requests.get(url)
+    
+    # レスポンスの内容を確認
+    print(response.text)  # ここでHTMLの内容を表示
+    
+    # BeautifulSoupでHTML解析
+    soup = BeautifulSoup(response.text, 'html.parser')
 
-resource "aws_api_gateway_integration" "lambda" {
-  rest_api_id = aws_api_gateway_rest_api.price_comparison.id
-  resource_id = aws_api_gateway_resource.prices.id
-  http_method = aws_api_gateway_method.get_prices.http_method
+    # 価格情報を取得するためのセレクタ
+    prices = soup.select('span.price-point.price-point-fullPrice > span.nowrap')
 
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.get_prices.invoke_arn
-}
-</file>
+    # 取得した価格情報をリストに格納
+    price_list = [price.get_text() for price in prices]
+    return price_list
 
-<file path="terraform/backup/bk-lambda.tf">
-resource "aws_lambda_function" "get_prices" {
-  filename         = data.archive_file.lambda_zip.output_path
-  function_name    = "get_prices_${var.environment}"
-  role             = aws_iam_role.lambda_role.arn
-  handler          = "lambda_function.lambda_handler"
-  runtime          = "python3.9"
-  timeout          = 30
+# iPhone 16シリーズの価格取得
+print("iPhone 16シリーズの価格:")
+iphone16_prices = get_prices(url_iphone16)
+for price in iphone16_prices:
+    print(price)
 
-  environment {
-    variables = {
-      ENVIRONMENT = var.environment
-    }
-  }
+# iPhone 16 Proシリーズの価格取得
+print("\niPhone 16 Proシリーズの価格:")
+iphone16_pro_prices = get_prices(url_iphone16_pro)
+for price in iphone16_pro_prices:
+    print(price)
 
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-  }
-}
+================
+File: templates/index.html
+================
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>iPhone 16シリーズ 買取価格比較</title>
+    <style>
+      /* ローディングスピナーのスタイル */
+      .loader {
+        border: 16px solid #f3f3f3;
+        border-radius: 50%;
+        border-top: 16px solid #3498db;
+        width: 120px;
+        height: 120px;
+        animation: spin 2s linear infinite;
+        margin: 20px auto;
+      }
 
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  source_dir  = "${path.module}/lambda/get_prices_lambda"
-  output_path = "${path.module}/lambda/get_prices_lambda.zip"
-}
-
-resource "aws_iam_role" "lambda_role" {
-  name = "get_prices_lambda_role_${var.environment}"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "lambda.amazonaws.com"
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
         }
       }
-    ]
-  })
-}
 
-resource "aws_iam_role_policy_attachment" "lambda_policy" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_iam_role_policy" "dynamodb_policy" {
-  name = "dynamodb_access_${var.environment}"
-  role = aws_iam_role.lambda_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:Query",
-          "dynamodb:Scan"
-        ]
-        Resource = [
-          aws_dynamodb_table.iphone_prices.arn,
-          aws_dynamodb_table.official_prices.arn
-        ]
+      #priceTable {
+        display: none;
       }
+
+      .tables-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 20px;
+        margin: 20px auto;
+        max-width: 1400px;
+        padding: 0 20px;
+      }
+
+      .price-table {
+        min-width: 300px;
+        width: 100%;
+        border-collapse: collapse;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+
+      .price-table caption {
+        font-weight: bold;
+        margin-bottom: 10px;
+        font-size: 1.2em;
+      }
+
+      .price-table th,
+      .price-table td {
+        padding: 8px 15px;
+        border: 1px solid #ddd;
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      .price-table th {
+        background-color: #f2f2f2;
+      }
+
+      .price-table td:last-child {
+        text-align: right;
+      }
+
+      .price-table td[style*='color: green'] {
+        font-weight: bold;
+      }
+
+      .price-table td[style*='color: red'] {
+        font-weight: bold;
+      }
+
+      .series-section {
+        flex: 1 1 100%;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .series-section h2 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 15px;
+      }
+
+      /* 収支の色分け */
+      .price-diff-negative {
+        color: red;
+        font-weight: bold;
+      }
+
+      .price-diff-positive {
+        color: green;
+        font-weight: bold;
+      }
+
+      /* ブレークポイントの調整 */
+      @media (min-width: 576px) {
+        .series-section {
+          padding: 0 10px;
+        }
+      }
+
+      @media (min-width: 768px) {
+        .series-section {
+          flex: 0 1 calc(50% - 20px);
+        }
+      }
+
+      @media (min-width: 992px) {
+        .series-section {
+          flex: 0 1 calc(33.333% - 20px);
+        }
+      }
+
+      @media (max-width: 576px) {
+        .price-table {
+          font-size: 0.85em;
+        }
+        .price-table th,
+        .price-table td {
+          padding: 6px 10px;
+        }
+      }
+
+      /* テーブルラッパーを追加 */
+      .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch; /* iOSでのスムーズスクロール */
+        margin-bottom: 15px;
+      }
+
+      /* スマートフォン向けの調整 */
+      @media (max-width: 414px) {
+        .series-section {
+          flex: 1 1 100%;
+          max-width: 100%;
+          padding: 0 10px;
+        }
+
+        .tables-container {
+          gap: 20px;
+          padding: 0 5px;
+        }
+
+        .table-wrapper {
+          max-width: calc(100vw - 20px); /* 画面幅からパディングを引いた幅 */
+        }
+
+        .price-table {
+          min-width: 300px; /* テーブルの最小幅を設定 */
+          font-size: 0.85em; /* フォントサイズを縮小 */
+        }
+
+        .price-table th,
+        .price-table td {
+          padding: 6px 10px; /* セルのパディングを縮小 */
+          white-space: nowrap; /* テキストの折り返しを防止 */
+        }
+
+        /* テーブルのキャプションスタイルを調整 */
+        .series-section h2 {
+          font-size: 1.1em;
+          margin-bottom: 10px;
+        }
+      }
+
+      /* さらに小さい画面向けの微調整 */
+      @media (max-width: 374px) {
+        .price-table {
+          font-size: 0.8em;
+        }
+
+        .price-table th,
+        .price-table td {
+          padding: 5px 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>iPhone 16シリーズ 買取価格比較</h1>
+
+    <!-- ローディング中の表示 -->
+    <div id="loading" style="display: none">
+      <p>データを読み込んでいます...</p>
+      <div class="loader"></div>
+    </div>
+
+    <!-- エラーメッセージ表示エリア -->
+    <div id="error-message" style="display: none; color: red"></div>
+
+    <!-- 価格テーブル -->
+    <div id="content">
+      <div id="priceTablesContainer" class="tables-container">
+        <!-- iPhone 16 -->
+        <div class="series-section">
+          <h2>iPhone 16</h2>
+          <div class="table-wrapper">
+            <table id="iPhone16-prices" class="price-table">
+              <thead>
+                <tr>
+                  <th>容量</th>
+                  <th>公式価格</th>
+                  <th>買取価格</th>
+                  <th>収支</th>
+                  <th>楽天錬金時収支</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- iPhone 16 Pro -->
+        <div class="series-section">
+          <h2>iPhone 16 Pro</h2>
+          <div class="table-wrapper">
+            <table id="iPhone16Pro-prices" class="price-table">
+              <thead>
+                <tr>
+                  <th>容量</th>
+                  <th>公式価格</th>
+                  <th>買取価格</th>
+                  <th>収支</th>
+                  <th>楽天錬金時収支</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- iPhone 16 Pro Max -->
+        <div class="series-section">
+          <h2>iPhone 16 Pro Max</h2>
+          <div class="table-wrapper">
+            <table id="iPhone16ProMax-prices" class="price-table">
+              <thead>
+                <tr>
+                  <th>容量</th>
+                  <th>公式価格</th>
+                  <th>買取価格</th>
+                  <th>収支</th>
+                  <th>楽天錬金時収支</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const API_ENDPOINT =
+          'https://qow3wyg1nj.execute-api.ap-northeast-1.amazonaws.com/prod/get_prices';
+        const series = ['iPhone 16', 'iPhone 16 Pro', 'iPhone 16 Pro Max'];
+
+        // ローディング状態を管理する要素
+        const loadingElement = document.getElementById('loading');
+        const contentElement = document.getElementById('content');
+        const priceTablesContainer = document.getElementById(
+          'priceTablesContainer'
+        );
+
+        // データ取得と表示の処理
+        async function fetchPrices() {
+          try {
+            // ローディング表示
+            if (loadingElement) loadingElement.style.display = 'block';
+            if (contentElement) contentElement.style.display = 'none';
+
+            const results = await Promise.all(
+              series.map(series =>
+                fetch(
+                  `${API_ENDPOINT}?series=${encodeURIComponent(series)}`
+                ).then(response => {
+                  if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                  }
+                  return response.json();
+                })
+              )
+            );
+
+            console.log('Raw response data from Lambda:', results);
+
+            results.forEach((data, index) => {
+              if (data && Object.keys(data).length > 0) {
+                const seriesName = Object.keys(data)[0];
+                const priceData = data[seriesName];
+
+                const tableId = seriesName.replace(/\s+/g, '') + '-prices';
+                const tableBody = document.querySelector(`#${tableId} tbody`);
+
+                if (tableBody && priceData) {
+                  // DocumentFragment を使用
+                  const fragment = document.createDocumentFragment();
+
+                  // 容量配列の作成（既存のソートロジックを維持）
+                  const capacities = Array.from(
+                    new Set([
+                      ...Object.keys(priceData.official || {}),
+                      ...Object.keys(priceData.kaitori || {}),
+                    ])
+                  ).sort((a, b) => {
+                    const [aNum, aUnit] = a.match(/(\d+)(GB|TB)/).slice(1);
+                    const [bNum, bUnit] = b.match(/(\d+)(GB|TB)/).slice(1);
+                    const aValue =
+                      aUnit === 'TB' ? parseInt(aNum) * 1024 : parseInt(aNum);
+                    const bValue =
+                      bUnit === 'TB' ? parseInt(bNum) * 1024 : parseInt(bNum);
+                    return aValue - bValue;
+                  });
+
+                  // 一度のループで全ての行を生成
+                  capacities.forEach(capacity => {
+                    const row = document.createElement('tr');
+                    const officialPrice = parseInt(
+                      priceData.official?.[capacity]?.replace(/,/g, '') || '0'
+                    );
+                    const kaitoriPrice = parseInt(
+                      priceData.kaitori?.[capacity]?.replace(/,/g, '') || '0'
+                    );
+                    const priceDiff = kaitoriPrice - officialPrice;
+                    const rakutenPriceDiff = kaitoriPrice - officialPrice * 0.9;
+
+                    row.innerHTML = `
+                      <td>${capacity}</td>
+                      <td>¥${officialPrice.toLocaleString()}</td>
+                      <td>¥${kaitoriPrice.toLocaleString()}</td>
+                      <td class="${
+                        priceDiff > 0
+                          ? 'price-diff-positive'
+                          : 'price-diff-negative'
+                      }">
+                        ¥${priceDiff.toLocaleString()}
+                      </td>
+                      <td class="${
+                        rakutenPriceDiff > 0
+                          ? 'price-diff-positive'
+                          : 'price-diff-negative'
+                      }">
+                        ¥${Math.round(rakutenPriceDiff).toLocaleString()}
+                      </td>
+                    `;
+                    fragment.appendChild(row);
+                  });
+
+                  // まとめてDOM更新
+                  tableBody.innerHTML = '';
+                  tableBody.appendChild(fragment);
+                }
+              }
+            });
+
+            // データ表示後にテーブルを表示
+            if (priceTablesContainer)
+              priceTablesContainer.style.display = 'flex';
+          } catch (error) {
+            console.error('Fetch Error:', error);
+            // エラーメッセージを表示
+            const errorElement = document.getElementById('error-message');
+            if (errorElement) {
+              errorElement.textContent = `データの取得に失敗しました: ${error.message}`;
+              errorElement.style.display = 'block';
+            }
+          } finally {
+            // ローディング非表示
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (contentElement) contentElement.style.display = 'block';
+          }
+        }
+
+        // 初期データ取得
+        fetchPrices();
+      });
+    </script>
+  </body>
+</html>
+
+================
+File: terraform-render/main.tf
+================
+resource "render_postgresql" "price-comparison-app" {
+  name     = var.db_name
+  database = var.db_name
+  user     = var.db_user
+  password = var.db_password
+  region   = var.db_region
+  version  = var.db_version
+}
+
+output "database_url" {
+  value = render_postgresql.price-comparison-app.connection_string
+}
+
+================
+File: terraform-render/variables.tf
+================
+variable "db_name" {
+  default     = "price-comparison-app"
+  description = "The name of the PostgreSQL database"
+}
+
+variable "db_user" {
+  default     = "app_user"
+  description = "The username for the PostgreSQL database"
+}
+
+variable "db_password" {
+  description = "The password for the PostgreSQL user"
+  type        = string
+}
+
+variable "db_region" {
+  default     = "oregon"
+  description = "The region where the database will be hosted"
+}
+
+variable "db_version" {
+  default     = "16"
+  description = "The PostgreSQL version"
+}
+
+================
+File: tests/integration/test_config_integration.py
+================
+from pathlib import Path
+
+import pytest
+
+from config import ConfigManager
+
+
+def test_config_environment_integration(mock_env_vars, test_config_file):
+    """設定ファイルと環境変数の統合テスト"""
+    config = ConfigManager(config_dir=test_config_file.parent)
+    
+    # 環境変数からの値
+    assert config.app.SECRET_KEY == mock_env_vars["SECRET_KEY"]
+    
+    # 設定ファイルからの値
+    assert isinstance(config.app.DEBUG, bool)
+    assert config.app.LOG_LEVEL in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+
+def test_scraper_config_integration(mock_env_vars, test_config_file):
+    """スクレイパー設定の統合テスト"""
+    config = ConfigManager(config_dir=test_config_file.parent)
+    
+    assert config.scraper.REQUEST_TIMEOUT > 0
+    assert config.scraper.RETRY_COUNT >= 0
+    assert all("http" in url for url in config.scraper.KAITORI_RUDEA_URLS)
+    assert "http" in config.scraper.APPLE_STORE_URL
+
+# ConfigManager の統合テスト: 設定ファイルと環境変数が正しく統合されるか確認
+def test_config_integration_with_file_and_env(monkeypatch, test_config_file):
+    """設定ファイルと環境変数の統合テスト"""
+    monkeypatch.setenv("FLASK_ENV", "testing")
+    monkeypatch.setenv("SECRET_KEY", "env-secret-key-16ch")  # 16文字以上に変更
+    config = ConfigManager(config_dir=test_config_file.parent)
+    
+    # 統合後の ConfigManager が正しく値を取得しているか確認
+    assert config.app.SECRET_KEY == "env-secret-key-16ch"  # 環境変数が優先される
+    assert config.app.DEBUG is True  # 設定ファイルから取得
+    assert config.scraper.REQUEST_TIMEOUT == 30  # 設定ファイルから取得
+
+# 設定ファイルが存在しない場合のテスト
+def test_config_file_not_found():
+    """設定ファイルが見つからない場合のエラーハンドリング"""
+    # 存在しないディレクトリを指定して ConfigManager を初期化
+    with pytest.raises(FileNotFoundError, match="Configuration file not found"):
+        ConfigManager(config_dir="non_existent_directory")
+
+def test_iphone16_pro_url_integration(mock_env_vars, test_config_file):
+    """iPhone 16 Pro URLの統合テスト"""
+    config = ConfigManager(config_dir=test_config_file.parent)
+    
+    # 全てのiPhoneモデルのURLが含まれているか確認
+    expected_urls = [
+        "https://kaitori-rudeya.com/category/detail/183",  # iPhone 16
+        "https://kaitori-rudeya.com/category/detail/185",  # iPhone 16 Pro
+        "https://kaitori-rudeya.com/category/detail/186"   # iPhone 16 Pro Max
     ]
-  })
-}
-</file>
+    
+    # URLの数が正しいか確認
+    assert len(config.scraper.KAITORI_RUDEA_URLS) == len(expected_urls)
+    
+    # 各URLが正しく含まれているか確認
+    for url in expected_urls:
+        assert url in config.scraper.KAITORI_RUDEA_URLS
+        
+    # URLの順序が正しいか確認
+    assert config.scraper.KAITORI_RUDEA_URLS == expected_urls
 
-<file path="terraform/backup/main.tf">
-terraform {
-  required_version = ">= 1.0.0"
+================
+File: tests/unit/test_validators.py
+================
+import pytest
 
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
+from config import AppConfig, ScraperConfig
+from config.manager import ConfigManager
+
+
+class TestAppConfigValidation:
+    def test_valid_app_config(self):
+        """有効なアプリケーション設定のテスト"""
+        config = AppConfig(
+            DEBUG=True,
+            SECRET_KEY="valid-secret-key-12345",
+            LOG_LEVEL="DEBUG"
+        )
+        assert config.DEBUG is True
+        assert config.SECRET_KEY == "valid-secret-key-12345"
+        assert config.LOG_LEVEL == "DEBUG"
+
+    def test_invalid_secret_key(self):
+        """無効なシークレットキーのテスト"""
+        with pytest.raises(ValueError, match="SECRET_KEY must be at least 16 characters"):
+            AppConfig(
+                DEBUG=True,
+                SECRET_KEY="short",
+                LOG_LEVEL="DEBUG"
+            )
+
+    def test_invalid_log_level(self):
+        """無効なログレベルのテスト"""
+        with pytest.raises(ValueError, match="LOG_LEVEL must be one of"):
+            AppConfig(
+                DEBUG=True,
+                SECRET_KEY="valid-secret-key-12345",
+                LOG_LEVEL="INVALID"
+            )
+
+class TestScraperConfigValidation:
+    def test_valid_scraper_config(self):
+        """有効なスクレイパー設定のテスト"""
+        config = ScraperConfig(
+            KAITORI_RUDEA_URLS=["https://example.com/kaitori"],
+            APPLE_STORE_URL="https://example.com/apple",
+            REQUEST_TIMEOUT=30,
+            RETRY_COUNT=3,
+            USER_AGENT="Test Agent"
+        )
+        assert len(config.KAITORI_RUDEA_URLS) == 1
+        assert config.KAITORI_RUDEA_URLS[0] == "https://example.com/kaitori"
+
+    def test_invalid_url_format(self):
+        """無効なURL形式のテスト"""
+        with pytest.raises(ValueError, match="Invalid URL format"):
+            ScraperConfig(
+                KAITORI_RUDEA_URLS=["invalid-url"],
+                APPLE_STORE_URL="https://example.com",
+                REQUEST_TIMEOUT=30,
+                RETRY_COUNT=3,
+                USER_AGENT="Test Agent"
+            )
+
+    def test_invalid_timeout(self):
+        """無効なタイムアウト値のテスト"""
+        with pytest.raises(ValueError, match="REQUEST_TIMEOUT must be a positive integer"):
+            ScraperConfig(
+                KAITORI_RUDEA_URLS=["https://example.com"],
+                APPLE_STORE_URL="https://example.com",
+                REQUEST_TIMEOUT=0,
+                RETRY_COUNT=3,
+                USER_AGENT="Test Agent"
+            )
+
+    def test_valid_scraper_config_with_multiple_urls(self):
+        """複数のURLを持つ有効なスクレイパー設定のテスト"""
+        config = ScraperConfig(
+            KAITORI_RUDEA_URLS=["https://example.com/kaitori1", "https://example.com/kaitori2"],
+            APPLE_STORE_URL="https://example.com/apple",
+            REQUEST_TIMEOUT=30,
+            RETRY_COUNT=3,
+            USER_AGENT="Test Agent"
+        )
+        assert len(config.KAITORI_RUDEA_URLS) == 2
+        assert config.KAITORI_RUDEA_URLS[0] == "https://example.com/kaitori1"
+        assert config.KAITORI_RUDEA_URLS[1] == "https://example.com/kaitori2"
+
+    def test_invalid_kaitori_rudea_urls(self):
+        """無効なkaitori_rudea_urlsのテスト"""
+        with pytest.raises(ValueError, match="Invalid URL format"):
+            ScraperConfig(
+                KAITORI_RUDEA_URLS=["https://example.com", "invalid-url"],
+                APPLE_STORE_URL="https://example.com/apple",
+                REQUEST_TIMEOUT=30,
+                RETRY_COUNT=3,
+                USER_AGENT="Test Agent"
+            )
+
+# 境界値テスト: REQUEST_TIMEOUT が 0 以下の場合はエラーを出す必要があります
+def test_scraper_request_timeout_boundary():
+    """REQUEST_TIMEOUT の境界値テスト"""
+    with pytest.raises(ValueError, match="REQUEST_TIMEOUT must be a positive integer"):
+        ScraperConfig(
+            KAITORI_RUDEA_URLS=["https://example.com"],
+            APPLE_STORE_URL="https://example.com",
+            REQUEST_TIMEOUT=-1,  # 境界値（0 以下はエラー）
+            RETRY_COUNT=1,
+            USER_AGENT="Test Agent"
+        )
+
+# 無効な LOG_LEVEL を渡した場合のテスト
+def test_app_log_level_invalid():
+    """LOG_LEVEL が無効な場合のテスト"""
+    with pytest.raises(ValueError, match="LOG_LEVEL must be one of"):
+        # LOG_LEVEL に無効な値 "INVALID" を指定し、エラーハンドリングを確認
+        AppConfig(
+            DEBUG=True,
+            SECRET_KEY="valid-secret-key-12345",
+            LOG_LEVEL="INVALID"  # 無効な LOG_LEVEL
+        )
+
+# SECRET_KEY が設定されていない場合、デフォルト値が使用されるかのテスト
+def test_config_environment_with_missing_secret_key(monkeypatch):
+    """SECRET_KEY が存在しない場合のテスト"""
+    # SECRET_KEY を削除して、デフォルト値が設定されるか確認
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    config = ConfigManager()
+    # デフォルトのシークレットキーが使用されるか確認
+    assert config.app.SECRET_KEY == "default-secret-key"  # デフォルト値として設定されている
+
+# FLASK_ENV が production の場合に正しく設定されるか確認
+def test_config_environment_with_different_env(monkeypatch):
+    """異なる FLASK_ENV のテスト"""
+    # FLASK_ENV を production に設定
+    monkeypatch.setenv("FLASK_ENV", "production")
+    config = ConfigManager()
+    # 環境が production になっているか確認
+    assert config.env == "production"
+
+# 無効な SECRET_KEY を渡した場合のエラーハンドリングテスト
+def test_invalid_secret_key_length(monkeypatch):
+    """SECRET_KEY が無効な場合のテスト"""
+    monkeypatch.setenv("SECRET_KEY", "short")
+    with pytest.raises(ValueError, match="SECRET_KEY must be at least 16 characters"):
+        config = ConfigManager()
+        _ = config.app  # app プロパティにアクセスして初期化を強制
+
+def test_config_manager_with_multiple_urls(monkeypatch, tmp_path):
+    """複数のURLを持つConfigManagerのテスト"""
+    config_content = """
+    app:
+      debug: true
+      log_level: DEBUG
+      secret_key: test-secret-key-16ch
+
+    scraper:
+      kaitori_rudea_urls:
+        - https://test1.example.com/kaitori
+        - https://test2.example.com/kaitori
+      apple_store_url: https://test.example.com/apple
+      request_timeout: 30
+      retry_count: 3
+      user_agent: "Test User Agent"
+    """
+    config_file = tmp_path / "config.testing.yaml"
+    config_file.write_text(config_content)
+
+    monkeypatch.setenv("FLASK_ENV", "testing")
+    config = ConfigManager(config_dir=tmp_path)
+
+    assert len(config.scraper.KAITORI_RUDEA_URLS) == 2
+    assert "https://test1.example.com/kaitori" in config.scraper.KAITORI_RUDEA_URLS
+    assert "https://test2.example.com/kaitori" in config.scraper.KAITORI_RUDEA_URLS
+
+def test_scraper_config_with_iphone16_pro_url():
+    """iPhone 16 Pro URLを含むスクレイパー設定のテスト"""
+    config = ScraperConfig(
+        KAITORI_RUDEA_URLS=[
+            "https://kaitori-rudeya.com/category/detail/183",  # iPhone 16
+            "https://kaitori-rudeya.com/category/detail/185",  # iPhone 16 Pro
+            "https://kaitori-rudeya.com/category/detail/186"   # iPhone 16 Pro Max
+        ],
+        APPLE_STORE_URL="https://example.com/apple",
+        REQUEST_TIMEOUT=30,
+        RETRY_COUNT=3,
+        USER_AGENT="Test Agent"
+    )
+    assert len(config.KAITORI_RUDEA_URLS) == 3
+    assert "https://kaitori-rudeya.com/category/detail/185" in config.KAITORI_RUDEA_URLS
+
+def test_config_manager_loads_iphone16_pro_url(mock_env_vars, tmp_path):
+    """ConfigManagerがiPhone 16 Pro URLを正しく読み込むかテスト"""
+    config_content = """
+    app:
+      debug: true
+      log_level: DEBUG
+      secret_key: test-secret-key-16ch
+
+    scraper:
+      kaitori_rudea_urls:
+        - https://kaitori-rudeya.com/category/detail/183
+        - https://kaitori-rudeya.com/category/detail/185
+        - https://kaitori-rudeya.com/category/detail/186
+      apple_store_url: https://example.com/apple
+      request_timeout: 30
+      retry_count: 3
+      user_agent: "Test User Agent"
+    """
+    config_file = tmp_path / "config.testing.yaml"
+    config_file.write_text(config_content)
+
+    monkeypatch = mock_env_vars
+    monkeypatch.setenv("FLASK_ENV", "testing")
+    config = ConfigManager(config_dir=tmp_path)
+
+    assert len(config.scraper.KAITORI_RUDEA_URLS) == 3
+    assert "https://kaitori-rudeya.com/category/detail/185" in config.scraper.KAITORI_RUDEA_URLS
+
+================
+File: tests/conftest.py
+================
+import pytest
+from pathlib import Path
+import shutil
+
+@pytest.fixture(scope="function")
+def mock_env_vars(monkeypatch):
+    """環境変数をモックするフィクスチャ"""
+    test_vars = {
+        "FLASK_ENV": "testing",
+        "SECRET_KEY": "test-secret-key-16ch",  # 16文字以上に変更
+        "LOG_LEVEL": "DEBUG"
     }
-  }
+    for key, value in test_vars.items():
+        monkeypatch.setenv(key, value)
+    return test_vars
 
-  # バックエンド設定は後で追加
-  # backend "s3" { ... }
-}
+@pytest.fixture(scope="function")
+def test_config_file(tmp_path):
+    """テスト用の設定ファイルを作成するフィクスチャ"""
+    config_content = """
+app:
+  debug: true
+  log_level: DEBUG
+  secret_key: test-secret-key-16
 
-provider "aws" {
-  region = "ap-northeast-1"
-}
+scraper:
+  kaitori_rudea_urls:
+    - https://kaitori-rudeya.com/category/detail/183  # iPhone 16
+    - https://kaitori-rudeya.com/category/detail/185  # iPhone 16 Pro
+    - https://kaitori-rudeya.com/category/detail/186  # iPhone 16 Pro Max
+  apple_store_url: https://test.example.com/apple
+  request_timeout: 30
+  retry_count: 3
+  user_agent: "Test User Agent"
+"""
+    config_file = tmp_path / "config.testing.yaml"
+    config_file.write_text(config_content)
+    
+    # ConfigManagerが参照するディレクトリにファイルをコピー
+    dest_dir = Path(__file__).parent.parent / "config"
+    dest_file = dest_dir / "config.testing.yaml"
+    dest_dir.mkdir(exist_ok=True)
+    shutil.copy(str(config_file), str(dest_file))
+    
+    yield dest_file
+    
+    # テスト後にファイルを削除
+    dest_file.unlink()
 
-# DynamoDBテーブルの定義のみを残す
-resource "aws_dynamodb_table" "iphone_prices" {
-  name           = "iphone_prices"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "series"
-  range_key      = "capacity"
+================
+File: tests/pytest.ini
+================
+[pytest]
+pythonpath = .
+testpaths = tests
+python_files = test_*.py
+addopts = -v -s --cov=config --cov-report=term-missing
 
-  attribute {
-    name = "series"
-    type = "S"
-  }
+================
+File: tests/test_config_manager.py
+================
+import sys
+from pathlib import Path
+import shutil
+import pytest
 
-  attribute {
-    name = "capacity"
-    type = "S"
-  }
+# プロジェクトのルートディレクトリをPYTHONPATHに追加
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
-  tags = {
-    Environment = "production"
-    Project     = "price-comparison"
-  }
-}
+import pytest
 
-resource "aws_dynamodb_table" "official_prices" {
-  name           = "official_prices"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "series"
-  range_key      = "capacity"
+from config import AppConfig, ConfigManager, ScraperConfig
 
-  attribute {
-    name = "series"
-    type = "S"
-  }
+@pytest.fixture(scope="function")
+def test_config_file(tmp_path):
+    config_content = """
+app:
+  debug: true
+  log_level: "DEBUG"
 
-  attribute {
-    name = "capacity"
-    type = "S"
-  }
+scraper:
+  kaitori_rudea_urls:
+    - "https://kaitori-rudeya.com/category/detail/183"  # iPhone 16
+    - "https://kaitori-rudeya.com/category/detail/185"  # iPhone 16 Pro
+    - "https://kaitori-rudeya.com/category/detail/186"  # iPhone 16 Pro Max
+  apple_store_url: "https://example.com/apple"
+  request_timeout: 30
+  retry_count: 3
+  user_agent: "Test User Agent"
+"""
+    config_file = tmp_path / "config.testing.yaml"
+    config_file.write_text(config_content)
+    
+    # ConfigManagerが参照するディレクトリにファイルをコピー
+    dest_dir = Path(__file__).parent.parent / "config"
+    dest_file = dest_dir / "config.testing.yaml"
+    shutil.copy(str(config_file), str(dest_file))
+    
+    yield dest_file
+    
+    # テスト後にファイルを削除
+    dest_file.unlink()
 
-  tags = {
-    Environment = "production"
-    Project     = "price-comparison"
-  }
-}
-</file>
+def test_config_manager_initialization(mock_env_vars, test_config_file):
+    """ConfigManagerの初期化テスト"""
+    config = ConfigManager()
+    assert config.env == "testing"
+    assert isinstance(config.app, AppConfig)
+    assert isinstance(config.scraper, ScraperConfig)
 
-<file path="terraform/backup/variables.tf">
-variable "environment" {
-  description = "Environment name"
-  type        = string
-  default     = "production"
-}
+def test_app_config_validation():
+    """AppConfigのバリデーションテスト"""
+    with pytest.raises(ValueError, match="SECRET_KEY must be at least 16 characters"):
+        AppConfig(
+            DEBUG=True,
+            SECRET_KEY="short",
+            LOG_LEVEL="DEBUG"
+        )
+    
+    with pytest.raises(ValueError, match="LOG_LEVEL must be one of"):
+        AppConfig(
+            DEBUG=True,
+            SECRET_KEY="valid-secret-key-12345",
+            LOG_LEVEL="INVALID"
+        )
 
-variable "project" {
-  description = "Project name"
-  type        = string
-  default     = "price-comparison"
-}
-</file>
+def test_scraper_config_validation():
+    """ScraperConfigのバリデーションテスト"""
+    with pytest.raises(ValueError, match="Invalid URL format"):
+        ScraperConfig(
+            KAITORI_RUDEA_URLS=["invalid-url"],
+            APPLE_STORE_URL="https://example.com",
+            REQUEST_TIMEOUT=30,
+            RETRY_COUNT=3,
+            USER_AGENT="Test Agent"
+        )
+    
+    with pytest.raises(ValueError, match="REQUEST_TIMEOUT must be a positive integer"):
+        ScraperConfig(
+            KAITORI_RUDEA_URLS=["https://example.com"],
+            APPLE_STORE_URL="https://example.com",
+            REQUEST_TIMEOUT=0,
+            RETRY_COUNT=3,
+            USER_AGENT="Test Agent"
+        )
 
-<file path="terraform/outputs.tf">
-output "api_gateway_url" {
-  description = "API Gateway endpoint URL"
-  value       = "${aws_api_gateway_stage.prod.invoke_url}/get_prices"
-}
+def test_scraper_config_multiple_urls(mock_env_vars, test_config_file):
+    """複数のkaitori_rudea_urlsを持つScraperConfigのテスト"""
+    config = ConfigManager()
+    assert isinstance(config.scraper.KAITORI_RUDEA_URLS, list)
+    assert len(config.scraper.KAITORI_RUDEA_URLS) == 3
+    assert "https://kaitori-rudeya.com/category/detail/183" in config.scraper.KAITORI_RUDEA_URLS
+    assert "https://kaitori-rudeya.com/category/detail/185" in config.scraper.KAITORI_RUDEA_URLS
+    assert "https://kaitori-rudeya.com/category/detail/186" in config.scraper.KAITORI_RUDEA_URLS
 
-output "lambda_function_name" {
-  description = "Lambda function name"
-  value       = aws_lambda_function.get_prices.function_name
-}
-</file>
+================
+File: .env.example
+================
+FLASK_ENV=development
+SECRET_KEY=your-secret-key-here
 
-<file path="terraform/variables.tf">
-variable "environment" {
-  description = "Environment name"
-  type        = string
-  default     = "production"
-}
+================
+File: .gitignore
+================
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
 
-variable "project" {
-  description = "Project name"
-  type        = string
-  default     = "price-comparison"
-}
-</file>
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-<file path=".python-version">
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Directory for instrumented libs generated by jscoverage/JSCover
+lib-cov
+
+# Coverage directory used by tools like istanbul
+coverage
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# Bower dependency directory (https://bower.io/)
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
+build/Release
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Snowpack dependency directory (https://snowpack.dev/)
+web_modules/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+out
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+# Comment in the public line in if your project uses Gatsby and not Next.js
+# https://nextjs.org/blog/next-9-1#public-directory-support
+# public
+
+# vuepress build output
+.vuepress/dist
+
+# vuepress v2.x temp and cache directory
+.temp
+.cache
+
+# Docusaurus cache and generated files
+.docusaurus
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+#   For a library or package, you might want to ignore these files since the code is
+#   intended to run in multiple environments; otherwise, check them in:
+# .python-version
+
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
+
+# poetry
+#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
+#   This is especially recommended for binary packages to ensure reproducibility, and is more
+#   commonly ignored for libraries.
+#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
+#poetry.lock
+
+# pdm
+#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
+#pdm.lock
+#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
+#   in version control.
+#   https://pdm.fming.dev/latest/usage/project/#working-with-version-control
+.pdm.toml
+.pdm-python
+.pdm-build/
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm
+#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+#  and can be added to the global gitignore or merged into this file.  For a more nuclear
+#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
+#.idea/
+
+# ... existing code ...
+artifacts/lambda/*
+!artifacts/lambda/function_latest.zip
+# ... existing code ...
+
+================
+File: .python-version
+================
 3.13.2
-</file>
 
-<file path="create_patch.py">
+================
+File: app.py
+================
+import logging
+import os
+import re
+
+from flask import Flask, jsonify, render_template, send_from_directory
+from playwright.sync_api import sync_playwright
+
+from config import config
+from services.dynamodb_service import get_prices_by_series
+
+
+def create_app():
+    app = Flask(__name__)
+
+    # アプリケーション設定の適用
+    app.config['DEBUG'] = config.app.DEBUG
+    app.config['SECRET_KEY'] = config.app.SECRET_KEY
+
+    # Playwrightのタイムアウト設定
+    app.config['PLAYWRIGHT_TIMEOUT'] = config.scraper.REQUEST_TIMEOUT * 1000  # ミリ秒単位に変換
+
+    # ログ設定
+    logging.basicConfig(
+        level=getattr(logging, config.app.LOG_LEVEL),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
+    @app.route("/favicon.ico")
+    def favicon():
+        try:
+            return send_from_directory(
+                os.path.join(app.root_path, "static"),
+                "favicon.ico",
+                mimetype="image/vnd.microsoft.icon"
+            )
+        except Exception as e:
+            app.logger.error(f"Favicon error: {str(e)}")
+            return "", 204  # No Content
+
+    return app
+
+# アプリケーションインスタンスの作成
+app = create_app()
+
+def price_text_to_int(price_text):
+    """価格テキストを整数に変換する"""
+    try:
+        # "123,456円" → 123456
+        return int(price_text.replace("円", "").replace(",", ""))
+    except (ValueError, AttributeError):
+        return 0
+
+def get_kaitori_prices():
+    """買取価格データをスクレイピングで取得"""
+    all_product_details = {
+        "iPhone 16": {},
+        "iPhone 16 Pro": {},
+        "iPhone 16 Pro Max": {},
+    }
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(chromium_sandbox=False)
+        page = browser.new_page()
+
+        for url in config.scraper.KAITORI_RUDEA_URLS:
+            page.goto(url)
+            page.wait_for_load_state("networkidle")
+
+            items = page.query_selector_all(".tr")
+
+            for item in items:
+                try:
+                    model_element = item.query_selector(".ttl h2")
+                    model_name = model_element.inner_text().strip() if model_element else ""
+
+                    # モデル名からシリーズを判定
+                    if "Pro Max" in model_name:
+                        series = "iPhone 16 Pro Max"
+                    elif "Pro" in model_name:
+                        series = "iPhone 16 Pro"
+                    elif "16" in model_name:
+                        series = "iPhone 16"
+                    else:
+                        continue
+
+                    # 容量を抽出（例: "128GB" または "1TB"）
+                    capacity_match = re.search(r"(\d+)(GB|TB)", model_name)
+                    if not capacity_match:
+                        continue
+                    capacity = capacity_match.group(0)  # "128GB" or "1TB"
+
+                    price_element = item.query_selector(".td.td2 .td2wrap")
+                    price_text = price_element.inner_text().strip() if price_element else ""
+
+                    if model_name and price_text and "円" in price_text:
+                        # カラーを抽出
+                        color_match = re.search(r"(黒|白|桃|緑|青|金|灰)", model_name)
+                        color = color_match.group(1) if color_match else "不明"
+
+                        # 容量ごとのデータを初期化・更新
+                        if capacity not in all_product_details[series]:
+                            all_product_details[series][capacity] = {
+                                "colors": {},
+                                "kaitori_price_min": None,
+                                "kaitori_price_max": None,
+                            }
+
+                        # 色ごとの価格を保存
+                        price_value = price_text_to_int(price_text)
+                        all_product_details[series][capacity]["colors"][color] = {
+                            "price_text": price_text,
+                            "price_value": price_value,
+                        }
+
+                        # 最小・最大価格を更新
+                        current_min = all_product_details[series][capacity]["kaitori_price_min"]
+                        current_max = all_product_details[series][capacity]["kaitori_price_max"]
+
+                        if current_min is None or price_value < current_min:
+                            all_product_details[series][capacity]["kaitori_price_min"] = price_value
+                        if current_max is None or price_value > current_max:
+                            all_product_details[series][capacity]["kaitori_price_max"] = price_value
+
+                except Exception as e:
+                    app.logger.error(f"データ取得エラー: {str(e)}")
+                    continue
+
+        browser.close()
+
+    return all_product_details
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+@app.route("/get_prices")
+def get_prices():
+    """買取価格と公式価格を取得して統合"""
+    try:
+        kaitori_prices = get_kaitori_prices()
+        official_prices = get_prices_by_series()  # DynamoDBから公式価格を取得
+
+        # データ統合処理
+        for series, capacities in kaitori_prices.items():
+            if series in official_prices:
+                for capacity, details in capacities.items():
+                    if capacity in official_prices[series]:
+                        official_price = min(official_prices[series][capacity].values())
+                        details["official_price"] = official_price
+                        details["profit_min"] = details["kaitori_price_min"] - official_price
+                        details["profit_max"] = details["kaitori_price_max"] - official_price
+
+        return jsonify(kaitori_prices), 200
+
+    except Exception as e:
+        app.logger.error(f"エラー: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
+
+================
+File: create_patch.py
+================
 import json
 import subprocess
 
@@ -1734,9 +4406,10 @@ except json.JSONEncoderError as e:
     print(f"Error encoding JSON: {e}")
 except Exception as e:
     print(f"An unexpected error occurred: {e}")
-</file>
 
-<file path="Dockerfile">
+================
+File: Dockerfile
+================
 # Dockerのイメージ名: price-comparison-app:latest
 
 # ベースイメージ
@@ -1779,59 +4452,196 @@ RUN playwright install chromium
 
 # アプリケーションを起動
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers=3", "--timeout=60"]
-</file>
 
-<file path="options-integration-template.json">
+================
+File: options-integration-template.json
+================
 {
   "application/json": "{\"statusCode\": 200}"
 }
-</file>
 
-<file path="renovate.json">
+================
+File: Procfile
+================
+web: gunicorn app:app
+
+================
+File: README.md
+================
+# **`priceComparisonAppForIphone`リポジトリについて**
+
+# Claude や ChatGPT にリポジトリを丸ごと読み込ませるコマンド
+
+以下のコマンドを実行することでリポジトリ一式をテキストファイル（`repomix-output.txt`, 旧：`repopack-output.txt`）を出力することができます。
+
+```
+npx repomix
+// 2024/12/20 `repopack`からupgrade
+```
+
+chat へ最初に取り込ませることでコード修正に役立ちます。
+
+### 読み込ませるポイント
+
+ファイルと合わせて以下のプロンプトで始めるとスムーズに改修を始めやすい
+
+```
+このファイルはリポジトリのファイルを1つにしたものです。コードのリファクタなどをしたいのでまず添付のコードを確認してください。
+```
+
+# About setting to "Renovate"
+
+## 説明:
+
+- extends: ["config:base"]: デフォルト設定に基づきます。
+- labels: ["dependencies"]: すべての PR に "dependencies" ラベルが付与されます。
+- packageRules:
+  - minor と patch の自動マージ: 自動的に PR がマージされます（automergeType: "pr"）。
+  - 大規模なマイナー変更（特定のパッケージ）やメジャーアップデートは自動マージされません\*\*。
+- prConcurrentLimit: 一度に開かれる PR の上限(number)。
+
+この設定で、メジャーアップデートと大規模なマイナー変更は手動でマージすることができ、それ以外の更新は自動的にマージされます。
+
+# `AWS`の設定について
+
+## credentials について
+
+以下`~/.aws/credentials`のサンプルになります(2024/12/20 時点のもの。セキュリティ面から 2,3 週間ごとに変更予定のため流用はほぼ不可)
+
+```
+[default]
+aws_access_key_id = ********************
+aws_secret_access_key = ****************************************
+# 格納方法は別途検討中
+```
+
+※ MFA を有効にする場合、`aws cli`は追加対応が必要になるため注意が必要（AI に聞くなり「aws-cli mfa」などで調べてください。大体は「一時的なアクセス情報を発行する」や`aws sts`コマンドに行き着くかと思います）
+
+※ `aws configure` は `--profile`オプションを追加して名前つきのプロファイルを設定することができます（上記同様 AI に聞くなりして調べてください）
+
+## config について
+
+以下`~/.aws/config`のサンプルになります。こちらは管理者が日本以外に帰化しない限りは以下のままかと思います。
+
+```
+[default]
+region = ap-northeast-1
+output = json
+# outputについて、`yaml`等が良ければ必要に応じて変更してください
+```
+
+## DynamoDB create command
+
+上記`aws configure`の設定は前提
+
+```
+aws dynamodb create-table \
+  --table-name official_prices \
+  --attribute-definitions \
+      AttributeName=series,AttributeType=S \
+      AttributeName=capacity,AttributeType=S \
+  --key-schema \
+      AttributeName=series,KeyType=HASH \
+      AttributeName=capacity,KeyType=RANGE \
+  --billing-mode PAY_PER_REQUEST
+```
+
+実際に保存したい情報（`2024/12/20`時点のもの）は`data/official_prices.json`に残っていたりもする（以前は`json`ファイルから描写していた名残）
+
+## ディレクトリ構成について（`2024/12/20`時点）
+
+```
+priceComparisonAppForIphone/
+│
+├── scripts/  # スクリプト関連
+│   ├── migrate_to_dynamodb.py  # データ移行用
+│
+├── services/  # AWSサービスごとの処理
+│   ├── dynamodb_service.py  # DynamoDB操作
+│   ├── lambda_handler.py  # Lambda関数のエントリーポイント
+│
+├── templates/  # HTMLテンプレート
+│   ├── index.html  # フロントエンド
+│
+├── app.py  # Flaskサーバー
+├── requirements.txt
+└── README.md
+```
+
+# ローカル環境での実行手順
+
+1. まず、必要な環境変数を設定します。`.env.example`をコピーして`.env`ファイルを作成：
+
+```bash
+cp .env.example .env
+```
+
+2. 必要な Python パッケージをインストール：
+
+```bash
+pip install -r requirements.txt
+```
+
+3. Playwright のブラウザをインストール：
+
+```bash
+playwright install chromium
+```
+
+4. アプリケーションの実行：
+
+開発モード（デバッグ有効）での実行：
+
+```bash
+python app.py
+```
+
+または、本番モードでの実行（Gunicorn を使用）：
+
+```bash
+gunicorn app:app --bind 0.0.0.0:5000 --workers=3 --timeout=60
+```
+
+Docker を使用する場合：
+
+```bash
+# イメージのビルド
+docker build -t price-comparison-app:latest .
+
+# コンテナの実行
+docker run -p 5000:5000 price-comparison-app:latest
+```
+
+アプリケーションが起動したら、ブラウザで以下の URL にアクセスできます：
+
+```
+http://localhost:5000
+```
+
+注意点：
+
+- AWS 関連の機能を使用する場合は、AWS 認証情報の設定が必要です
+- DynamoDB を使用する場合は、`~/.aws/credentials`の設定が必要です
+- 開発環境では`config/config.development.yaml`の設定が使用されます
+
+エラーが発生した場合は、ログを確認することで詳細な情報を得ることができます。
+
+================
+File: renovate.json
+================
 {
-  "extends": ["config:recommended", ":timezone(Asia/Tokyo)"],
-  "labels": ["dependencies", "renovate"],
-  "automerge": true,
-  "pin": {
-    "automerge": true
-  },
+  "extends": [
+    "config:recommended"
+  ],
+  "labels": [
+    "dependencies"
+  ],
   "packageRules": [
     {
-      "packagePatterns": ["^@types/"],
-      "automerge": true,
-      "major": {
-        "automerge": false
-      }
-    },
-    {
-      "groupName": "jest",
-      "automerge": true,
-      "sourceUrlPrefixes": [
-        "https://github.com/facebook/jest",
-        "https://github.com/kulshekhar/ts-jest"
-      ]
-    },
-    {
-      "groupName": "linters",
-      "automerge": true,
-      "extends": ["packages:linters"],
-      "packageNames": ["prettier"],
-      "packagePatterns": ["^@typescript-eslint/"]
-    },
-    {
-      "matchDepTypes": ["githubActionsForWorkflows"],
-      "groupName": "actions for github actions workflows",
-      "automerge": true,
-      "groupSlug": "actions-update-for-github-actions-workflows"
-    },
-    {
-      "matchDepTypes": ["dockerImageForWorkflows"],
-      "groupName": "docker image for github actions workflows",
-      "automerge": true,
-      "groupSlug": "docker-image-update-for-github-actions-workflows"
-    },
-    {
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "automerge": true,
       "automergeType": "pr",
       "prConcurrentLimit": 10,
@@ -1843,197 +4653,700 @@ CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers=3", "--timeout=
       ]
     },
     {
-      "matchUpdateTypes": ["major"],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "automerge": false,
       "prConcurrentLimit": 5,
       "prPriority": 1
+    },
+    {
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "automerge": false,
+      "prPriority": 1,
+      "matchPackageNames": [
+        "/@*/"
+      ]
     }
   ],
   "prConcurrentLimit": 10
 }
+
+================
+File: requirements.txt
+================
+attrs==24.3.0
+beautifulsoup4==4.13.3
+blinker==1.9.0
+boto3==1.26.148
+certifi==2024.12.14
+charset-normalizer==3.3.2
+click==8.1.8
+exceptiongroup==1.2.2
+flask==3.1.0
+greenlet==3.1.1
+gunicorn==23.0.0
+h11==0.14.0
+idna==3.10
+importlib_metadata==8.5.0
+itsdangerous==2.2.0
+Jinja2==3.1.4
+MarkupSafe==2.1.5
+outcome==1.3.0.post0
+packaging==24.1
+playwright==1.50.0
+pyee==12.1.1
+PySocks==1.7.1
+pytest-cov==6.0.0
+pytest==7.4.4
+python-dotenv==1.0.1
+PyYAML==6.0.1
+requests==2.32.3
+selenium==4.27.1
+sniffio==1.3.1
+sortedcontainers==2.4.0
+soupsieve==2.6
+trio-websocket==0.11.1
+trio==0.26.2
+typing_extensions==4.12.2
+urllib3>=1.26,<2.0
+webdriver-manager==4.0.2
+websocket-client==1.8.0
+wsproto==1.2.0
+zipp==3.21.0
+
+
+
+================================================================
+End of Codebase
+================================================================
 </file>
 
-<file path="terraform/api_gateway.tf">
-resource "aws_api_gateway_rest_api" "price_comparison" {
-  name        = "price-comparison-api"
-  description = "API for iPhone price comparison"
-}
+<file path="lambda/get_price_history_lambda/get_price_history.py">
+import json
+from datetime import datetime, timedelta
 
-resource "aws_api_gateway_resource" "prices" {
-  rest_api_id = aws_api_gateway_rest_api.price_comparison.id
-  parent_id   = aws_api_gateway_rest_api.price_comparison.root_resource_id
-  path_part   = "get_prices"
-}
+import boto3
+from boto3.dynamodb.conditions import Key
 
-resource "aws_api_gateway_method" "get_prices" {
-  rest_api_id   = aws_api_gateway_rest_api.price_comparison.id
-  resource_id   = aws_api_gateway_resource.prices.id
-  http_method   = "GET"
-  authorization = "NONE"
-}
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('price_history')
 
-resource "aws_api_gateway_integration" "lambda" {
-  rest_api_id = aws_api_gateway_rest_api.price_comparison.id
-  resource_id = aws_api_gateway_resource.prices.id
-  http_method = aws_api_gateway_method.get_prices.http_method
-
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.get_prices.invoke_arn
-}
-
-resource "aws_api_gateway_deployment" "api" {
-  rest_api_id = aws_api_gateway_rest_api.price_comparison.id
-
-  depends_on = [
-    aws_api_gateway_integration.lambda
-  ]
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_stage" "prod" {
-  deployment_id = aws_api_gateway_deployment.api.id
-  rest_api_id   = aws_api_gateway_rest_api.price_comparison.id
-  stage_name    = "prod"
-}
-
-# Lambda関数のAPI Gateway呼び出し許可
-resource "aws_lambda_permission" "api_gateway" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.get_prices.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.price_comparison.execution_arn}/*/*"
-}
-</file>
-
-<file path="terraform/iam.tf">
-# terraform/iam.tf
-# 既存のIAMロールの存在確認
-data "aws_iam_role" "existing_lambda_role" {
-  name = "get_prices_lambda_role"
-  
-  # ロールが存在しない場合はスキップ
-  count = try(data.aws_iam_role.existing_lambda_role[0].name, "") != "" ? 1 : 0
-}
-
-# Lambda実行用のIAMロール（存在しない場合のみ作成）
-resource "aws_iam_role" "lambda_role" {
-  # 既存のロールが見つからない場合のみ作成
-  count = try(data.aws_iam_role.existing_lambda_role[0].name, "") == "" ? 1 : 0
-
-  name = "get_prices_lambda_role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "lambda.amazonaws.com"
+def lambda_handler(event, context):
+    try:
+        # Get query parameters
+        query_params = event.get('queryStringParameters', {})
+        model = query_params.get('model')
+        if not model:
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Credentials': True
+                },
+                'body': json.dumps('Missing required parameter: model')
+            }
+        days = int(query_params.get('days', 30))  # Default to 30 days
+        
+        # Calculate timestamp for the start date
+        start_timestamp = int((datetime.now() - timedelta(days=days)).timestamp())
+        
+        # Query DynamoDB
+        response = table.query(
+            KeyConditionExpression=Key('model').eq(model) & Key('timestamp').gte(start_timestamp),
+            IndexName='TimestampIndex'
+        )
+        
+        # Format response data
+        items = response.get('Items', [])
+        formatted_data = []
+        
+        for item in items:
+            formatted_data.append({
+                'timestamp': item['timestamp'],
+                'price': item['price']
+            })
+        
+        # Sort by timestamp
+        formatted_data.sort(key=lambda x: x['timestamp'])
+        
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Credentials': True
+            },
+            'body': json.dumps(formatted_data)
         }
-      }
-    ]
-  })
-
-  lifecycle {
-    prevent_destroy = true  # 誤削除防止
-  }
-}
-
-# 基本的なLambda実行権限
-resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-  role       = try(
-    data.aws_iam_role.existing_lambda_role[0].name,
-    try(aws_iam_role.lambda_role[0].name, "")
-  )
-
-  count = try(data.aws_iam_role.existing_lambda_role[0].name, "") != "" ? 1 : 0
-}
-
-# DynamoDB アクセス用のポリシー
-resource "aws_iam_role_policy" "dynamodb_access" {
-  name = "dynamodb_access"
-  role = try(
-    data.aws_iam_role.existing_lambda_role[0].id,
-    try(aws_iam_role.lambda_role[0].id, "")
-  )
-
-  count = try(data.aws_iam_role.existing_lambda_role[0].name, "") != "" ? 1 : 0
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:Query",
-          "dynamodb:Scan",
-          "dynamodb:PutItem",
-          "dynamodb:UpdateItem"
-        ]
-        Resource = [
-          aws_dynamodb_table.iphone_prices[0].arn
-        ]
-      }
-    ]
-  })
-}
-
-# IAMロールのARNを出力（既存または新規作成）
-output "lambda_role_arn" {
-  value = try(
-    data.aws_iam_role.existing_lambda_role[0].arn,
-    try(aws_iam_role.lambda_role[0].arn, "")
-  )
-}
+        
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Credentials': True
+            },
+            'body': json.dumps(f'Error retrieving price history: {str(e)}')
+        }
 </file>
 
-<file path="terraform-render/main.tf">
-resource "render_postgresql" "price-comparison-app" {
-  name     = var.db_name
-  database = var.db_name
-  user     = var.db_user
-  password = var.db_password
-  region   = var.db_region
-  version  = var.db_version
-}
+<file path="lambda/get_prices_lambda/lambda_function.py">
+import json
+import logging
+import traceback
+from datetime import datetime
+from decimal import Decimal
 
-output "database_url" {
-  value = render_postgresql.price-comparison-app.connection_string
-}
+import boto3
+import requests
+import yaml
+from bs4 import BeautifulSoup
+
+from src.apple_scraper_for_rudea import DecimalEncoder, get_kaitori_prices
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+def save_kaitori_prices(series, prices):
+    """
+    買取価格をDynamoDBに保存する
+    
+    Args:
+        series (str): iPhoneのシリーズ名
+        prices (dict): 容量ごとの価格データ
+        
+    Returns:
+        bool: 保存が成功したかどうか
+    """
+    try:
+        if not prices:
+            logger.warning(f"No prices to save for {series}")
+            return False
+            
+        dynamodb = boto3.resource('dynamodb')
+        table = dynamodb.Table('iphone_prices')
+        
+        success_count = 0
+        total_count = len(prices)
+        
+        for capacity, price in prices.items():
+            try:
+                # 価格が数値でない場合はスキップ
+                if not price or not price.isdigit():
+                    logger.warning(f"Invalid price format for {series} {capacity}: {price}")
+                    continue
+                
+                item = {
+                    'series': series,
+                    'capacity': capacity,
+                    'price': Decimal(str(price)),
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'store': 'rudea'  # 店舗情報を追加
+                }
+                
+                table.put_item(Item=item)
+                logger.info(f"Saved price for {series} {capacity}: {price}")
+                success_count += 1
+                
+            except Exception as e:
+                logger.error(f"Error saving price for {series} {capacity}: {e}")
+                logger.error(f"Stack trace: {traceback.format_exc()}")
+                continue
+        
+        logger.info(f"Successfully saved {success_count}/{total_count} prices for {series}")
+        return success_count > 0
+        
+    except Exception as e:
+        logger.error(f"Error saving kaitori prices: {e}")
+        logger.error(f"Stack trace: {traceback.format_exc()}")
+        return False
+
+def lambda_handler(event, context):
+    """
+    Lambda関数のメインハンドラー
+    
+    Args:
+        event (dict): API Gatewayからのイベントデータ
+        context (object): Lambda実行コンテキスト
+        
+    Returns:
+        dict: レスポンスデータ
+    """
+    try:
+        logger.info(f"Received event: {json.dumps(event)}")
+        logger.info(f"Lambda context: RequestId: {context.aws_request_id}, Function: {context.function_name}, Memory: {context.memory_limit_in_mb}MB")
+        
+        # クエリパラメータからseriesを取得
+        query_params = event.get('queryStringParameters', {})
+        if not query_params:
+            logger.error("No query parameters found")
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET,OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                    'Content-Type': 'application/json'
+                },
+                'body': json.dumps({
+                    'error': 'Query parameters are required',
+                    'request_id': context.aws_request_id
+                })
+            }
+
+        series = query_params.get('series')
+        if not series:
+            logger.error("Series parameter is missing")
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET,OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                    'Content-Type': 'application/json'
+                },
+                'body': json.dumps({
+                    'error': 'series parameter is required',
+                    'request_id': context.aws_request_id
+                })
+            }
+
+        logger.info(f"Fetching prices for series: {series}")
+        
+        # 価格データを取得
+        prices = get_kaitori_prices(series=series)
+        logger.info(f"Retrieved prices: {json.dumps(prices, indent=2, cls=DecimalEncoder)}")
+        
+        # 買取価格が取得できた場合のみDynamoDBに保存
+        if series in prices and 'kaitori' in prices[series] and prices[series]['kaitori']:
+            save_success = save_kaitori_prices(series, prices[series]['kaitori'])
+            if not save_success:
+                logger.warning(f"Failed to save some or all prices for {series}")
+        else:
+            logger.warning(f"No kaitori prices found for {series}")
+        
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET,OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                'Content-Type': 'application/json'
+            },
+            'body': json.dumps({
+                'data': prices,
+                'request_id': context.aws_request_id
+            }, cls=DecimalEncoder)
+        }
+
+    except Exception as e:
+        logger.error(f"Error: {str(e)}")
+        logger.error(f"Stack trace: {traceback.format_exc()}")
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET,OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                'Content-Type': 'application/json'
+            },
+            'body': json.dumps({
+                'error': str(e),
+                'detail': 'An error occurred while processing your request',
+                'request_id': context.aws_request_id,
+                'stack_trace': traceback.format_exc()
+            }, cls=DecimalEncoder)
+        }
 </file>
 
-<file path="terraform-render/variables.tf">
-variable "db_name" {
-  default     = "price-comparison-app"
-  description = "The name of the PostgreSQL database"
-}
+<file path="lambda/save_price_history_lambda/save_price_history.py">
+import json
+import time
+from datetime import datetime, timedelta
 
-variable "db_user" {
-  default     = "app_user"
-  description = "The username for the PostgreSQL database"
-}
+import boto3
 
-variable "db_password" {
-  description = "The password for the PostgreSQL user"
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('price_history')
+
+def lambda_handler(event, context):
+    try:
+        # Log the incoming event
+        print(f"Processing event: {json.dumps(event)}")
+        
+        # Get current timestamp
+        current_timestamp = int(time.time())
+        
+        # Calculate expiration time (2 months from now)
+        expiration_time = int((datetime.now() + timedelta(days=60)).timestamp())
+        
+        # Get price data from event
+        price_data = event.get('price_data', {})
+        
+        # Validate price data
+        if not price_data:
+            print("Warning: No price data found in event")
+            return {
+                'statusCode': 400,
+                'body': json.dumps('No price data provided')
+            }
+        
+        # Save each model's price data
+        items_processed = 0
+        for model, capacities in price_data.items():
+            for capacity, colors in capacities.items():
+                for color, price in colors.items():
+                    # Validate price
+                    try:
+                        price = int(price) if isinstance(price, str) else price
+                    except ValueError:
+                        print(f"Warning: Invalid price value for {model}-{capacity}-{color}: {price}")
+                        continue
+                        
+                    item = {
+                        'model': f"{model}-{capacity}-{color}",
+                        'timestamp': current_timestamp,
+                        'price': price,
+                        'expiration_time': expiration_time
+                    }
+                    
+                    table.put_item(Item=item)
+                    items_processed += 1
+        
+        print(f"Successfully processed {items_processed} price items")
+        
+        return {
+            'statusCode': 200,
+            'body': json.dumps(f'Price history saved successfully: {items_processed} items processed')
+        }
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'body': json.dumps(f'Error saving price history: {str(e)}')
+        }
+</file>
+
+<file path="terraform/variables.tf">
+variable "environment" {
+  description = "Environment name"
   type        = string
+  default     = "production"
 }
 
-variable "db_region" {
-  default     = "oregon"
-  description = "The region where the database will be hosted"
+variable "project" {
+  description = "Project name"
+  type        = string
+  default     = "iphone_price_tracker"
+}
+</file>
+
+<file path=".github/workflows/deploy.yml">
+name: Deploy to Render
+
+on:
+  push:
+    branches:
+      - main  # `main`ブランチへのプッシュをトリガー
+
+env:
+  AWS_REGION: ap-northeast-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # コードをチェックアウト
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Terraformのセットアップ
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: 'arn:aws:iam::273354647319:role/github_actions_role'
+          role-session-name: GitHubActionsSession
+
+      # Terraformの初期化
+      - name: Initialize Terraform
+        run: |
+          cd terraform
+          terraform init
+
+      # Terraform構成の適用
+      - name: Apply Terraform configuration
+        run: |
+          cd terraform
+          terraform apply -auto-approve -input=false  # `input=false`を追加して自動承認
+</file>
+
+<file path="src/apple_scraper_for_rudea.py">
+import json
+import logging
+import os
+import re
+import traceback
+from decimal import Decimal
+from pathlib import Path
+
+import boto3
+import requests
+import yaml
+from bs4 import BeautifulSoup
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+# Decimalを処理するJSONエンコーダを追加
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return int(obj) if obj % 1 == 0 else float(obj)
+        return super(DecimalEncoder, self).default(obj)
+
+def load_config():
+    try:
+        # Lambda環境での設定ファイルのパスを確認
+        lambda_config_path = '/var/task/config/config.production.yaml'
+        local_config_path = Path(__file__).parent.parent / 'config' / 'config.production.yaml'
+        
+        if os.path.exists(lambda_config_path):
+            logger.info(f"Loading config from Lambda path: {lambda_config_path}")
+            with open(lambda_config_path, 'r') as f:
+                return yaml.safe_load(f)
+        elif os.path.exists(local_config_path):
+            logger.info(f"Loading config from local path: {local_config_path}")
+            with open(local_config_path, 'r') as f:
+                return yaml.safe_load(f)
+        else:
+            logger.error("Config file not found in either Lambda or local path")
+            return None
+    except Exception as e:
+        logger.error(f"Error loading config: {e}")
+        logger.error(f"Current working directory: {os.getcwd()}")
+        logger.error(f"Directory contents: {os.listdir()}")
+        return None
+
+def get_official_prices(series):
+    try:
+        dynamodb = boto3.resource('dynamodb')
+        table = dynamodb.Table('official_prices')
+        
+        # Handle both "iPhone 16e" and "iPhone 16 e" formats
+        lookup_series = series.replace(' e', 'e') if ' e' in series else series
+        logger.info(f"Looking up official prices for {lookup_series} (original request: {series})")
+        
+        # 各容量の価格を取得
+        formatted_prices = {}
+        capacities = ['128GB', '256GB', '512GB', '1TB']
+        
+        for capacity in capacities:
+            try:
+                response = table.get_item(
+                    Key={
+                        'series': lookup_series,
+                        'capacity': capacity
+                    }
+                )
+                
+                if 'Item' in response:
+                    # 各色の価格から最小値を取得
+                    colors = response['Item'].get('colors', {})
+                    if colors:
+                        min_price = min(Decimal(str(price)) for price in colors.values())
+                        formatted_prices[capacity] = str(min_price)
+                        logger.info(f"Found price for {lookup_series} {capacity}: {min_price}")
+                    else:
+                        logger.warning(f"No color prices found for {lookup_series} {capacity}")
+                else:
+                    logger.warning(f"No data found for {lookup_series} {capacity}")
+            except Exception as e:
+                logger.error(f"Error getting price for {capacity}: {e}")
+                logger.error(f"Stack trace: {traceback.format_exc()}")
+                continue
+        
+        if not formatted_prices:
+            logger.warning(f"No official prices found for {lookup_series}")
+        else:
+            logger.info(f"Found official prices for {lookup_series}: {formatted_prices}")
+        return formatted_prices
+            
+    except Exception as e:
+        logger.error(f"Error getting official prices: {e}")
+        logger.error(f"Stack trace: {traceback.format_exc()}")
+        return {}
+
+def get_kaitori_prices(series):
+    try:
+        logger.info(f"Starting price fetch for series: {series}")
+        config = load_config()
+        
+        if not config:
+            logger.error("Failed to load configuration, using fallback URLs")
+            # フォールバックURLを使用
+            fallback_urls = {
+                'iPhone 16': 'https://www.rudea.net/iphone16',
+                'iPhone 16 Pro': 'https://www.rudea.net/iphone16pro',
+                'iPhone 16 Pro Max': 'https://www.rudea.net/iphone16promax',
+                'iPhone 16 e': 'https://www.rudea.net/iphone16e',
+                'iPhone 16e': 'https://www.rudea.net/iphone16e'
+            }
+            series_url_map = fallback_urls
+        else:
+            series_url_map = {
+                'iPhone 16': config['scraper']['kaitori_rudea_urls'][0],
+                'iPhone 16 Pro': config['scraper']['kaitori_rudea_urls'][1],
+                'iPhone 16 Pro Max': config['scraper']['kaitori_rudea_urls'][2],
+                'iPhone 16 e': config['scraper']['kaitori_rudea_urls'][3],
+                'iPhone 16e': config['scraper']['kaitori_rudea_urls'][3]
+            }
+        
+        logger.info(f"Looking up URL for series: {series}, Available mappings: {list(series_url_map.keys())}")
+        
+        if series not in series_url_map:
+            logger.warning(f"No URL configured for series: {series}")
+            return {
+                series: {
+                    'kaitori': {},
+                    'official': get_official_prices(series)
+                }
+            }
+
+        url = series_url_map[series]
+        headers = {
+            'User-Agent': config.get('scraper', {}).get('user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36')
+        }
+        timeout = config.get('scraper', {}).get('request_timeout', 10)
+        
+        logger.info(f"Fetching data from URL: {url} with timeout: {timeout}")
+        
+        try:
+            response = requests.get(url, headers=headers, timeout=timeout)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            logger.info(f"HTML content length: {len(response.text)}")
+            
+            # デバッグ用にHTML構造を解析
+            main_content = soup.find('div', class_='main-content')
+            if main_content:
+                logger.info("Found main-content div")
+                logger.info(f"Main content structure: {[elem.name for elem in main_content.children if elem.name]}")
+            else:
+                logger.warning("Main content div not found")
+                logger.info(f"Available top-level divs: {[div.get('class', []) for div in soup.find_all('div', recursive=False)]}")
+            
+            # 買取価格データを抽出
+            kaitori_prices = {}
+            
+            # 価格情報を含む要素を探す
+            price_elements = soup.find_all('div', class_='tr')
+            if price_elements:
+                logger.info(f"Found {len(price_elements)} price elements")
+                for elem in price_elements:
+                    try:
+                        # 容量を探す
+                        capacity_elem = elem.find('h2') or elem.find('div', class_='ttl')
+                        # 価格を探す
+                        price_elem = elem.find('div', class_='td2wrap') or elem.find('div', class_='td td2')
+                        
+                        if capacity_elem and price_elem:
+                            capacity_text = capacity_elem.text.strip()
+                            capacity_match = re.search(r'(\d+)\s*(GB|TB)', capacity_text, re.IGNORECASE)
+                            if capacity_match:
+                                capacity_num = capacity_match.group(1)
+                                capacity_unit = capacity_match.group(2).upper()
+                                capacity = f"{capacity_num}{capacity_unit}"
+                                price = re.sub(r'[^\d]', '', price_elem.text.strip())
+                                if price:
+                                    kaitori_prices[capacity] = price
+                                    logger.info(f"Found price for {capacity}: {price}")
+                                else:
+                                    logger.warning(f"Empty price found for {capacity}")
+                            else:
+                                logger.warning(f"Could not extract capacity from: {capacity_text}")
+                        else:
+                            logger.warning(f"Missing capacity or price element in: {elem}")
+                    except Exception as e:
+                        logger.error(f"Error processing price element: {e}")
+                        logger.error(f"Element content: {elem}")
+                        continue
+                
+                if not kaitori_prices:
+                    logger.warning("No valid price data found in elements")
+            else:
+                logger.warning("No price elements found")
+                logger.info(f"Page title: {soup.title.string if soup.title else 'No title'}")
+            
+            # 公式価格を取得
+            official_prices = get_official_prices(series)
+            
+            result = {
+                series: {
+                    'kaitori': kaitori_prices,
+                    'official': official_prices
+                }
+            }
+            
+            logger.info(f"Returning data for {series}: {json.dumps(result, indent=4, cls=DecimalEncoder)}")
+            return result
+            
+        except requests.RequestException as e:
+            logger.error(f"Failed to fetch data from URL: {e}")
+            logger.error(f"Response status code: {getattr(e.response, 'status_code', 'N/A')}")
+            logger.error(f"Response content: {getattr(e.response, 'text', 'N/A')[:500]}")
+            return {
+                series: {
+                    'kaitori': {},
+                    'official': get_official_prices(series)
+                }
+            }
+            
+    except Exception as e:
+        logger.error(f"Error in get_kaitori_prices: {e}")
+        logger.error(f"Stack trace: {traceback.format_exc()}")
+        return {
+            series: {
+                'kaitori': {},
+                'official': get_official_prices(series)
+            }
+        }
+</file>
+
+<file path="terraform/outputs.tf">
+output "api_gateway_url" {
+  description = "API Gateway endpoint URL"
+  value       = "${aws_api_gateway_stage.prod.invoke_url}/${aws_api_gateway_resource.prices.path_part}"
 }
 
-variable "db_version" {
-  default     = "16"
-  description = "The PostgreSQL version"
+output "dynamodb_table_arn" {
+  value = aws_dynamodb_table.iphone_prices.arn
+}
+
+output "official_prices_table_arn" {
+  value = aws_dynamodb_table.official_prices.arn
+}
+
+output "lambda_function_name" {
+  value = aws_lambda_function.get_prices.function_name
+}
+
+output "lambda_function_arn" {
+  value = aws_lambda_function.get_prices.arn
+}
+
+output "lambda_role_arn" {
+  value = aws_iam_role.lambda_role.arn
 }
 </file>
 
@@ -2343,463 +5656,69 @@ terraform/lambda/*/
 
 
 # Terraform
-**/.terraform/*
-*.tfstate
-*.tfstate.*
-crash.log
-crash.*.log
-*.tfvars
-*.tfvars.json
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
-.terraformrc
-terraform.rc
-.terraform.lock.hcl
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform.lock.hcl
+terraform/*.backup
+terraform/*.bak
 
 # Lambda
-terraform/lambda/*/
-!terraform/lambda/*/*.py
-!terraform/lambda/*/requirements.txt
-*.zip
+terraform/lambda_function.zip
+terraform/layer.zip
+terraform/layer/
+terraform/lambda/
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
-</file>
-
-<file path="app.py">
-import logging
-import os
-import re
-
-from flask import Flask, jsonify, render_template, send_from_directory
-from playwright.sync_api import sync_playwright
-
-from config import config
-from services.dynamodb_service import get_prices_by_series
-
-
-def create_app():
-    app = Flask(__name__)
-
-    # アプリケーション設定の適用
-    app.config['DEBUG'] = config.app.DEBUG
-    app.config['SECRET_KEY'] = config.app.SECRET_KEY
-
-    # Playwrightのタイムアウト設定
-    app.config['PLAYWRIGHT_TIMEOUT'] = config.scraper.REQUEST_TIMEOUT * 1000  # ミリ秒単位に変換
-
-    # ログ設定
-    logging.basicConfig(
-        level=getattr(logging, config.app.LOG_LEVEL),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-
-    @app.route("/favicon.ico")
-    def favicon():
-        try:
-            return send_from_directory(
-                os.path.join(app.root_path, "static"),
-                "favicon.ico",
-                mimetype="image/vnd.microsoft.icon"
-            )
-        except Exception as e:
-            app.logger.error(f"Favicon error: {str(e)}")
-            return "", 204  # No Content
-
-    return app
-
-# アプリケーションインスタンスの作成
-app = create_app()
-
-def price_text_to_int(price_text):
-    """価格テキストを整数に変換する"""
-    try:
-        # "123,456円" → 123456
-        return int(price_text.replace("円", "").replace(",", ""))
-    except (ValueError, AttributeError):
-        return 0
-
-def get_kaitori_prices():
-    """買取価格データをスクレイピングで取得"""
-    all_product_details = {
-        "iPhone 16": {},
-        "iPhone 16 Pro": {},
-        "iPhone 16 Pro Max": {},
-        "iPhone 16e": {},
-    }
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(chromium_sandbox=False)
-        page = browser.new_page()
-
-        for url in config.scraper.KAITORI_RUDEA_URLS:
-            page.goto(url)
-            page.wait_for_load_state("networkidle")
-
-            items = page.query_selector_all(".tr")
-
-            for item in items:
-                try:
-                    model_element = item.query_selector(".ttl h2")
-                    model_name = model_element.inner_text().strip() if model_element else ""
-
-                    # モデル名からシリーズを判定
-                    if "Pro Max" in model_name:
-                        series = "iPhone 16 Pro Max"
-                    elif "Pro" in model_name:
-                        series = "iPhone 16 Pro"
-                    elif "16" in model_name:
-                        series = "iPhone 16"
-                    elif "16" in model_name:
-                        series = "iPhone 16 e"
-                    else:
-                        continue
-
-                    # 容量を抽出（例: "128GB" または "1TB"）
-                    capacity_match = re.search(r"(\d+)(GB|TB)", model_name)
-                    if not capacity_match:
-                        continue
-                    capacity = capacity_match.group(0)  # "128GB" or "1TB"
-
-                    price_element = item.query_selector(".td.td2 .td2wrap")
-                    price_text = price_element.inner_text().strip() if price_element else ""
-
-                    if model_name and price_text and "円" in price_text:
-                        # カラーを抽出
-                        color_match = re.search(r"(黒|白|桃|緑|青|金|灰)", model_name)
-                        color = color_match.group(1) if color_match else "不明"
-
-                        # 容量ごとのデータを初期化・更新
-                        if capacity not in all_product_details[series]:
-                            all_product_details[series][capacity] = {
-                                "colors": {},
-                                "kaitori_price_min": None,
-                                "kaitori_price_max": None,
-                            }
-
-                        # 色ごとの価格を保存
-                        price_value = price_text_to_int(price_text)
-                        all_product_details[series][capacity]["colors"][color] = {
-                            "price_text": price_text,
-                            "price_value": price_value,
-                        }
-
-                        # 最小・最大価格を更新
-                        current_min = all_product_details[series][capacity]["kaitori_price_min"]
-                        current_max = all_product_details[series][capacity]["kaitori_price_max"]
-
-                        if current_min is None or price_value < current_min:
-                            all_product_details[series][capacity]["kaitori_price_min"] = price_value
-                        if current_max is None or price_value > current_max:
-                            all_product_details[series][capacity]["kaitori_price_max"] = price_value
-
-                except Exception as e:
-                    app.logger.error(f"データ取得エラー: {str(e)}")
-                    continue
-
-        browser.close()
-
-    return all_product_details
-
-@app.route("/")
-def home():
-    return render_template("index.html")
-
-@app.route("/get_prices")
-def get_prices():
-    """買取価格と公式価格を取得して統合"""
-    try:
-        kaitori_prices = get_kaitori_prices()
-        official_prices = get_prices_by_series()  # DynamoDBから公式価格を取得
-
-        # データ統合処理
-        for series, capacities in kaitori_prices.items():
-            if series in official_prices:
-                for capacity, details in capacities.items():
-                    if capacity in official_prices[series]:
-                        official_price = min(official_prices[series][capacity].values())
-                        details["official_price"] = official_price
-                        details["profit_min"] = details["kaitori_price_min"] - official_price
-                        details["profit_max"] = details["kaitori_price_max"] - official_price
-
-        return jsonify(kaitori_prices), 200
-
-    except Exception as e:
-        app.logger.error(f"エラー: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
-</file>
-
-<file path="terraform/lambda.tf">
-data "archive_file" "lambda_get_prices" {
-  type        = "zip"
-  source_dir  = "${path.module}/lambda/get_prices"
-  output_path = "${path.module}/lambda/get_prices.zip"
-  excludes    = ["__pycache__", "*.pyc"]
-}
-
-resource "aws_lambda_function" "get_prices" {
-  filename         = data.archive_file.lambda_get_prices.output_path
-  function_name    = "get_prices"
-  role             = try(
-    data.aws_iam_role.existing_lambda_role[0].arn,
-    try(aws_iam_role.lambda_role[0].arn, "")
-  )
-  handler          = "lambda_function.lambda_handler"
-  source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
-  runtime          = "python3.9"
-  timeout          = 30
-  memory_size      = 512 # メモリサイズを増やす
-
-  environment {
-    variables = {
-      ENVIRONMENT = "production"
-    }
-  }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.lambda_basic,
-    aws_iam_role_policy.dynamodb_access
-  ]
-}
-</file>
-
-<file path="README.md">
-# **`priceComparisonAppForIphone`リポジトリについて**
-
-# Claude や ChatGPT にリポジトリを丸ごと読み込ませるコマンド
-
-以下のコマンドを実行することでリポジトリ一式をテキストファイル（`repomix-output.txt`, 旧：`repopack-output.txt`）を出力することができます。
-
-```
-npx repomix
-// 2024/12/20 `repopack`からupgrade
-```
-
-chat へ最初に取り込ませることでコード修正に役立ちます。
-
-### 読み込ませるポイント
-
-ファイルと合わせて以下のプロンプトで始めるとスムーズに改修を始めやすい
-
-```
-このファイルはリポジトリのファイルを1つにしたものです。コードのリファクタなどをしたいのでまず添付のコードを確認してください。
-```
-
-# About setting to "Renovate"
-
-## 説明:
-
-- extends: ["config:base"]: デフォルト設定に基づきます。
-- labels: ["dependencies"]: すべての PR に "dependencies" ラベルが付与されます。
-- packageRules:
-  - minor と patch の自動マージ: 自動的に PR がマージされます（automergeType: "pr"）。
-  - 大規模なマイナー変更（特定のパッケージ）やメジャーアップデートは自動マージされません\*\*。
-- prConcurrentLimit: 一度に開かれる PR の上限(number)。
-
-この設定で、メジャーアップデートと大規模なマイナー変更は手動でマージすることができ、それ以外の更新は自動的にマージされます。
-
-# `AWS`の設定について
-
-## credentials について
-
-以下`~/.aws/credentials`のサンプルになります(2024/12/20 時点のもの。セキュリティ面から 2,3 週間ごとに変更予定のため流用はほぼ不可)
-
-```
-[default]
-aws_access_key_id = ********************
-aws_secret_access_key = ****************************************
-# 格納方法は別途検討中
-```
-
-※ MFA を有効にする場合、`aws cli`は追加対応が必要になるため注意が必要（AI に聞くなり「aws-cli mfa」などで調べてください。大体は「一時的なアクセス情報を発行する」や`aws sts`コマンドに行き着くかと思います）
-
-※ `aws configure` は `--profile`オプションを追加して名前つきのプロファイルを設定することができます（上記同様 AI に聞くなりして調べてください）
-
-## config について
-
-以下`~/.aws/config`のサンプルになります。こちらは管理者が日本以外に帰化しない限りは以下のままかと思います。
-
-```
-[default]
-region = ap-northeast-1
-output = json
-# outputについて、`yaml`等が良ければ必要に応じて変更してください
-```
-
-## DynamoDB create command
-
-上記`aws configure`の設定は前提
-
-```
-aws dynamodb create-table \
-  --table-name official_prices \
-  --attribute-definitions \
-      AttributeName=series,AttributeType=S \
-      AttributeName=capacity,AttributeType=S \
-  --key-schema \
-      AttributeName=series,KeyType=HASH \
-      AttributeName=capacity,KeyType=RANGE \
-  --billing-mode PAY_PER_REQUEST
-```
-
-実際に保存したい情報（`2024/12/20`時点のもの）は`data/official_prices.json`に残っていたりもする（以前は`json`ファイルから描写していた名残）
-
-## ディレクトリ構成について（`2024/12/20`時点）
-
-```
-priceComparisonAppForIphone/
-│
-├── scripts/  # スクリプト関連
-│   ├── migrate_to_dynamodb.py  # データ移行用
-│
-├── services/  # AWSサービスごとの処理
-│   ├── dynamodb_service.py  # DynamoDB操作
-│   ├── lambda_handler.py  # Lambda関数のエントリーポイント
-│
-├── templates/  # HTMLテンプレート
-│   ├── index.html  # フロントエンド
-│
-├── app.py  # Flaskサーバー
-├── requirements.txt
-└── README.md
-```
-
-# ローカル環境での実行手順
-
-1. まず、必要な環境変数を設定します。`.env.example`をコピーして`.env`ファイルを作成：
-
-```bash
-cp .env.example .env
-```
-
-2. 必要な Python パッケージをインストール：
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Playwright のブラウザをインストール：
-
-```bash
-playwright install chromium
-```
-
-4. アプリケーションの実行：
-
-開発モード（デバッグ有効）での実行：
-
-```bash
-python app.py
-```
-
-または、本番モードでの実行（Gunicorn を使用）：
-
-```bash
-gunicorn app:app --bind 0.0.0.0:5000 --workers=3 --timeout=60
-```
-
-Docker を使用する場合：
-
-```bash
-# イメージのビルド
-docker build -t price-comparison-app:latest .
-
-# コンテナの実行
-docker run -p 5000:5000 price-comparison-app:latest
-```
-
-アプリケーションが起動したら、ブラウザで以下の URL にアクセスできます：
-
-```
-http://localhost:5000
-```
-
-注意点：
-
-- AWS 関連の機能を使用する場合は、AWS 認証情報の設定が必要です
-- DynamoDB を使用する場合は、`~/.aws/credentials`の設定が必要です
-- 開発環境では`config/config.development.yaml`の設定が使用されます
-
-エラーが発生した場合は、ログを確認することで詳細な情報を得ることができます。
-
-# 仮想環境の作成
-
-venv モジュールを使用して仮想環境を作成します。以下のコマンドを実行します。
-
-```
-python -m venv venv
-```
-
-これにより、venv という名前の仮想環境が作成されます。後半の'venv'の部分は任意の名前に変更できます。
-
-# 仮想環境の有効化
-
-仮想環境を作成したら、その環境を有効化します。OS によってコマンドが異なります。
-
-### Windows の場合
-
-```
-venv\Scripts\activate
-```
-
-### macOS/Linux の場合
-
-```
-source venv/bin/activate
-```
-
-仮想環境が有効化されると、ターミナルのプロンプトが以下のように変わります。
-
-```
-(venv) $
-```
-</file>
-
-<file path=".github/workflows/deploy.yml">
-name: Deploy to Render
-
-on:
-  push:
-    branches:
-      - main  # `main`ブランチへのプッシュをトリガー
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-      # コードをチェックアウト
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # Terraformのセットアップ
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.0
-
-      # Terraformの初期化
-      - name: Initialize Terraform
-        env:
-          TF_VAR_db_password: ${{ secrets.RENDER_POSTGRESQL_DB_PASSWORD }}  # GitHub Secretsからパスワードを取得
-        run: |
-          cd terraform
-          terraform init
-
-      # Terraform構成の適用
-      - name: Apply Terraform configuration
-        env:
-          TF_VAR_db_password: ${{ secrets.RENDER_POSTGRESQL_DB_PASSWORD }}  # GitHub Secretsからパスワードを取得
-        run: |
-          cd terraform
-          terraform apply -auto-approve -input=false  # `input=false`を追加して自動承認
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.venv
+venv/
+ENV/
+
+# Test
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
 </file>
 
 <file path="templates/index.html">
@@ -2809,6 +5728,7 @@ jobs:
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>iPhone 16シリーズ 買取価格比較</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
       /* ローディングスピナーのスタイル */
       .loader {
@@ -2989,6 +5909,38 @@ jobs:
           padding: 5px 8px;
         }
       }
+
+      /* グラフコンテナのスタイル */
+      .graph-container {
+        width: 100%;
+        height: 200px;
+        margin-top: 20px;
+        margin-bottom: 30px;
+      }
+
+      .graph-toggle {
+        background-color: #f2f2f2;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-top: 10px;
+        font-size: 0.9em;
+      }
+
+      .graph-toggle:hover {
+        background-color: #e0e0e0;
+      }
+
+      .graph-wrapper {
+        display: none;
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      .graph-wrapper.active {
+        display: block;
+      }
     </style>
   </head>
   <body>
@@ -3087,7 +6039,7 @@ jobs:
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         const API_ENDPOINT =
-          'https://qow3wyg1nj.execute-api.ap-northeast-1.amazonaws.com/prod/get_prices';
+          'https://l8l7v5xw9d.execute-api.ap-northeast-1.amazonaws.com/prod/get_prices';
         const series = [
           'iPhone 16',
           'iPhone 16 Pro',
@@ -3125,9 +6077,9 @@ jobs:
             console.log('Raw response data from Lambda:', results);
 
             results.forEach((data, index) => {
-              if (data && Object.keys(data).length > 0) {
-                const seriesName = Object.keys(data)[0];
-                const priceData = data[seriesName];
+              if (data && data.data) {
+                const seriesName = Object.keys(data.data)[0];
+                const priceData = data.data[seriesName];
 
                 const tableId = seriesName.replace(/\s+/g, '') + '-prices';
                 const tableBody = document.querySelector(`#${tableId} tbody`);
@@ -3214,9 +6166,373 @@ jobs:
         // 初期データ取得
         fetchPrices();
       });
+
+      // 価格履歴グラフの実装
+      const priceHistoryCharts = {};
+
+      function formatDate(timestamp) {
+        const date = new Date(timestamp * 1000);
+        return `${date.getMonth() + 1}/${date.getDate()}`;
+      }
+
+      function createPriceHistoryGraph(series, capacity, color) {
+        const modelId = `${series}-${capacity}-${color}`;
+        const graphContainer = document.createElement('div');
+        graphContainer.className = 'graph-wrapper';
+        graphContainer.id = `graph-${modelId}`;
+
+        const canvas = document.createElement('canvas');
+        graphContainer.appendChild(canvas);
+
+        const table = document.getElementById(`${series}-prices`);
+        const row = table.querySelector(
+          `tr[data-capacity="${capacity}"][data-color="${color}"]`
+        );
+        if (row) {
+          row.parentNode.insertBefore(graphContainer, row.nextSibling);
+        }
+
+        const ctx = canvas.getContext('2d');
+        priceHistoryCharts[modelId] = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: '買取価格',
+                data: [],
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: false,
+              },
+            },
+          },
+        });
+
+        return graphContainer;
+      }
+
+      async function fetchPriceHistory(series, capacity, color) {
+        const modelId = `${series}-${capacity}-${color}`;
+        try {
+          const response = await fetch(`/price-history?model=${modelId}`);
+          const data = await response.json();
+
+          const chart = priceHistoryCharts[modelId];
+          if (chart) {
+            chart.data.labels = data.map(item => formatDate(item.timestamp));
+            chart.data.datasets[0].data = data.map(item => item.price);
+            chart.update();
+          }
+        } catch (error) {
+          console.error('Error fetching price history:', error);
+        }
+      }
+
+      function addGraphToggle(series, capacity, color) {
+        const modelId = `${series}-${capacity}-${color}`;
+        const table = document.getElementById(`${series}-prices`);
+        const row = table.querySelector(
+          `tr[data-capacity="${capacity}"][data-color="${color}"]`
+        );
+
+        if (row) {
+          const toggleButton = document.createElement('button');
+          toggleButton.className = 'graph-toggle';
+          toggleButton.textContent = '価格推移を表示';
+          toggleButton.onclick = () => {
+            const graphWrapper = document.getElementById(`graph-${modelId}`);
+            if (!graphWrapper) {
+              createPriceHistoryGraph(series, capacity, color);
+              fetchPriceHistory(series, capacity, color);
+            }
+            graphWrapper.classList.toggle('active');
+            toggleButton.textContent = graphWrapper.classList.contains('active')
+              ? '価格推移を隠す'
+              : '価格推移を表示';
+          };
+          row.insertCell(-1).appendChild(toggleButton);
+        }
+      }
+
+      // 既存のテーブル作成処理を修正
+      function createTable(series, data) {
+        // ... existing table creation code ...
+
+        // 各行にグラフトグルを追加
+        Object.entries(data).forEach(([capacity, colors]) => {
+          Object.entries(colors).forEach(([color, price]) => {
+            addGraphToggle(series, capacity, color);
+          });
+        });
+      }
     </script>
   </body>
 </html>
+</file>
+
+<file path="terraform/dynamodb.tf">
+# DynamoDBテーブルのデータ管理
+resource "aws_dynamodb_table_item" "iphone_prices_data" {
+  table_name = aws_dynamodb_table.iphone_prices.name
+  hash_key   = "series"
+  range_key  = "capacity"
+
+  item = jsonencode({
+    series = {
+      S = "iPhone 16"
+    }
+    capacity = {
+      S = "128GB"
+    }
+    price = {
+      N = "999"
+    }
+    timestamp = {
+      S = timestamp()
+    }
+  })
+}
+
+# DynamoDBテーブルの定義
+resource "aws_dynamodb_table" "iphone_prices" {
+  name           = "iphone_prices"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "series"
+  range_key      = "capacity"
+
+  attribute {
+    name = "series"
+    type = "S"
+  }
+
+  attribute {
+    name = "capacity"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "CapacityIndex"
+    hash_key        = "series"
+    range_key       = "capacity"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  tags = {
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
+}
+
+resource "aws_dynamodb_table" "official_prices" {
+  name           = "official_prices"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "series"
+  range_key      = "capacity"
+
+  attribute {
+    name = "series"
+    type = "S"
+  }
+
+  attribute {
+    name = "capacity"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "CapacityIndex"
+    hash_key        = "series"
+    range_key       = "capacity"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  tags = {
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
+}
+
+# 公式価格データの登録
+locals {
+  official_prices = jsondecode(file("${path.module}/../data/official_prices.json"))
+  
+  flattened_prices = {
+    for item in flatten([
+      for series, models in local.official_prices : [
+        for capacity, colors in models : {
+          series   = series
+          capacity = capacity
+          colors   = colors
+        }
+      ]
+    ]) : "${item.series}-${item.capacity}" => item
+  }
+}
+
+resource "aws_dynamodb_table_item" "official_prices_data" {
+  for_each = local.flattened_prices
+
+  table_name = aws_dynamodb_table.official_prices.name
+  hash_key   = "series"
+  range_key  = "capacity"
+
+  item = jsonencode({
+    series = {
+      S = each.value.series
+    }
+    capacity = {
+      S = each.value.capacity
+    }
+    colors = {
+      M = {
+        for color, price in each.value.colors : color => {
+          N = tostring(price)
+        }
+      }
+    }
+  })
+}
+
+resource "aws_dynamodb_table" "price_history" {
+  name           = "price_history"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "model"
+  range_key      = "timestamp"
+
+  attribute {
+    name = "model"
+    type = "S"
+  }
+
+  attribute {
+    name = "timestamp"
+    type = "N"
+  }
+
+  ttl {
+    attribute_name = "expiration_time"
+    enabled        = true
+  }
+
+  global_secondary_index {
+    name            = "TimestampIndex"
+    hash_key        = "model"
+    range_key       = "timestamp"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  tags = {
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
+}
+</file>
+
+<file path="terraform/api_gateway.tf">
+resource "aws_api_gateway_rest_api" "price_comparison" {
+  name        = "price-comparison-api"
+  description = "API for iPhone price comparison"
+}
+
+resource "aws_api_gateway_resource" "prices" {
+  rest_api_id = aws_api_gateway_rest_api.price_comparison.id
+  parent_id   = aws_api_gateway_rest_api.price_comparison.root_resource_id
+  path_part   = "get_prices"
+}
+
+resource "aws_api_gateway_method" "get_prices" {
+  rest_api_id   = aws_api_gateway_rest_api.price_comparison.id
+  resource_id   = aws_api_gateway_resource.prices.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "lambda" {
+  rest_api_id = aws_api_gateway_rest_api.price_comparison.id
+  resource_id = aws_api_gateway_resource.prices.id
+  http_method = aws_api_gateway_method.get_prices.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.get_prices.invoke_arn
+}
+
+resource "aws_api_gateway_deployment" "api" {
+  rest_api_id = aws_api_gateway_rest_api.price_comparison.id
+
+  depends_on = [
+    aws_api_gateway_integration.lambda
+  ]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_api_gateway_stage" "prod" {
+  deployment_id = aws_api_gateway_deployment.api.id
+  rest_api_id   = aws_api_gateway_rest_api.price_comparison.id
+  stage_name    = "prod"
+}
+
+resource "aws_lambda_permission" "api_gateway" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.get_prices.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.price_comparison.execution_arn}/*/*"
+}
+
+resource "aws_api_gateway_resource" "price_history" {
+  rest_api_id = aws_api_gateway_rest_api.price_comparison.id
+  parent_id   = aws_api_gateway_rest_api.price_comparison.root_resource_id
+  path_part   = "price-history"
+}
+
+resource "aws_api_gateway_method" "price_history_get" {
+  rest_api_id   = aws_api_gateway_rest_api.price_comparison.id
+  resource_id   = aws_api_gateway_resource.price_history.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "price_history_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.price_comparison.id
+  resource_id             = aws_api_gateway_resource.price_history.id
+  http_method             = aws_api_gateway_method.price_history_get.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.get_price_history.invoke_arn
+}
+
+resource "aws_lambda_permission" "api_gateway_price_history" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.get_price_history.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.price_comparison.execution_arn}/*/*"
+}
 </file>
 
 <file path=".github/workflows/renovate.yaml">
@@ -3254,7 +6570,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Self-hosted Renovate
-        uses: renovatebot/github-action@v41.0.16
+        uses: renovatebot/github-action@v41.0.17
         with:
           configurationFile: renovate.json
           token: 'x-access-token:${{ steps.get_token.outputs.token }}'
@@ -3264,161 +6580,410 @@ jobs:
           RENOVATE_REPOSITORIES: ${{ env.RENOVATE_REPOSITORIES }}
 </file>
 
-<file path=".github/workflows/docker-build-and-push.yml">
-name: Build, Push, and Deploy
+<file path="terraform/iam.tf">
+# Lambda実行用のIAMロール
+resource "aws_iam_role" "lambda_role" {
+  name = "get_prices_lambda_role"
 
-on:
-  push:
-    branches:
-      - main
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
 
-jobs:
-  build-and-push:
-    name: Build, Push, and Deploy to Render
-    runs-on: ubuntu-latest
+# 基本的なLambda実行権限
+resource "aws_iam_role_policy_attachment" "lambda_basic" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  role       = aws_iam_role.lambda_role.name
+}
 
-    steps:
-      # リポジトリをチェックアウト
-      - name: Checkout repository
-        uses: actions/checkout@v4
+# DynamoDB アクセス用のポリシー
+resource "aws_iam_role_policy" "dynamodb_access" {
+  name = "dynamodb_access"
+  role = aws_iam_role.lambda_role.id
 
-      # Dockerにログイン
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+          "dynamodb:Scan",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem"
+        ]
+        Resource = [
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/iphone_prices",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/official_prices"
+        ]
+      }
+    ]
+  })
+}
 
-      # Dockerイメージをビルド＆プッシュ
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          push: true
-          tags: |
-            koninji/price-comparison-app:latest
+# GitHub Actions用のOIDCプロバイダー
+resource "aws_iam_openid_connect_provider" "github_actions" {
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+}
 
-      # Renderのサービス一覧からサービスIDを取得
-      - name: Fetch Render Service ID
-        id: fetch-service-id
-        env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-        run: |
-          SERVICE_ID=$(curl -s -X GET \
-            -H "Authorization: Bearer $RENDER_API_KEY" \
-            https://api.render.com/v1/services \
-            | jq -r '.[] | select(.service.name=="price-comparison-app:latest") | .service.id')
+# GitHub Actions用のIAMロール
+resource "aws_iam_role" "github_actions" {
+  name = "github_actions_role"
 
-          if [ -z "$SERVICE_ID" ]; then
-            echo "Service ID not found for 'price-comparison-app:latest'."
-            exit 1
-          fi
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.github_actions.arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          }
+          StringLike = {
+            "token.actions.githubusercontent.com:sub" = "repo:${var.github_org}/${var.github_repo}:*"
+          }
+        }
+      }
+    ]
+  })
+}
 
-          echo "SERVICE_ID=$SERVICE_ID" >> $GITHUB_ENV
+# GitHub Actions用のカスタムポリシー
+resource "aws_iam_policy" "github_actions_policy" {
+  name        = "github_actions_policy"
+  description = "Policy for GitHub Actions to manage infrastructure"
 
-      # Renderでデプロイをトリガー
-      - name: Trigger Render Deploy
-        env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-        run: |
-          curl -X POST \
-            -H "Authorization: Bearer $RENDER_API_KEY" \
-            -H "Content-Type: application/json" \
-            https://api.render.com/v1/services/$SERVICE_ID/deploys
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:*",
+          "lambda:*",
+          "apigateway:*",
+          "iam:*",
+          "cloudwatch:*",
+          "logs:*",
+          "s3:*",
+          "ec2:*",
+          "sts:GetCallerIdentity"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# GitHub Actionsロールにカスタムポリシーをアタッチ
+resource "aws_iam_role_policy_attachment" "github_actions_custom" {
+  role       = aws_iam_role.github_actions.name
+  policy_arn = aws_iam_policy.github_actions_policy.arn
+}
+
+# 変数の定義
+variable "github_org" {
+  description = "GitHub organization name"
+  type        = string
+}
+
+variable "github_repo" {
+  description = "GitHub repository name"
+  type        = string
+}
+
+resource "aws_iam_role_policy" "price_history_dynamodb_policy" {
+  name = "price_history_dynamodb_policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+          "dynamodb:Scan"
+        ]
+        Resource = [
+          aws_dynamodb_table.price_history.arn
+        ]
+      }
+    ]
+  })
+}
+</file>
+
+<file path="terraform/lambda.tf">
+locals {
+  lambda_src_dir = "${path.module}/.."
+  lambda_files = [
+    "lambda/get_prices_lambda/lambda_function.py",
+    "lambda/save_price_history_lambda/save_price_history.py",
+    "lambda/get_price_history_lambda/get_price_history.py",
+    "src/apple_scraper_for_rudea.py",
+    "config/config.production.yaml"
+  ]
+  layer_build_dir = "${path.module}/layer"
+  layer_zip_path  = "${path.module}/layer.zip"
+}
+
+# Lambda Layer用のPythonパッケージをインストール
+resource "null_resource" "install_lambda_layer_packages" {
+  triggers = {
+    requirements = filemd5("${path.module}/requirements.txt")
+  }
+
+  provisioner "local-exec" {
+    command = <<EOF
+rm -rf ${local.layer_build_dir}
+mkdir -p ${local.layer_build_dir}/python
+pip install -r ${path.module}/requirements.txt -t ${local.layer_build_dir}/python
+cd ${local.layer_build_dir} && zip -r ${local.layer_zip_path} .
+EOF
+  }
+}
+
+# Lambda Layer
+resource "aws_lambda_layer_version" "dependencies" {
+  layer_name          = "get_prices_dependencies"
+  description         = "Dependencies for get_prices Lambda function"
+  compatible_runtimes = ["python3.9"]
+  filename           = "./layer/layer.zip"
+  source_code_hash   = null_resource.install_lambda_layer_packages.id
+
+  depends_on = [null_resource.install_lambda_layer_packages]
+}
+
+data "archive_file" "lambda_get_prices" {
+  type        = "zip"
+  output_path = "${path.module}/lambda_function.zip"
+
+  dynamic "source" {
+    for_each = local.lambda_files
+    content {
+      content  = file("${local.lambda_src_dir}/${source.value}")
+      filename = source.value
+    }
+  }
+}
+
+# Lambda関数
+resource "aws_lambda_function" "get_prices" {
+  filename         = data.archive_file.lambda_get_prices.output_path
+  function_name    = "get_prices"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "lambda/get_prices_lambda/lambda_function.lambda_handler"
+  source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
+  runtime          = "python3.9"
+  timeout          = 60
+  memory_size      = 256
+  layers           = [aws_lambda_layer_version.dependencies.arn]
+
+  environment {
+    variables = {
+      PYTHONPATH = "/opt/python:/var/task"
+    }
+  }
+
+  depends_on = [
+    aws_iam_role.lambda_role,
+    aws_iam_role_policy_attachment.lambda_basic,
+    aws_iam_role_policy.dynamodb_access
+  ]
+}
+
+resource "aws_lambda_function" "save_price_history" {
+  filename         = data.archive_file.lambda_get_prices.output_path
+  function_name    = "save_price_history"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "save_price_history.lambda_handler"
+  source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
+  runtime          = "python3.9"
+  timeout          = 300
+  memory_size      = 128
+  layers           = [aws_lambda_layer_version.dependencies.arn]
+
+  environment {
+    variables = {
+      DYNAMODB_TABLE = "price_history"
+      PYTHONPATH     = "/opt/python:/var/task"
+    }
+  }
+
+  depends_on = [
+    aws_iam_role.lambda_role,
+    aws_iam_role_policy_attachment.lambda_basic,
+    aws_iam_role_policy.dynamodb_access,
+    aws_iam_role_policy.price_history_dynamodb_policy
+  ]
+}
+
+resource "aws_cloudwatch_event_rule" "save_price_history_schedule" {
+  name                = "save_price_history_schedule"
+  description         = "Schedule for saving price history"
+  schedule_expression = "cron(0 1,13 * * ? *)"  # 10:00 and 22:00 JST
+}
+
+resource "aws_cloudwatch_event_target" "save_price_history_target" {
+  rule      = aws_cloudwatch_event_rule.save_price_history_schedule.name
+  target_id = "SavePriceHistory"
+  arn       = aws_lambda_function.save_price_history.arn
+}
+
+resource "aws_lambda_permission" "allow_cloudwatch" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.save_price_history.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.save_price_history_schedule.arn
+}
+
+resource "aws_lambda_function" "get_price_history" {
+  filename         = data.archive_file.lambda_get_prices.output_path
+  function_name    = "get_price_history"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "get_price_history.lambda_handler"
+  source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
+  runtime          = "python3.9"
+  timeout          = 30
+  memory_size      = 128
+  layers           = [aws_lambda_layer_version.dependencies.arn]
+
+  environment {
+    variables = {
+      DYNAMODB_TABLE = "price_history"
+      PYTHONPATH     = "/opt/python:/var/task"
+    }
+  }
+
+  depends_on = [
+    aws_iam_role.lambda_role,
+    aws_iam_role_policy_attachment.lambda_basic,
+    aws_iam_role_policy.dynamodb_access,
+    aws_iam_role_policy.price_history_dynamodb_policy
+  ]
+}
 </file>
 
 <file path=".github/workflows/terraform.yml">
 # .github/workflows/terraform.yml
-name: 'Terraform CI/CD'
+name: Terraform Deploy
 
 on:
   push:
-    branches: [ main ]
     paths:
       - 'terraform/**'
+      - 'src/**'
+      - 'lambda/**'
       - '.github/workflows/terraform.yml'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'terraform/**'
-      - '.github/workflows/terraform.yml'
+
+env:
+  AWS_REGION: ap-northeast-1
 
 jobs:
-  terraform:
-    name: 'Terraform'
+  deploy:
+    name: Deploy Infrastructure
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./terraform
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: 1.0.0
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActionsSession
 
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.13'
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-    - name: Prepare Lambda Function
-      run: |
-        # Lambda関数のディレクトリ作成
-        mkdir -p lambda/get_prices
-        
-        # Lambda関数のコードをコピー
-        cp ../src/apple_scraper_for_rudea.py lambda/get_prices/lambda_function.py
-        
-        # requirements.txtの作成
-        cat > lambda/get_prices/requirements.txt << 'EOF'
-        requests
-        boto3
-        beautifulsoup4
-        playwright
-        EOF
-        
-        # 依存関係のインストール
-        cd lambda/get_prices
-        pip install -r requirements.txt -t .
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r terraform/requirements.txt
 
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ap-northeast-1
+      - name: Terraform Init
+        working-directory: terraform
+        run: |
+          terraform init -input=false
 
-    - name: Terraform Format
-      run: terraform fmt
+      - name: Terraform Plan
+        working-directory: terraform
+        run: |
+          terraform plan -input=false
 
-    - name: Terraform Init
-      run: terraform init
+      - name: Terraform Apply
+        working-directory: terraform
+        run: |
+          terraform apply -auto-approve
 
-    - name: Import existing resources
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: |
-        # DynamoDBテーブルのインポート
-        if aws dynamodb describe-table --table-name iphone_prices &> /dev/null; then
-          echo "Importing existing iphone_prices table..."
-          terraform import 'aws_dynamodb_table.iphone_prices[0]' iphone_prices || true
-        fi
-        
-        # IAMロールのインポート
-        if aws iam get-role --role-name get_prices_lambda_role &> /dev/null; then
-          echo "Importing existing lambda role..."
-          terraform import 'aws_iam_role.lambda_role[0]' get_prices_lambda_role || true
-        fi
+      - name: Update DynamoDB Data
+        run: |
+          cd terraform
+          python3 scripts/migrate_to_dynamodb.py
 
-    - name: Terraform Plan
-      run: terraform plan
-      if: github.event_name == 'pull_request'
+      - name: Cleanup API Gateway
+        run: |
+          cd terraform
+          python3 scripts/cleanup_api_gateway.py
 
-    - name: Terraform Apply
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: terraform apply -auto-approve
+      - name: Cleanup Python cache
+        run: |
+          find . -type d -name "__pycache__" -exec rm -rf {} +
+          find . -type f -name "*.pyc" -delete
+
+      - name: Cleanup temporary files
+        run: |
+          # Remove Terraform state files
+          rm -f terraform/terraform.tfstate*
+          rm -f terraform/.terraform.lock.hcl
+          
+          # Remove Lambda deployment packages
+          rm -f terraform/lambda_function.zip
+          rm -f terraform/layer.zip
+          
+          # Remove backup files
+          rm -f terraform/*.bak
+          rm -f terraform/*.backup
+          
+          # Remove empty directories
+          find . -type d -empty -delete
+
+      - name: Commit and push cleanup changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: cleanup temporary files [skip ci]" && git push)
 </file>
 
 <file path="terraform/main.tf">
@@ -3428,95 +6993,41 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "5.91.0"
+      version = "5.31.0"
+    }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "2.4.2"
     }
   }
 }
 
+# AWSプロバイダーの設定
 provider "aws" {
   region = "ap-northeast-1"
-}
-
-# 既存のテーブルの存在確認
-data "aws_dynamodb_table" "existing_iphone_prices" {
-  name = "iphone_prices"
-  count = try(data.aws_dynamodb_table.existing_iphone_prices[0].name, "") != "" ? 1 : 0
-}
-
-# テーブルが存在しない場合のみ作成
-resource "aws_dynamodb_table" "iphone_prices" {
-  count = try(data.aws_dynamodb_table.existing_iphone_prices[0].name, "") == "" ? 1 : 0
-
-  name         = "iphone_prices"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "series"
-  range_key    = "capacity"
-
-  attribute {
-    name = "series"
-    type = "S"
-  }
-
-  attribute {
-    name = "capacity"
-    type = "S"
-  }
-
-  global_secondary_index {
-    name            = "CapacityIndex"
-    hash_key        = "series"
-    range_key       = "capacity"
-    projection_type = "ALL"
-  }
-
-  lifecycle {
-    prevent_destroy = true
-    ignore_changes = [
-      read_capacity,
-      write_capacity,
-      range_key  # 既存の設定との競合を防ぐ
-    ]
+  
+  default_tags {
+    tags = {
+      Environment = "production"
+      Project     = "iphone_price_tracker"
+    }
   }
 }
 
-resource "aws_dynamodb_table" "official_prices" {
-  name         = "official_prices"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "series"
-  range_key    = "capacity"
+provider "archive" {}
 
-  attribute {
-    name = "series"
-    type = "S"
-  }
+# 現在のAWSアカウントIDを取得
+data "aws_caller_identity" "current" {}
 
-  attribute {
-    name = "capacity"
-    type = "S"
-  }
-
-  global_secondary_index {
-    name            = "CapacityIndex"
-    hash_key        = "series"
-    range_key       = "capacity"
-    projection_type = "ALL"
-  }
-}
-
-# テーブルのARNを出力
-output "dynamodb_table_arn" {
-  value = try(
-    data.aws_dynamodb_table.existing_iphone_prices[0].arn,
-    try(aws_dynamodb_table.iphone_prices[0].arn, "")
-  )
-}
+# 現在のリージョンを取得
+data "aws_region" "current" {}
 </file>
 
 <file path="requirements.txt">
 attrs==24.3.0
-beautifulsoup4==4.13.3
+beautifulsoup4==4.12.3
 blinker==1.9.0
-boto3==1.37.16
+boto3==1.37.23
 certifi==2024.12.14
 charset-normalizer==3.4.1
 click==8.1.8
@@ -3537,16 +7048,16 @@ pyee==12.1.1
 PySocks==1.7.1
 pytest-cov==6.0.0
 pytest==7.4.4
-python-dotenv==1.0.1
+python-dotenv==1.1.0
 PyYAML==6.0.1
-requests==2.32.3
-selenium==4.29.0
+requests==2.31.0
+selenium==4.30.0
 sniffio==1.3.1
 sortedcontainers==2.4.0
 soupsieve==2.6
 trio-websocket==0.12.2
 trio==0.29.0
-typing_extensions==4.12.2
+typing_extensions==4.13.0
 urllib3>=1.26,<2.0
 webdriver-manager==4.0.2
 websocket-client==1.8.0
