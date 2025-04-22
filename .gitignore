@@ -303,10 +303,11 @@ terraform/lambda/*/
 
 
 # Terraform
-terraform/.terraform/
-terraform/*.tfstate
-terraform/*.tfstate.*
-terraform/.terraform.lock.hcl
+terraform.tfstate
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
 terraform/*.backup
 terraform/*.bak
 
