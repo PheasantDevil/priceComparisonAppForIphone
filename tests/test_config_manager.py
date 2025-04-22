@@ -1,6 +1,7 @@
+import shutil
 import sys
 from pathlib import Path
-import shutil
+
 import pytest
 
 # プロジェクトのルートディレクトリをPYTHONPATHに追加
@@ -10,6 +11,7 @@ sys.path.insert(0, str(project_root))
 import pytest
 
 from config import AppConfig, ConfigManager, ScraperConfig
+
 
 @pytest.fixture(scope="function")
 def test_config_file(tmp_path):
@@ -89,7 +91,7 @@ def test_scraper_config_multiple_urls(mock_env_vars, test_config_file):
     """複数のkaitori_rudea_urlsを持つScraperConfigのテスト"""
     config = ConfigManager()
     assert isinstance(config.scraper.KAITORI_RUDEA_URLS, list)
-    assert len(config.scraper.KAITORI_RUDEA_URLS) == 3
+    assert len(config.scraper.KAITORI_RUDEA_URLS) == 4
     assert "https://kaitori-rudeya.com/category/detail/183" in config.scraper.KAITORI_RUDEA_URLS
     assert "https://kaitori-rudeya.com/category/detail/185" in config.scraper.KAITORI_RUDEA_URLS
     assert "https://kaitori-rudeya.com/category/detail/186" in config.scraper.KAITORI_RUDEA_URLS

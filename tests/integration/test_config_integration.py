@@ -52,7 +52,7 @@ def test_iphone16_pro_url_integration(mock_env_vars, test_config_file):
     expected_urls = [
         "https://kaitori-rudeya.com/category/detail/183",  # iPhone 16
         "https://kaitori-rudeya.com/category/detail/185",  # iPhone 16 Pro
-        "https://kaitori-rudeya.com/category/detail/186"   # iPhone 16 Pro Max
+        "https://kaitori-rudeya.com/category/detail/186",  # iPhone 16 Pro Max
         "https://kaitori-rudeya.com/category/detail/205"   # iPhone 16 e
     ]
     
