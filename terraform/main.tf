@@ -16,7 +16,7 @@ terraform {
 # AWSプロバイダーの設定
 provider "aws" {
   region = "ap-northeast-1"
-  
+
   default_tags {
     tags = {
       Environment = "production"

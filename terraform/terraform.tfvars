@@ -1,0 +1,6 @@
+environment               = "production"
+project                   = "iphone_price_tracker"
+alert_email               = "your-email@example.com"
+budget_notification_email = "your-email@example.com"
+aws_account_id            = "your-aws-account-id"
+vpc_id                    = "your-vpc-id" 

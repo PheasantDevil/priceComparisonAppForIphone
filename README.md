@@ -187,3 +187,134 @@ source venv/bin/activate
 ```
 (venv) $
 ```
+
+# iPhone Price Comparison App
+
+iPhone の価格比較を行うためのアプリケーションのバックエンドサービスです。
+
+## 機能
+
+- iPhone の公式価格情報の取得
+- 買取価格の取得と履歴の保存
+- RESTful API による価格情報の提供
+
+## アーキテクチャ
+
+### インフラストラクチャ
+
+- AWS Lambda: 価格取得と保存の処理
+- API Gateway: RESTful API の提供
+- DynamoDB: 価格データの保存
+- IAM: アクセス制御
+
+### データ構造
+
+価格データは以下の構造で保存されます：
+
+```json
+{
+  "products": [
+    {
+      "model": "iPhone 16",
+      "capacity": "128GB",
+      "color": "black",
+      "color_ja": "黒",
+      "model_number": "MYDQ3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 124800
+    }
+  ]
+}
+```
+
+## セットアップ
+
+### 前提条件
+
+- Python 3.9 以上
+- Terraform 1.5.0 以上
+- AWS CLI
+- GitHub Actions の設定
+
+### 環境変数
+
+以下の環境変数を設定する必要があります：
+
+```bash
+AWS_REGION=ap-northeast-1
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_ROLE_ARN=your_role_arn
+```
+
+### デプロイメント
+
+1. リポジトリをクローン
+2. 依存関係のインストール
+   ```bash
+   cd terraform
+   pip install -r requirements.txt
+   ```
+3. Terraform の初期化
+   ```bash
+   terraform init
+   ```
+4. インフラストラクチャのデプロイ
+   ```bash
+   terraform apply
+   ```
+
+## API エンドポイント
+
+### 価格情報の取得
+
+```
+GET /get_prices?series={series}
+```
+
+パラメータ:
+
+- `series`: iPhone のシリーズ名（例: "iPhone 16"）
+
+レスポンス:
+
+```json
+{
+  "data": {
+    "official": {
+      "128GB": 124800,
+      "256GB": 139800,
+      "512GB": 169800
+    },
+    "kaitori": {
+      "128GB": 110000,
+      "256GB": 125000,
+      "512GB": 155000
+    }
+  }
+}
+```
+
+## セキュリティ
+
+- IAM ロールは最小権限の原則に基づいて設定
+- API Gateway は IAM 認証を必須
+- アクセスログは CloudWatch Logs に保存（30 日間保持）
+
+## メンテナンス
+
+### 価格データの更新
+
+1. `data/official_prices.json`を編集
+2. 変更をコミットしてプッシュ
+3. GitHub Actions が自動的にデプロイ
+
+### モニタリング
+
+- CloudWatch Logs で API アクセスを監視
+- Lambda 関数の実行ログを確認
+
+## ライセンス
+
+MIT License

@@ -186,7 +186,7 @@ def test_scraper_config_with_iphone16_pro_url():
     assert len(config.KAITORI_RUDEA_URLS) == 3
     assert "https://kaitori-rudeya.com/category/detail/185" in config.KAITORI_RUDEA_URLS
 
-def test_config_manager_loads_iphone16_pro_url(mock_env_vars, tmp_path):
+def test_config_manager_loads_iphone16_pro_url(mock_env_vars, tmp_path, monkeypatch):
     """ConfigManagerがiPhone 16 Pro URLを正しく読み込むかテスト"""
     config_content = """
     app:
@@ -208,9 +208,8 @@ def test_config_manager_loads_iphone16_pro_url(mock_env_vars, tmp_path):
     config_file = tmp_path / "config.testing.yaml"
     config_file.write_text(config_content)
 
-    monkeypatch = mock_env_vars
     monkeypatch.setenv("FLASK_ENV", "testing")
     config = ConfigManager(config_dir=tmp_path)
 
-    assert len(config.scraper.KAITORI_RUDEA_URLS) == 3
+    assert len(config.scraper.KAITORI_RUDEA_URLS) == 4
     assert "https://kaitori-rudeya.com/category/detail/185" in config.scraper.KAITORI_RUDEA_URLS

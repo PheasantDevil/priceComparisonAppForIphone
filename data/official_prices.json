@@ -1,85 +1,154 @@
 {
-  "iPhone 16": {
-    "128GB": {
-      "black 黒 MYDQ3J/A 未開封 SIMフリー": 124800,
-      "pink 桃 MYDT3J/A 未開封 SIMフリー": 124800,
-      "teal 緑 MYDV3J/A 未開封 SIMフリー": 124800,
-      "ultramarine 青 MYDU3J/A 未開封 SIMフリー": 124800,
-      "white 白 MYDR3J/A 未開封 SIMフリー": 124800
+  "products": [
+    {
+      "model": "iPhone 16",
+      "capacity": "128GB",
+      "color": "black",
+      "color_ja": "黒",
+      "model_number": "MYDQ3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 124800
     },
-    "256GB": {
-      "black 黒 MYDW3J/A 未開封 SIMフリー": 139800,
-      "pink 桃 MYDY3J/A 未開封 SIMフリー": 139800,
-      "teal 緑 MYDZ3J/A 未開封 SIMフリー": 139800,
-      "ultramarine 青 MYDX3J/A 未開封 SIMフリー": 139800,
-      "white 白 MYDW3J/A 未開封 SIMフリー": 139800
+    {
+      "model": "iPhone 16",
+      "capacity": "128GB",
+      "color": "pink",
+      "color_ja": "桃",
+      "model_number": "MYDT3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 124800
     },
-    "512GB": {
-      "black 黒 MYDQ3J/A 未開封 SIMフリー": 169800,
-      "pink 桃 MYDT3J/A 未開封 SIMフリー": 169800,
-      "teal 緑 MYDV3J/A 未開封 SIMフリー": 169800,
-      "ultramarine 青 MYDU3J/A 未開封 SIMフリー": 169800,
-      "white 白 MYDR3J/A 未開封 SIMフリー": 169800
+    {
+      "model": "iPhone 16",
+      "capacity": "128GB",
+      "color": "teal",
+      "color_ja": "緑",
+      "model_number": "MYDV3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 124800
+    },
+    {
+      "model": "iPhone 16",
+      "capacity": "128GB",
+      "color": "ultramarine",
+      "color_ja": "青",
+      "model_number": "MYDU3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 124800
+    },
+    {
+      "model": "iPhone 16",
+      "capacity": "128GB",
+      "color": "white",
+      "color_ja": "白",
+      "model_number": "MYDR3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 124800
+    },
+    {
+      "model": "iPhone 16",
+      "capacity": "256GB",
+      "color": "black",
+      "color_ja": "黒",
+      "model_number": "MYDW3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 139800
+    },
+    {
+      "model": "iPhone 16",
+      "capacity": "256GB",
+      "color": "pink",
+      "color_ja": "桃",
+      "model_number": "MYDY3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 139800
+    },
+    {
+      "model": "iPhone 16",
+      "capacity": "256GB",
+      "color": "teal",
+      "color_ja": "緑",
+      "model_number": "MYDZ3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 139800
+    },
+    {
+      "model": "iPhone 16",
+      "capacity": "256GB",
+      "color": "ultramarine",
+      "color_ja": "青",
+      "model_number": "MYDX3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 139800
+    },
+    {
+      "model": "iPhone 16",
+      "capacity": "256GB",
+      "color": "white",
+      "color_ja": "白",
+      "model_number": "MYDW3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 139800
+    },
+    {
+      "model": "iPhone 16",
+      "capacity": "512GB",
+      "color": "black",
+      "color_ja": "黒",
+      "model_number": "MYDQ3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 169800
+    },
+    {
+      "model": "iPhone 16",
+      "capacity": "512GB",
+      "color": "pink",
+      "color_ja": "桃",
+      "model_number": "MYDT3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 169800
+    },
+    {
+      "model": "iPhone 16",
+      "capacity": "512GB",
+      "color": "teal",
+      "color_ja": "緑",
+      "model_number": "MYDV3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 169800
+    },
+    {
+      "model": "iPhone 16",
+      "capacity": "512GB",
+      "color": "ultramarine",
+      "color_ja": "青",
+      "model_number": "MYDU3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 169800
+    },
+    {
+      "model": "iPhone 16",
+      "capacity": "512GB",
+      "color": "white",
+      "color_ja": "白",
+      "model_number": "MYDR3J/A",
+      "condition": "未開封",
+      "carrier": "SIMフリー",
+      "price": 169800
     }
-  },
-  "iPhone 16 Pro": {
-    "128GB": {
-      "black 黒 MYWG3J/A 未開封 SIMフリー": 161000,
-      "desert 金 MYWH3J/A 未開封 SIMフリー": 161000,
-      "natural 灰 MYWJ3J/A 未開封 SIMフリー": 161000,
-      "white 白 MYWK3J/A 未開封 SIMフリー": 161000
-    },
-    "256GB": {
-      "black 黒 MYWG3J/A 未開封 SIMフリー": 177500,
-      "desert 金 MYWH3J/A 未開封 SIMフリー": 177500,
-      "natural 灰 MYWJ3J/A 未開封 SIMフリー": 177500,
-      "white 白 MYWK3J/A 未開封 SIMフリー": 177500
-    },
-    "512GB": {
-      "black 黒 MYWQ3J/A 未開封 SIMフリー": 204000,
-      "desert 金 MYWT3J/A 未開封 SIMフリー": 204000,
-      "natural 灰 MYWU3J/A 未開封 SIMフリー": 204000,
-      "white 白 MYWR3J/A 未開封 SIMフリー": 204000
-    },
-    "1TB": {
-      "black 黒 MYWQ3J/A 未開封 SIMフリー": 234000,
-      "desert 金 MYWT3J/A 未開封 SIMフリー": 234000,
-      "natural 灰 MYWU3J/A 未開封 SIMフリー": 234000,
-      "white 白 MYWR3J/A 未開封 SIMフリー": 234000
-    }
-  },
-  "iPhone 16 Pro Max": {
-    "256GB": {
-      "black 黒 MYWG3J/A 未開封 SIMフリー": 189800,
-      "desert 金 MYWH3J/A 未開封 SIMフリー": 189800,
-      "natural 灰 MYWJ3J/A 未開封 SIMフリー": 189800,
-      "white 白 MYWK3J/A 未開封 SIMフリー": 189800
-    },
-    "512GB": {
-      "black 黒 MYWQ3J/A 未開封 SIMフリー": 219800,
-      "desert 金 MYWT3J/A 未開封 SIMフリー": 219800,
-      "natural 灰 MYWU3J/A 未開封 SIMフリー": 219800,
-      "white 白 MYWR3J/A 未開封 SIMフリー": 219800
-    },
-    "1TB": {
-      "black 黒 MYWQ3J/A 未開封 SIMフリー": 249800,
-      "desert 金 MYWT3J/A 未開封 SIMフリー": 249800,
-      "natural 灰 MYWU3J/A 未開封 SIMフリー": 249800,
-      "white 白 MYWR3J/A 未開封 SIMフリー": 249800
-    }
-  },
-  "iPhone 16e": {
-    "128GB": {
-      "black 黒": 99800,
-      "white 白": 99800
-    },
-    "256GB": {
-      "black 黒": 114800,
-      "white 白": 114800
-    },
-    "512GB": {
-      "black 黒": 144800,
-      "white 白": 144800
-    }
-  }
+  ]
 }
