@@ -22,10 +22,10 @@ resource "aws_dynamodb_table_item" "iphone_prices_data" {
 
 # DynamoDBテーブルの定義
 resource "aws_dynamodb_table" "iphone_prices" {
-  name           = "iphone_prices"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "series"
-  range_key      = "capacity"
+  name         = "iphone_prices"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "series"
+  range_key    = "capacity"
 
   attribute {
     name = "series"
@@ -55,10 +55,10 @@ resource "aws_dynamodb_table" "iphone_prices" {
 }
 
 resource "aws_dynamodb_table" "official_prices" {
-  name           = "official_prices"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "series"
-  range_key      = "capacity"
+  name         = "official_prices"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "series"
+  range_key    = "capacity"
 
   attribute {
     name = "series"
@@ -87,10 +87,93 @@ resource "aws_dynamodb_table" "official_prices" {
   }
 }
 
+# DynamoDBテーブルの設定
+
+# 価格情報を格納するメインテーブル
+resource "aws_dynamodb_table" "price_comparison" {
+  name         = "price-comparison"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
+  range_key    = "timestamp"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+
+  attribute {
+    name = "timestamp"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  tags = {
+    Name        = "price-comparison"
+    Environment = var.environment
+    Project     = var.project
+  }
+}
+
+# DynamoDBのオートスケーリング設定
+resource "aws_appautoscaling_target" "dynamodb_table_read_target" {
+  max_capacity       = 50
+  min_capacity       = 5
+  resource_id        = "table/${aws_dynamodb_table.price_comparison.name}"
+  scalable_dimension = "dynamodb:table:ReadCapacityUnits"
+  service_namespace  = "dynamodb"
+}
+
+resource "aws_appautoscaling_policy" "dynamodb_table_read_policy" {
+  name               = "dynamodb-read-capacity-scaling-policy"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.dynamodb_table_read_target.resource_id
+  scalable_dimension = aws_appautoscaling_target.dynamodb_table_read_target.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.dynamodb_table_read_target.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    target_value       = 70.0
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 300
+
+    predefined_metric_specification {
+      predefined_metric_type = "DynamoDBReadCapacityUtilization"
+    }
+  }
+}
+
+resource "aws_appautoscaling_target" "dynamodb_table_write_target" {
+  max_capacity       = 25
+  min_capacity       = 5
+  resource_id        = "table/${aws_dynamodb_table.price_comparison.name}"
+  scalable_dimension = "dynamodb:table:WriteCapacityUnits"
+  service_namespace  = "dynamodb"
+}
+
+resource "aws_appautoscaling_policy" "dynamodb_table_write_policy" {
+  name               = "dynamodb-write-capacity-scaling-policy"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.dynamodb_table_write_target.resource_id
+  scalable_dimension = aws_appautoscaling_target.dynamodb_table_write_target.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.dynamodb_table_write_target.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    target_value       = 70.0
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 300
+
+    predefined_metric_specification {
+      predefined_metric_type = "DynamoDBWriteCapacityUtilization"
+    }
+  }
+}
 # 公式価格データの登録
 locals {
   official_prices = jsondecode(file("${path.module}/../data/official_prices.json"))
-  
+
   flattened_prices = {
     for item in flatten([
       for series, models in local.official_prices : [
@@ -107,16 +190,19 @@ locals {
 resource "aws_dynamodb_table_item" "official_prices_data" {
   for_each = local.flattened_prices
 
-  table_name = aws_dynamodb_table.official_prices.name
-  hash_key   = "series"
-  range_key  = "capacity"
+  table_name = aws_dynamodb_table.price_comparison.name
+  hash_key   = "model"
+  range_key  = "timestamp"
 
   item = jsonencode({
-    series = {
-      S = each.value.series
+    model = {
+      S = "${each.value.series} ${each.value.capacity}"
     }
-    capacity = {
-      S = each.value.capacity
+    timestamp = {
+      S = timestamp()
+    }
+    store = {
+      S = "Apple"
     }
     colors = {
       M = {
