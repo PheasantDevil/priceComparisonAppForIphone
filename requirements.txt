@@ -9,7 +9,7 @@ exceptiongroup==1.2.2
 flask==3.1.0
 greenlet==3.2.1
 gunicorn==23.0.0
-h11==0.14.0
+h11==0.16.0
 idna==3.10
 importlib_metadata==8.6.1
 itsdangerous==2.2.0
