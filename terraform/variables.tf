@@ -33,11 +33,17 @@ variable "budget_notification_email" {
 variable "github_org" {
   description = "GitHub organization name"
   type        = string
-  default     = "your-github-org"
+  default     = "PheasantDevil"
 }
 
 variable "github_repo" {
   description = "GitHub repository name"
   type        = string
   default     = "priceComparisonAppForIphone"
+}
+
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "ap-northeast-1"
 }

@@ -1,3 +1,32 @@
+# CloudWatch Log Group for API Gateway
+resource "aws_cloudwatch_log_group" "api_gateway" {
+  name              = "/aws/apigateway/price-comparison-api"
+  retention_in_days = 30
+}
+
+# API Gateway Stage
+resource "aws_api_gateway_stage" "production" {
+  stage_name    = "production"
+  rest_api_id   = aws_api_gateway_rest_api.price_comparison.id
+  deployment_id = aws_api_gateway_deployment.price_comparison.id
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_gateway.arn
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      ip             = "$context.identity.sourceIp"
+      caller         = "$context.identity.caller"
+      user           = "$context.identity.user"
+      requestTime    = "$context.requestTime"
+      httpMethod     = "$context.httpMethod"
+      resourcePath   = "$context.resourcePath"
+      status         = "$context.status"
+      protocol       = "$context.protocol"
+      responseLength = "$context.responseLength"
+    })
+  }
+}
+
 resource "aws_api_gateway_rest_api" "price_comparison" {
   name        = "price-comparison-api"
   description = "API for iPhone price comparison"
@@ -26,7 +55,7 @@ resource "aws_api_gateway_integration" "lambda" {
   uri                     = aws_lambda_function.get_prices.invoke_arn
 }
 
-resource "aws_api_gateway_deployment" "api" {
+resource "aws_api_gateway_deployment" "price_comparison" {
   rest_api_id = aws_api_gateway_rest_api.price_comparison.id
 
   depends_on = [
@@ -39,7 +68,7 @@ resource "aws_api_gateway_deployment" "api" {
 }
 
 resource "aws_api_gateway_stage" "prod" {
-  deployment_id = aws_api_gateway_deployment.api.id
+  deployment_id = aws_api_gateway_deployment.price_comparison.id
   rest_api_id   = aws_api_gateway_rest_api.price_comparison.id
   stage_name    = "prod"
 }
