@@ -258,7 +258,7 @@ def load_config():
 class PriceData(BaseModel):
     """価格データモデル"""
     model: str
-    price: int
+    price: float
     source: str
     timestamp: datetime = Field(default_factory=datetime.now)
     url: Optional[str] = None
@@ -267,14 +267,21 @@ class PriceData(BaseModel):
     currency: str = "JPY"
 
     def to_dict(self) -> Dict[str, Any]:
-        """JSONシリアライズ可能な辞書に変換"""
-        data = self.dict()
-        data['timestamp'] = self.timestamp.isoformat()
-        return data
+        """辞書形式に変換"""
+        return {
+            'model': self.model,
+            'price': self.price,
+            'source': self.source,
+            'timestamp': self.timestamp.isoformat(),
+            'url': self.url,
+            'condition': self.condition,
+            'notes': self.notes,
+            'currency': self.currency
+        }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'PriceData':
-        """辞書からPriceDataオブジェクトを作成"""
+        """辞書からインスタンスを作成"""
         if 'timestamp' in data and isinstance(data['timestamp'], str):
             data['timestamp'] = datetime.fromisoformat(data['timestamp'])
         return cls(**data)
@@ -394,6 +401,30 @@ class PerformanceTracker:
             items_found=items_found
         ))
     
+    def measure_request(self):
+        """リクエストの計測用コンテキストマネージャ"""
+        class RequestContext:
+            def __init__(self, tracker, url):
+                self.tracker = tracker
+                self.url = url
+                self.start_time = None
+
+            def __enter__(self):
+                self.start_time = self.tracker.start_scraping(self.url)
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                success = exc_type is None
+                error_message = str(exc_val) if exc_val else None
+                self.tracker.end_scraping(
+                    self.url,
+                    self.start_time,
+                    success,
+                    error_message
+                )
+
+        return RequestContext(self, "request")
+
     def get_summary(self) -> Dict[str, float]:
         """パフォーマンスメトリクスのサマリーを返す"""
         if not self.metrics:
@@ -440,46 +471,41 @@ class CacheManager:
     """キャッシュ管理クラス"""
     def __init__(self, cache_dir: str = "cache", cache_duration: int = CACHE_DURATION):
         self.cache_dir = Path(cache_dir)
-        self.cache_duration = cache_duration  # キャッシュの有効期間（秒）
+        self.cache_duration = cache_duration
         self.cache_dir.mkdir(parents=True, exist_ok=True)
     
     def _get_cache_path(self, url: str) -> Path:
-        """URLに対応するキャッシュファイルのパスを生成"""
-        cache_key = url.replace('/', '_').replace(':', '_')
-        return self.cache_dir / f"{cache_key}.json"
+        """URLに対応するキャッシュファイルのパスを取得"""
+        url_hash = str(hash(url))
+        return self.cache_dir / f"{url_hash}.json"
     
     def _is_cache_valid(self, cache_path: Path) -> bool:
         """キャッシュが有効かどうかを確認"""
         if not cache_path.exists():
             return False
-        
-        cache_time = datetime.fromtimestamp(cache_path.stat().st_mtime)
-        return datetime.now() - cache_time < timedelta(seconds=self.cache_duration)
+        cache_time = cache_path.stat().st_mtime
+        return (time.time() - cache_time) < self.cache_duration
     
-    def get_cached_data(self, url: str) -> Optional[List[PriceData]]:
+    def get_cached_data(self, url: str) -> Optional[List[Dict[str, Any]]]:
         """キャッシュからデータを取得"""
         cache_path = self._get_cache_path(url)
-        
         if not self._is_cache_valid(cache_path):
             return None
-        
+
         try:
             with open(cache_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                logger.info(f"Cache hit for {url}")
-                return [PriceData.from_dict(item) for item in data]
+                return [PriceData.from_dict(item).to_dict() for item in data]
         except Exception as e:
             logger.warning(f"Failed to read cache for {url}: {str(e)}")
             return None
     
-    def save_to_cache(self, url: str, data: List[PriceData]) -> None:
+    def save_to_cache(self, url: str, data: List[Dict[str, Any]]) -> None:
         """データをキャッシュに保存"""
         cache_path = self._get_cache_path(url)
-        
         try:
             with open(cache_path, 'w', encoding='utf-8') as f:
-                json.dump([price.to_dict() for price in data], f, ensure_ascii=False, indent=2)
-            logger.info(f"Cache saved for {url}")
+                json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger.warning(f"Failed to save cache for {url}: {str(e)}")
     
@@ -488,7 +514,6 @@ class CacheManager:
         try:
             for cache_file in self.cache_dir.glob("*.json"):
                 cache_file.unlink()
-            logger.info("Cache cleared")
         except Exception as e:
             logger.warning(f"Failed to clear cache: {str(e)}")
 
@@ -499,11 +524,7 @@ class ErrorHandler:
     """エラーハンドリングを管理するクラス"""
     def __init__(self):
         self.errors: List[ScraperError] = []
-        self.error_counts = {
-            ErrorSeverity.LOW: 0,
-            ErrorSeverity.MEDIUM: 0,
-            ErrorSeverity.HIGH: 0
-        }
+        self.error_counts = {severity: 0 for severity in ErrorSeverity}
         self.consecutive_high_severity_errors = 0
     
     def handle_error(self, error: ScraperError) -> None:
@@ -526,19 +547,16 @@ class ErrorHandler:
         """エラーのサマリーを返す"""
         return {
             'total_errors': len(self.errors),
-            'error_counts': {
-                severity.name: count
-                for severity, count in self.error_counts.items()
-            },
+            'error_counts': {severity.value: count for severity, count in self.error_counts.items()},
             'recent_errors': [
                 {
                     'error_id': error.error_id,
                     'message': str(error),
-                    'severity': error.severity.name,
+                    'severity': error.severity.value,
                     'timestamp': error.timestamp.isoformat(),
                     'context': error.context
                 }
-                for error in self.errors[-5:]  # 最近の5件のエラー
+                for error in self.errors[-10:]  # 最新の10件のエラーのみ
             ]
         }
     
@@ -549,7 +567,7 @@ class ErrorHandler:
     def should_continue(self) -> bool:
         """処理を継続すべきかどうかを判断"""
         # HIGHレベルのエラーが3件以上発生した場合は処理を中断
-        return self.error_counts[ErrorSeverity.HIGH] < 3
+        return self.consecutive_high_severity_errors < 3  # 3回以上の連続した重大なエラーで停止
 
 # グローバルなエラーハンドラー
 error_handler = ErrorHandler()
@@ -576,189 +594,147 @@ def validate_price_data(data: Dict[str, Any]) -> None:
         raise ValidationError(f"Invalid price format: {str(e)}", field='price', value=data.get('price'))
 
 class Scraper:
-    def __init__(self):
-        self.config = self._load_config()
-        self.headers = {
-            'User-Agent': self.config['scraper']['user_agent'],
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'ja,en-US;q=0.7,en;q=0.3',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
-        }
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        self.config = config or self._load_default_config()
         self.cache_manager = CacheManager()
         self.error_handler = ErrorHandler()
         self.performance_tracker = PerformanceTracker()
-        
-    def _load_config(self) -> Dict[str, Any]:
-        """設定ファイルを読み込む"""
-        config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', 'config.production.yaml')
-        try:
-            with open(config_path, 'r') as f:
-                config = yaml.safe_load(f)
-                if not config or 'scraper' not in config:
-                    raise ConfigError("Invalid configuration: missing 'scraper' section")
-                return config
-        except FileNotFoundError:
-            logger.error(f"Config file not found: {config_path}")
-            raise ConfigError(f"Configuration file not found: {config_path}")
-        except yaml.YAMLError as e:
-            logger.error(f"Error parsing config file: {str(e)}")
-            raise ConfigError(f"Invalid YAML format: {str(e)}")
-        except Exception as e:
-            logger.error(f"Error loading config: {str(e)}")
-            raise ConfigError(f"Failed to load configuration: {str(e)}")
-        
-    def _handle_error(self, error: Exception, url: str = "unknown", severity: ErrorSeverity = ErrorSeverity.MEDIUM) -> None:
-        """エラーハンドリングの共通処理"""
-        error_id = str(uuid.uuid4())
-        timestamp = datetime.now(timezone.utc)
-        context = {
-            'url': url,
-            'timestamp': timestamp.isoformat(),
-            'error_type': type(error).__name__,
-            'error_message': str(error)
+        self.session = requests.Session()
+        self.session.headers.update(self.config.get('headers', {}))
+
+    def _load_default_config(self) -> Dict[str, Any]:
+        """デフォルト設定を読み込む"""
+        return {
+            'scraper': {
+                'selectors': {
+                    'price_item': '.price-item',
+                    'model': '.model',
+                    'price': '.price',
+                    'condition': '.condition'
+                },
+                'headers': {
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'ja,en-US;q=0.7,en;q=0.3',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1'
+                },
+                'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'max_retries': 3,
+                'timeout': 30,
+                'cache_duration': 3600
+            },
+            'urls': {
+                'kaitori': ['https://example.com/kaitori'],
+                'official': ['https://example.com/official']
+            }
         }
-        
-        if isinstance(error, HTTPError):
-            severity = ErrorSeverity.HIGH
-            context['status_code'] = error.status_code
-        elif isinstance(error, ParseError):
-            severity = ErrorSeverity.MEDIUM
-            context['html_snippet'] = error.html_snippet
-        elif isinstance(error, ValidationError):
-            severity = ErrorSeverity.LOW
-            context['invalid_data'] = error.invalid_data
-        elif isinstance(error, CacheError):
-            severity = ErrorSeverity.LOW
-            context['cache_path'] = error.cache_path
-            
-        self.error_handler.handle_error(ScraperError(message=str(error), severity=severity, context=context))
-        
-        # 重大なエラーが連続して発生した場合は例外を発生させる
-        if severity == ErrorSeverity.HIGH:
-            if self.error_handler.get_consecutive_high_severity_errors() >= 3:
-                raise ScraperError("Too many consecutive high severity errors", severity=ErrorSeverity.HIGH)
-                
+
+    def _validate_price_data(self, data: Dict[str, Any]) -> bool:
+        """価格データの検証を行う"""
+        try:
+            # 必須フィールドの存在確認
+            required_fields = ['model', 'price']
+            if not all(field in data for field in required_fields):
+                return False
+
+            # 価格が数値であることを確認
+            if not isinstance(data['price'], (int, float)):
+                return False
+
+            # 価格が正の数であることを確認
+            if data['price'] <= 0:
+                return False
+
+            return True
+        except Exception as e:
+            logger.error(f"価格データの検証中にエラーが発生: {str(e)}")
+            return False
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        retry=retry_if_exception_type((requests.RequestException, ParseError)),
+        before_sleep=before_sleep_log(logger, logging.DEBUG)
+    )
     def scrape_url(self, url: str) -> List[Dict[str, Any]]:
-        """URLから価格情報をスクレイピング"""
+        """URLから価格データをスクレイピングする"""
         try:
             # キャッシュの確認
             cached_data = self.cache_manager.get_cached_data(url)
             if cached_data:
                 logger.info(f"キャッシュからデータを取得: {url}")
-                return [price.to_dict() for price in cached_data]
+                return cached_data
 
-            # スクレイピングの実行
-            start_time = time.time()
-            self.performance_tracker.start_scraping(url)
-            
-            # HTTPリクエスト
-            response = requests.get(url, headers=self.headers, timeout=30)
-            response.raise_for_status()
-            
-            # HTMLパース
-            soup = BeautifulSoup(response.text, 'html.parser')
-            price_items = soup.select(self.config['scraper']['selectors']['price_item'])
-            
-            if not price_items:
-                raise ParseError("No price items found", html_snippet=response.text[:200])
+            # パフォーマンス計測開始
+            with self.performance_tracker.measure_request():
+                response = self.session.get(url, timeout=TIMEOUT)
+                response.raise_for_status()
                 
-            prices = []
-            for item in price_items:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                price_items = soup.select(self.config['scraper']['selectors']['price_item'])
+                
+                prices = []
+                for item in price_items:
+                    try:
+                        model = item.select_one(self.config['scraper']['selectors']['model']).text.strip()
+                        price_text = item.select_one(self.config['scraper']['selectors']['price']).text.strip()
+                        price = int(re.sub(r'[^\d]', '', price_text))
+                        
+                        price_data = PriceData(
+                            model=model,
+                            price=price,
+                            source=url,
+                            timestamp=datetime.now(timezone.utc)
+                        )
+                        
+                        prices.append(price_data.to_dict())
+                    except Exception as e:
+                        self.error_handler.handle_error(ParseError(str(e)))
+                
+                # キャッシュに保存
                 try:
-                    model = item.select_one(self.config['scraper']['selectors']['model']).text.strip()
-                    price_text = item.select_one(self.config['scraper']['selectors']['price']).text.strip()
-                    price = int(price_text.replace(',', ''))
-                    condition = item.select_one(self.config['scraper']['selectors']['condition']).text.strip()
-                    
-                    price_data = PriceData(
-                        model=model,
-                        price=price,
-                        source=url,
-                        timestamp=datetime.now(timezone.utc),
-                        condition=condition
-                    )
-                    
-                    prices.append(price_data)
+                    self.cache_manager.save_to_cache(url, prices)
                 except Exception as e:
-                    self._handle_error(e, url, ErrorSeverity.LOW)
-                    continue
-                    
-            if not prices:
-                raise ParseError("No valid price data found", html_snippet=response.text[:200])
+                    self.error_handler.handle_error(CacheError(str(e), "save"))
                 
-            # キャッシュに保存
-            try:
-                self.cache_manager.save_to_cache(url, prices)
-            except Exception as e:
-                self._handle_error(e, url, ErrorSeverity.LOW)
+                return prices
                 
-            # パフォーマンス計測終了
-            self.performance_tracker.end_scraping(
-                url=url,
-                start_time=start_time,
-                success=True,
-                items_found=len(prices)
-            )
-            
-            return [price.to_dict() for price in prices]
-            
-        except requests.exceptions.RequestException as e:
-            self._handle_error(HTTPError(str(e), url=url, status_code=getattr(e.response, 'status_code', None)))
-            return []
+        except requests.RequestException as e:
+            self.error_handler.handle_error(HTTPError(str(e)))
+            raise
         except Exception as e:
-            self._handle_error(e, url)
-            return []
-            
-    def get_summary(self) -> Dict[str, Any]:
-        """パフォーマンスとエラーのサマリーを取得"""
-        return {
-            'performance': self.performance_tracker.get_summary(),
-            'errors': self.error_handler.get_error_summary()
-        }
+            self.error_handler.handle_error(ScraperError(str(e)))
+            raise
 
     def get_kaitori_prices(self) -> List[Dict[str, Any]]:
         """買取価格を取得する"""
         try:
-            config = self._load_config()
-            urls = config['scraper']['kaitori_rudea_urls']
-            
+            urls = self.config['urls']['kaitori']
             with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
                 futures = [executor.submit(self.scrape_url, url) for url in urls]
                 results = []
                 for future in as_completed(futures):
                     try:
-                        result = future.result()
-                        if result:
-                            results.extend(result)
+                        results.extend(future.result())
                     except Exception as e:
-                        self._handle_error(e, "Unknown URL", ErrorSeverity.HIGH)
-                
+                        self.error_handler.handle_error(ScraperError(str(e)))
                 return results
-                
         except Exception as e:
-            self._handle_error(e, "get_kaitori_prices", ErrorSeverity.HIGH)
-            return []
+            raise ScraperError("買取価格の取得に失敗しました", ErrorSeverity.HIGH)
 
     def get_official_prices(self) -> List[Dict[str, Any]]:
         """公式価格を取得する"""
         try:
-            config = self._load_config()
-            urls = config['scraper']['official_urls']
-            
+            urls = self.config['urls']['official']
             with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
                 futures = [executor.submit(self.scrape_url, url) for url in urls]
                 results = []
                 for future in as_completed(futures):
                     try:
-                        result = future.result()
-                        if result:
-                            results.extend(result)
+                        results.extend(future.result())
                     except Exception as e:
-                        self._handle_error(e, "Unknown URL", ErrorSeverity.HIGH)
-                
+                        self.error_handler.handle_error(ScraperError(str(e)))
                 return results
-                
         except Exception as e:
-            self._handle_error(e, "get_official_prices", ErrorSeverity.HIGH)
-            return []
+            raise ScraperError("公式価格の取得に失敗しました", ErrorSeverity.HIGH)
