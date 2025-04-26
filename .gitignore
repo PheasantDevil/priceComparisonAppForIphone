@@ -342,6 +342,10 @@ wheels/
 .installed.cfg
 *.egg
 
+# Virtual Environment
+venv/
+ENV/
+
 # IDE
 .idea/
 .vscode/
@@ -352,18 +356,19 @@ wheels/
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-logs/
-
-# Environment
-.env
-.venv
-venv/
-ENV/
-
-# Test
+# Project specific
+cache/
 .coverage
-htmlcov/
+coverage.xml
 .pytest_cache/
-.tox/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform.lock.hcl
+
+# Node
+node_modules/
+package-lock.json
