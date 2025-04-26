@@ -317,6 +317,9 @@ terraform/layer.zip
 terraform/layer/
 terraform/lambda/
 
+# DynamoDB Local files
+dynamodb_local/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -341,6 +344,20 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.pyc
+*.pyo
+*.pyd
+.cache/
+.venv/
+.env
+.DS_Store
+
+# Coverage
+.coverage
+coverage.xml
+
+# Test/pytest
+.pytest_cache/
 
 # Virtual Environment
 venv/
