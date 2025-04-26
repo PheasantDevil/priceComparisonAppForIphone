@@ -27,14 +27,46 @@ from src.lambda_functions.get_prices_lambda.scraper import (MAX_WORKERS,
                                                             ValidationError)
 
 
+# テスト用のフィクスチャ
 @pytest.fixture
 def mock_response():
     response = MagicMock()
     response.text = """
-    <div class="price">¥120,000</div>
-    <div class="model">iPhone 15 128GB</div>
+    <div class="price-item">
+        <span class="model">iPhone 15 Pro</span>
+        <span class="price">150,000</span>
+        <span class="condition">新品</span>
+    </div>
     """
     return response
+
+@pytest.fixture
+def mock_config():
+    return {
+        'scraper': {
+            'selectors': {
+                'price_item': '.price-item',
+                'model': '.model',
+                'price': '.price',
+                'condition': '.condition'
+            },
+            'headers': {
+                'User-Agent': 'test-agent',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'ja,en-US;q=0.7,en;q=0.3',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            },
+            'user_agent': 'test-agent',
+            'max_retries': 3,
+            'timeout': 30,
+            'cache_duration': 3600
+        },
+        'urls': {
+            'kaitori': ['https://example.com/kaitori'],
+            'official': ['https://example.com/official']
+        }
+    }
 
 def test_scraper_initialization():
     """Scraperクラスの初期化テスト"""
@@ -43,10 +75,10 @@ def test_scraper_initialization():
     assert isinstance(scraper.error_handler, ErrorHandler)
     assert isinstance(scraper.performance_tracker, PerformanceTracker)
 
-def test_get_kaitori_prices():
+def test_get_kaitori_prices(mock_config):
     """買取価格の取得テスト"""
-    scraper = Scraper()
-    with patch('requests.get') as mock_get:
+    scraper = Scraper(mock_config)
+    with patch('requests.Session.get') as mock_get:
         # モックのレスポンスを設定
         mock_response = MagicMock()
         mock_response.text = """
@@ -67,10 +99,10 @@ def test_get_kaitori_prices():
             assert 'model' in price
             assert 'price' in price
 
-def test_get_official_prices():
+def test_get_official_prices(mock_config):
     """公式価格の取得テスト"""
-    scraper = Scraper()
-    with patch('requests.get') as mock_get:
+    scraper = Scraper(mock_config)
+    with patch('requests.Session.get') as mock_get:
         # モックのレスポンスを設定
         mock_response = MagicMock()
         mock_response.text = """
@@ -91,33 +123,33 @@ def test_get_official_prices():
             assert 'model' in price
             assert 'price' in price
 
-def test_get_kaitori_prices_success(mock_response):
+def test_get_kaitori_prices_success(mock_config, mock_response):
     """買取価格取得の成功テスト"""
-    scraper = Scraper()
-    with patch('requests.get', return_value=mock_response):
+    scraper = Scraper(mock_config)
+    with patch('requests.Session.get', return_value=mock_response):
         prices = scraper.get_kaitori_prices()
         assert len(prices) > 0
         assert isinstance(prices[0], dict)
         assert 'model' in prices[0]
         assert 'price' in prices[0]
 
-def test_get_kaitori_prices_retry():
+def test_get_kaitori_prices_retry(mock_config):
     """買取価格取得のリトライテスト"""
-    scraper = Scraper()
-    with patch('requests.get', side_effect=Exception("Connection error")):
+    scraper = Scraper(mock_config)
+    with patch('requests.Session.get', side_effect=Exception("Connection error")):
         with pytest.raises(ScraperError) as exc_info:
             scraper.get_kaitori_prices()
-        assert "Failed to scrape" in str(exc_info.value)
+        assert "買取価格の取得に失敗" in str(exc_info.value)
 
 def test_price_data_validation():
     valid_data = {
         'model': 'iPhone 15 128GB',
-        'price': '120000',
+        'price': 120000.0,
         'source': 'test_source',
         'timestamp': datetime.now(timezone.utc)
     }
     price_data = PriceData(**valid_data)
-    assert price_data.price == 120000.00
+    assert price_data.price == 120000.0
     assert price_data.currency == "JPY"
 
 def test_price_data_invalid_model():
@@ -129,21 +161,6 @@ def test_price_data_invalid_model():
     }
     with pytest.raises(ValueError):
         PriceData(**invalid_data)
-
-@pytest.fixture
-def mock_config():
-    return {
-        'scraper': {
-            'user_agent': 'test-agent',
-            'request_timeout': 10,
-            'kaitori_rudea_urls': [
-                'https://example.com/url1',
-                'https://example.com/url2',
-                'https://example.com/url3'
-            ],
-            'apple_store_url': 'https://example.com/apple'
-        }
-    }
 
 @pytest.fixture
 def mock_html_response():
@@ -160,14 +177,12 @@ def mock_html_response():
 
 def test_get_official_prices_success(mock_config, mock_html_response):
     """公式価格取得の成功テスト"""
-    scraper = Scraper()
-    with patch('src.lambda_functions.get_prices_lambda.scraper.load_config', return_value=mock_config), \
-         patch('src.lambda_functions.get_prices_lambda.scraper.safe_request') as mock_request:
-        
+    scraper = Scraper(mock_config)
+    with patch('requests.Session.get') as mock_get:
         # モックレスポンスの設定
         mock_response = MagicMock()
         mock_response.text = mock_html_response
-        mock_request.return_value = mock_response
+        mock_get.return_value = mock_response
         
         # 関数の実行
         prices = scraper.get_official_prices()
@@ -175,22 +190,20 @@ def test_get_official_prices_success(mock_config, mock_html_response):
         # 結果の検証
         assert len(prices) == 2
         assert prices[0]['model'] == "iPhone 15 Pro 256GB"
-        assert prices[0]['price'] == 150000
+        assert prices[0]['price'] == 150000.0
         assert prices[0]['condition'] == "新品"
         assert prices[1]['model'] == "iPhone 15 128GB"
-        assert prices[1]['price'] == 120000
+        assert prices[1]['price'] == 120000.0
         assert prices[1]['condition'] == "新品"
 
 def test_get_official_prices_no_elements(mock_config):
     """公式価格取得の空要素テスト"""
-    scraper = Scraper()
-    with patch('src.lambda_functions.get_prices_lambda.scraper.load_config', return_value=mock_config), \
-         patch('src.lambda_functions.get_prices_lambda.scraper.safe_request') as mock_request:
-        
+    scraper = Scraper(mock_config)
+    with patch('requests.Session.get') as mock_get:
         # 空のHTMLレスポンス
         mock_response = MagicMock()
         mock_response.text = "<html><body></body></html>"
-        mock_request.return_value = mock_response
+        mock_get.return_value = mock_response
         
         # 関数の実行
         prices = scraper.get_official_prices()
@@ -200,12 +213,10 @@ def test_get_official_prices_no_elements(mock_config):
 
 def test_get_official_prices_request_error(mock_config):
     """公式価格取得のリクエストエラーテスト"""
-    scraper = Scraper()
-    with patch('src.lambda_functions.get_prices_lambda.scraper.load_config', return_value=mock_config), \
-         patch('src.lambda_functions.get_prices_lambda.scraper.safe_request') as mock_request:
-        
+    scraper = Scraper(mock_config)
+    with patch('requests.Session.get') as mock_get:
         # リクエストエラーをシミュレート
-        mock_request.side_effect = HTTPError("Connection failed")
+        mock_get.side_effect = HTTPError("Connection failed")
         
         # エラーが発生することを確認
         with pytest.raises(ScraperError) as exc_info:
@@ -215,14 +226,12 @@ def test_get_official_prices_request_error(mock_config):
 
 def test_get_official_prices_invalid_html(mock_config):
     """公式価格取得の無効なHTMLテスト"""
-    scraper = Scraper()
-    with patch('src.lambda_functions.get_prices_lambda.scraper.load_config', return_value=mock_config), \
-         patch('src.lambda_functions.get_prices_lambda.scraper.safe_request') as mock_request:
-        
+    scraper = Scraper(mock_config)
+    with patch('requests.Session.get') as mock_get:
         # 無効なHTMLレスポンス
         mock_response = MagicMock()
         mock_response.text = "<div>Invalid HTML</div>"
-        mock_request.return_value = mock_response
+        mock_get.return_value = mock_response
         
         # 関数の実行
         prices = scraper.get_official_prices()
