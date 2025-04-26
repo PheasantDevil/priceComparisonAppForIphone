@@ -5,11 +5,18 @@ from pathlib import Path
 
 import pytest
 
-# Add the project root to the Python path
-sys.path.append(str(Path(__file__).parent.parent))
-
 # プロジェクトのルートディレクトリをPythonパスに追加
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+project_root = str(Path(__file__).parent.parent)
+sys.path.insert(0, project_root)
+
+# 環境変数の設定
+os.environ["PYTHONPATH"] = project_root
+
+# テスト用の設定
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "integration: mark test as integration test"
+    )
 
 @pytest.fixture(scope="function")
 def mock_env_vars(monkeypatch):
