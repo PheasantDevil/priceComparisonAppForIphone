@@ -1,6 +1,15 @@
-import pytest
-from pathlib import Path
+import os
 import shutil
+import sys
+from pathlib import Path
+
+import pytest
+
+# Add the project root to the Python path
+sys.path.append(str(Path(__file__).parent.parent))
+
+# プロジェクトのルートディレクトリをPythonパスに追加
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 @pytest.fixture(scope="function")
 def mock_env_vars(monkeypatch):
@@ -47,3 +56,18 @@ scraper:
     
     # テスト後にファイルを削除
     dest_file.unlink()
+
+@pytest.fixture(autouse=True)
+def setup_test_env():
+    """テスト環境のセットアップ"""
+    # テスト用の環境変数を設定
+    os.environ['DYNAMODB_TABLE'] = 'test_prices'
+    os.environ['ERROR_NOTIFICATION_TOPIC_ARN'] = 'arn:aws:sns:ap-northeast-1:123456789012:test-topic'
+    
+    yield
+    
+    # テスト後のクリーンアップ
+    if 'DYNAMODB_TABLE' in os.environ:
+        del os.environ['DYNAMODB_TABLE']
+    if 'ERROR_NOTIFICATION_TOPIC_ARN' in os.environ:
+        del os.environ['ERROR_NOTIFICATION_TOPIC_ARN']
