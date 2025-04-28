@@ -61,9 +61,10 @@ def setup_logger():
     logger.addHandler(console_handler)
     
     # ファイルハンドラ
-    log_file = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'logs', 'scraper.log')
-    os.makedirs(os.path.dirname(log_file), exist_ok=True)
-    file_handler = logging.FileHandler(log_file)
+    log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'logs'))
+    os.makedirs(log_dir, mode=0o755, exist_ok=True)
+    log_file = os.path.join(log_dir, 'scraper.log')
+    file_handler = logging.FileHandler(log_file, mode='a')
     file_handler.setFormatter(ScraperFormatter())
     logger.addHandler(file_handler)
     
@@ -230,7 +231,7 @@ def log_error(error: ScraperError) -> None:
 def safe_request(url: str, headers: Dict[str, str], timeout: int = TIMEOUT) -> requests.Response:
     """安全なHTTPリクエストを実行"""
     try:
-        response = requests.get(url, headers=headers, timeout=timeout)
+        response = requests.get(url, headers=headers, timeout=timeout, verify=True)
         response.raise_for_status()
         return response
     except requests.exceptions.RequestException as e:
@@ -502,7 +503,7 @@ class CacheManager:
 
     def _get_cache_path(self, url: str) -> Path:
         """URLからキャッシュファイルのパスを生成"""
-        url_hash = hashlib.md5(url.encode()).hexdigest()
+        url_hash = hashlib.md5(url.encode(), usedforsecurity=False).hexdigest()
         return self.cache_dir / f"{url_hash}.json"
 
     def _is_cache_valid(self, cache_path: Path) -> bool:
@@ -567,8 +568,8 @@ class CacheManager:
             if temp_path.exists():
                 try:
                     temp_path.unlink()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to remove temporary file {temp_path}: {e}")
             raise CacheError(f"Failed to save data to cache: {e}")
 
     def clear_cache(self) -> None:
