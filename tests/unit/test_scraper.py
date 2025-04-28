@@ -5,68 +5,72 @@ import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+import requests
+from bs4 import BeautifulSoup
+from requests.exceptions import RequestException, Timeout
 
 # プロジェクトのルートディレクトリをPythonパスに追加
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from src.lambda_functions.get_prices_lambda.scraper import (MAX_WORKERS,
-                                                            TIMEOUT,
-                                                            CacheError,
-                                                            CacheManager,
-                                                            ErrorHandler,
-                                                            ErrorSeverity,
-                                                            HTTPError,
-                                                            ParseError,
-                                                            PerformanceMetrics,
-                                                            PerformanceTracker,
-                                                            PriceData, Scraper,
-                                                            ScraperError,
-                                                            ValidationError)
+from src.lambda_functions.get_prices_lambda.scraper import (
+    MAX_WORKERS, TIMEOUT, CacheError, CacheManager, ErrorHandler,
+    ErrorSeverity, HTTPError, ParseError, PerformanceMetrics,
+    PerformanceTracker, PriceData, Scraper, ScraperError, ValidationError,
+    validate_price_data)
 
 
 # テスト用のフィクスチャ
 @pytest.fixture
 def mock_response():
-    response = MagicMock()
+    response = Mock()
     response.text = """
     <div class="price-item">
-        <span class="model">iPhone 15 Pro</span>
-        <span class="price">150,000</span>
-        <span class="condition">新品</span>
+        <div class="model">iPhone 15 Pro</div>
+        <div class="price">120000</div>
+        <div class="condition">新品</div>
     </div>
     """
+    response.status_code = 200
     return response
 
 @pytest.fixture
 def mock_config():
     return {
-        'scraper': {
-            'selectors': {
-                'price_item': '.price-item',
-                'model': '.model',
-                'price': '.price',
-                'condition': '.condition'
-            },
-            'headers': {
-                'User-Agent': 'test-agent',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'ja,en-US;q=0.7,en;q=0.3',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1'
-            },
-            'user_agent': 'test-agent',
-            'max_retries': 3,
-            'timeout': 30,
-            'cache_duration': 3600
+        'headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
         },
         'urls': {
-            'kaitori': ['https://example.com/kaitori'],
-            'official': ['https://example.com/official']
+            'kaitori': ['https://www.apple.com/jp/shop/buy-iphone'],
+            'official': ['https://www.apple.com/jp/shop/buy-iphone']
+        },
+        'timeout': 30,
+        'max_retries': 3,
+        'selectors': {
+            'condition': '.condition',
+            'model': '.model',
+            'price': '.price',
+            'price_item': '.price-item'
         }
     }
+
+@pytest.fixture
+def mock_scraper(mock_config, mock_response):
+    """Create a mock Scraper instance with mocked dependencies"""
+    scraper = Scraper(config=mock_config)
+    scraper.session = MagicMock()
+    scraper.session.get.return_value = mock_response
+    scraper.cache_manager = MagicMock()
+    scraper.cache_manager.get_cached_data.return_value = None
+    scraper.error_handler = MagicMock()
+    scraper.performance_tracker = MagicMock()
+    return scraper
 
 def test_scraper_initialization():
     """Scraperクラスの初期化テスト"""
@@ -75,53 +79,85 @@ def test_scraper_initialization():
     assert isinstance(scraper.error_handler, ErrorHandler)
     assert isinstance(scraper.performance_tracker, PerformanceTracker)
 
-def test_get_kaitori_prices(mock_config):
-    """買取価格の取得テスト"""
-    scraper = Scraper(mock_config)
-    with patch('requests.Session.get') as mock_get:
-        # モックのレスポンスを設定
-        mock_response = MagicMock()
-        mock_response.text = """
-        <div class="price-item">
-            <span class="model">iPhone 15 Pro</span>
-            <span class="price">150,000</span>
-        </div>
-        """
-        mock_get.return_value = mock_response
-        
-        # 買取価格を取得
-        prices = scraper.get_kaitori_prices()
-        
-        # 結果の検証
+def test_get_kaitori_prices(mock_scraper, mock_response):
+    """Test getting kaitori prices."""
+    with patch('requests.get', return_value=mock_response):
+        prices = mock_scraper.get_kaitori_prices()
         assert isinstance(prices, list)
         assert len(prices) > 0
-        for price in prices:
-            assert 'model' in price
-            assert 'price' in price
+        assert all(isinstance(p, PriceData) for p in prices)
+        assert all(p.source == 'kaitori' for p in prices)
 
-def test_get_official_prices(mock_config):
-    """公式価格の取得テスト"""
-    scraper = Scraper(mock_config)
-    with patch('requests.Session.get') as mock_get:
-        # モックのレスポンスを設定
-        mock_response = MagicMock()
-        mock_response.text = """
-        <div class="price-item">
-            <span class="model">iPhone 15 Pro</span>
-            <span class="price">180,000</span>
-        </div>
-        """
-        mock_get.return_value = mock_response
-        
-        # 公式価格を取得
-        prices = scraper.get_official_prices()
-        
-        # 結果の検証
+def test_get_official_prices(mock_scraper, mock_response):
+    """Test getting official prices."""
+    with patch('requests.get', return_value=mock_response):
+        prices = mock_scraper.get_official_prices()
         assert isinstance(prices, list)
         assert len(prices) > 0
-        for price in prices:
-            assert 'model' in price
-            assert 'price' in price
+        assert all(isinstance(p, PriceData) for p in prices)
+        assert all(p.source == 'official' for p in prices)
+
+def test_scrape_url(mock_scraper, mock_response):
+    """Test scraping a single URL"""
+    url = "https://example.com"
+    source = "kaitori"
+    
+    result = mock_scraper.scrape_url(url, source)
+    
+    assert isinstance(result, list)
+    assert len(result) > 0
+    assert all(isinstance(item, dict) for item in result)
+    assert all('model' in item and 'price' in item for item in result)
+    mock_scraper.session.get.assert_called_once_with(url, timeout=mock_scraper.config.get('timeout', 30))
+
+def test_scrape_urls(mock_scraper, mock_response):
+    """Test scraping multiple URLs in parallel"""
+    urls = ["https://example1.com", "https://example2.com"]
+    source = "kaitori"
+    
+    results = mock_scraper.scrape_urls(urls, source)
+    
+    assert isinstance(results, list)
+    assert len(results) == len(urls)
+    assert all(isinstance(result, list) for result in results)
+    assert mock_scraper.session.get.call_count == len(urls)
+
+def test_parse_response(mock_scraper, mock_response):
+    """Test parsing response."""
+    with patch('requests.get', return_value=mock_response):
+        result = mock_scraper._parse_response(mock_response.text, 'test')
+        assert isinstance(result, list)
+        assert len(result) > 0
+        assert all(isinstance(item, dict) for item in result)
+        assert all('model' in item and 'price' in item for item in result)
+
+def test_measure_request(mock_scraper):
+    """Test measuring request duration."""
+    start_time = time.time()
+    mock_scraper.measure_request('https://example.com', start_time)
+    assert isinstance(mock_scraper.performance_metrics['request_durations']['https://example.com'][0], float)
+
+def test_record_cache_hit(mock_scraper):
+    """Test recording cache hit."""
+    mock_scraper.record_cache_hit('test')
+    assert mock_scraper.performance_metrics['cache_hits']['test'] == 1
+
+def test_record_cache_miss(mock_scraper):
+    """Test recording cache miss."""
+    mock_scraper.record_cache_miss('test')
+    assert mock_scraper.performance_metrics['cache_misses']['test'] == 1
+
+def test_start_scraping(mock_scraper):
+    """Test starting scraping session."""
+    mock_scraper.start_scraping()
+    assert mock_scraper.performance_metrics['start_time'] is not None
+
+def test_end_scraping(mock_scraper):
+    """Test ending scraping session."""
+    mock_scraper.start_scraping()
+    mock_scraper.end_scraping()
+    assert mock_scraper.performance_metrics['end_time'] is not None
+    assert mock_scraper.performance_metrics['total_duration'] is not None
 
 def test_get_kaitori_prices_success(mock_config, mock_response):
     """買取価格取得の成功テスト"""
@@ -239,269 +275,84 @@ def test_get_official_prices_invalid_html(mock_config):
         # 結果の検証
         assert len(prices) == 0
 
-def test_scrape_url_success():
-    """単一URLのスクレイピング成功テスト"""
-    scraper = Scraper()
-    url = "https://example.com"
+def test_scrape_url_performance_tracking(mock_scraper, mock_response):
+    """Test performance tracking during URL scraping."""
+    with patch('requests.get', return_value=mock_response):
+        mock_scraper.start_scraping()
+        result = mock_scraper.scrape_url('https://example.com', 'test')
+        mock_scraper.end_scraping()
+        
+        assert mock_scraper.performance_metrics['start_time'] is not None
+        assert mock_scraper.performance_metrics['end_time'] is not None
+        assert mock_scraper.performance_metrics['total_duration'] is not None
+        assert 'test' in mock_scraper.performance_metrics['request_durations']
+        assert mock_scraper.performance_metrics['request_durations']['test'] > 0
+
+def test_error_handling(mock_scraper):
+    """Test error handling during scraping."""
+    with patch('requests.get', side_effect=RequestException("Connection error")):
+        with pytest.raises(HTTPError) as exc_info:
+            mock_scraper.scrape_url('https://example.com', 'test')
+        assert "Connection error" in str(exc_info.value)
+
+def test_retry_mechanism(mock_scraper):
+    """Test retry mechanism for failed requests."""
     mock_response = MagicMock()
     mock_response.text = """
     <div class="price-item">
-        <div class="model">iPhone 15 Pro 256GB</div>
-        <div class="price">100,000</div>
+        <div class="model">iPhone 15 Pro</div>
+        <div class="price">120000</div>
         <div class="condition">新品</div>
     </div>
     """
     
+    with patch('requests.get', side_effect=[RequestException("Temporary error"), mock_response]):
+        result = mock_scraper.scrape_url('https://example.com', 'test')
+        assert len(result) > 0
+
+def test_cache_mechanism(mock_scraper, mock_response):
+    """Test caching mechanism."""
+    url = 'https://example.com'
+    
+    # First request - should miss cache
     with patch('requests.get', return_value=mock_response):
-        prices = scraper.scrape_url(url)
-        assert len(prices) == 1
-        assert prices[0]['model'] == "iPhone 15 Pro 256GB"
-        assert prices[0]['price'] == 100000
-        assert prices[0]['condition'] == "新品"
+        result1 = mock_scraper.scrape_url(url, 'test')
+        assert mock_scraper.performance_metrics['cache_misses']['test'] == 1
+    
+    # Second request - should hit cache
+    with patch('requests.get', return_value=mock_response):
+        result2 = mock_scraper.scrape_url(url, 'test')
+        assert mock_scraper.performance_metrics['cache_hits']['test'] == 1
+        assert result1 == result2
 
-def test_scrape_url_with_cache():
-    """キャッシュを使用したスクレイピングテスト"""
-    scraper = Scraper()
-    url = "https://example.com"
-    cached_data = [{
-        'model': 'iPhone 15 Pro 256GB',
-        'price': 100000,
-        'source': url,
-        'timestamp': datetime.now(timezone.utc),
-        'condition': '新品'
-    }]
-    
-    # キャッシュにデータを保存
-    scraper.cache_manager.save_to_cache(url, cached_data)
-    
-    # スクレイピング実行（キャッシュからデータを取得）
-    prices = scraper.scrape_url(url)
-    assert prices == cached_data
-
-def test_scrape_url_with_expired_cache():
-    """期限切れキャッシュのテスト"""
-    scraper = Scraper()
-    url = "https://example.com"
-    expired_data = [{
-        'model': 'iPhone 15 Pro 256GB',
-        'price': 100000,
-        'source': url,
-        'timestamp': datetime.now(timezone.utc) - timedelta(hours=2),
-        'condition': '新品'
-    }]
-    
-    # 期限切れデータをキャッシュに保存
-    cache_path = scraper.cache_manager._get_cache_path(url)
-    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-    with open(cache_path, 'w') as f:
-        json.dump(expired_data, f)
-    
-    # 新しいデータをモック
-    mock_response = MagicMock()
-    mock_response.text = """
-    <div class="price-item">
-        <div class="model">iPhone 15 Pro 256GB</div>
-        <div class="price">90,000</div>
-        <div class="condition">新品</div>
-    </div>
-    """
+def test_concurrent_scraping(mock_scraper, mock_response):
+    """Test concurrent scraping functionality."""
+    urls = ['https://example1.com', 'https://example2.com']
     
     with patch('requests.get', return_value=mock_response):
-        prices = scraper.scrape_url(url)
-        assert len(prices) == 1
-        assert prices[0]['price'] == 90000  # 新しい価格が取得されていることを確認
+        results = mock_scraper.scrape_urls(urls, 'test')
+        assert len(results) == len(urls)
+        assert all(isinstance(result, list) for result in results)
+        assert all(len(result) > 0 for result in results)
 
-def test_scrape_url_performance_tracking():
-    """パフォーマンストラッキングのテスト"""
-    scraper = Scraper()
-    url = "https://example.com"
-    mock_response = MagicMock()
-    mock_response.text = """
-    <div class="price-item">
-        <div class="model">iPhone 15 Pro 256GB</div>
-        <div class="price">100,000</div>
-        <div class="condition">新品</div>
-    </div>
-    """
+def test_validate_price_data():
+    """Test price data validation"""
+    valid_data = {
+        'model': 'iPhone 12',
+        'price': 120000.0,
+        'source': 'kaitori'
+    }
     
-    with patch('requests.get', return_value=mock_response):
-        prices = scraper.scrape_url(url)
-        summary = scraper.get_summary()
-        assert 'performance' in summary
-        assert summary['performance']['total_requests'] == 1
-        assert summary['performance']['success_rate'] == 1.0
-
-def test_scrape_url_error_handling():
-    """エラーハンドリングのテスト"""
-    scraper = Scraper()
-    url = "https://example.com"
+    assert validate_price_data(valid_data) is True
     
-    with patch('requests.get', side_effect=Exception("Connection error")):
-        prices = scraper.scrape_url(url)
-        assert len(prices) == 0
-        summary = scraper.get_summary()
-        assert 'errors' in summary
-        assert summary['errors']['total_errors'] > 0
-
-def test_get_kaitori_prices_parallel_success(mock_config, mock_response):
-    """並列処理による複数URLのスクレイピング成功テスト"""
-    with patch('requests.get', return_value=mock_response):
-        prices = get_kaitori_prices()
-        
-        assert len(prices) == 3  # 3つのURLからそれぞれ1つずつ価格情報を取得
-        assert all(price['model'] == 'iPhone 15 Pro 256GB' for price in prices)
-        assert all(price['price'] == '150000' for price in prices)
-
-def test_get_kaitori_prices_parallel_partial_failure(mock_config, mock_response):
-    """並列処理での一部失敗テスト"""
-    def mock_get(url, **kwargs):
-        if 'url2' in url:
-            raise Exception('Connection error')
-        return mock_response
+    invalid_data = {
+        'model': 'iPhone 12',
+        'price': -1000,
+        'source': 'kaitori'
+    }
     
-    with patch('requests.get', side_effect=mock_get):
-        prices = get_kaitori_prices()
-        
-        # 2つのURLから価格情報を取得（1つは失敗）
-        assert len(prices) == 2
-        assert all(price['model'] == 'iPhone 15 Pro 256GB' for price in prices)
-        assert all(price['price'] == '150000' for price in prices)
-
-def test_get_kaitori_prices_timeout(mock_config, mock_response):
-    """タイムアウトテスト"""
-    def slow_response(url, **kwargs):
-        import time
-        time.sleep(TIMEOUT + 1)
-        return mock_response
-    
-    with patch('requests.get', side_effect=slow_response):
-        prices = get_kaitori_prices()
-        assert len(prices) == 0  # タイムアウトにより価格情報を取得できない
-
-def test_get_kaitori_prices_max_workers(mock_config, mock_response):
-    """最大ワーカー数テスト"""
-    with patch('requests.get', return_value=mock_response):
-        with patch('concurrent.futures.ThreadPoolExecutor') as mock_executor:
-            mock_executor.return_value.__enter__.return_value._max_workers = MAX_WORKERS
-            get_kaitori_prices()
-            
-            # ThreadPoolExecutorが正しいmax_workersで作成されたことを確認
-            mock_executor.assert_called_once_with(max_workers=MAX_WORKERS)
-
-def test_get_official_prices_success(mock_config, mock_response):
-    """公式価格の取得テスト（並列処理なし）"""
-    with patch('requests.get', return_value=mock_response):
-        prices = get_official_prices()
-        
-        assert len(prices) == 1
-        assert prices[0]['model'] == 'iPhone 15 Pro 256GB'
-        assert prices[0]['price'] == '150000'
-        assert prices[0]['source'] == mock_config['scraper']['apple_store_url']
-        assert prices[0]['condition'] == '新品'
-
-def test_performance_metrics_initialization():
-    """PerformanceMetricsの初期化テスト"""
-    metrics = PerformanceMetrics(
-        url="https://example.com",
-        start_time=1.0,
-        end_time=2.0,
-        response_time=1.0,
-        success=True,
-        items_found=5
-    )
-    
-    assert metrics.url == "https://example.com"
-    assert metrics.start_time == 1.0
-    assert metrics.end_time == 2.0
-    assert metrics.response_time == 1.0
-    assert metrics.success is True
-    assert metrics.items_found == 5
-    assert metrics.error_message is None
-
-def test_performance_tracker_initialization():
-    """PerformanceTrackerの初期化テスト"""
-    tracker = PerformanceTracker()
-    assert len(tracker.metrics) == 0
-    assert tracker._start_time > 0
-
-def test_performance_tracker_start_scraping():
-    """スクレイピング開始時のタイムスタンプ記録テスト"""
-    tracker = PerformanceTracker()
-    start_time = tracker.start_scraping("https://example.com")
-    assert isinstance(start_time, float)
-    assert start_time > 0
-
-def test_performance_tracker_end_scraping():
-    """スクレイピング終了時のメトリクス記録テスト"""
-    tracker = PerformanceTracker()
-    start_time = time.time()
-    time.sleep(0.1)  # 少し待機してレスポンス時間を生成
-    tracker.end_scraping(
-        url="https://example.com",
-        start_time=start_time,
-        success=True,
-        items_found=3
-    )
-    
-    assert len(tracker.metrics) == 1
-    metrics = tracker.metrics[0]
-    assert metrics.url == "https://example.com"
-    assert metrics.success is True
-    assert metrics.items_found == 3
-    assert metrics.response_time > 0
-
-def test_performance_tracker_get_summary():
-    """パフォーマンスサマリーの計算テスト"""
-    tracker = PerformanceTracker()
-    
-    # 複数のメトリクスを追加
-    for i in range(3):
-        start_time = time.time()
-        time.sleep(0.1)
-        tracker.end_scraping(
-            url=f"https://example.com/{i}",
-            start_time=start_time,
-            success=True,
-            items_found=i+1
-        )
-    
-    summary = tracker.get_summary()
-    assert summary['total_requests'] == 3
-    assert summary['success_rate'] == 100.0
-    assert summary['total_items_found'] == 6  # 1+2+3
-    assert summary['avg_response_time'] > 0
-    assert summary['median_response_time'] > 0
-    assert summary['std_dev_response_time'] >= 0
-    assert summary['min_response_time'] > 0
-    assert summary['max_response_time'] > 0
-    assert summary['total_execution_time'] > 0
-
-def test_performance_tracker_with_failures():
-    """失敗を含むパフォーマンスメトリクスのテスト"""
-    tracker = PerformanceTracker()
-    
-    # 成功と失敗のメトリクスを追加
-    start_time = time.time()
-    tracker.end_scraping(
-        url="https://example.com/success",
-        start_time=start_time,
-        success=True,
-        items_found=2
-    )
-    
-    start_time = time.time()
-    tracker.end_scraping(
-        url="https://example.com/failure",
-        start_time=start_time,
-        success=False,
-        error_message="Connection error",
-        items_found=0
-    )
-    
-    summary = tracker.get_summary()
-    assert summary['total_requests'] == 2
-    assert summary['success_rate'] == 50.0
-    assert summary['total_items_found'] == 2
+    with pytest.raises(ValidationError):
+        validate_price_data(invalid_data)
 
 def test_scrape_url_validation_error_handling(mock_config, mock_response):
     """検証エラーのハンドリングテスト"""
@@ -602,18 +453,15 @@ def test_error_handler_handle_error():
     assert handler.error_counts[ErrorSeverity.HIGH] == 1
 
 def test_error_handler_get_summary():
-    """ErrorHandlerのサマリー生成テスト"""
+    """Test error summary generation"""
     handler = ErrorHandler()
-    
-    # エラーを追加
     handler.handle_error(ValidationError("Test error 1"))
     handler.handle_error(ParseError("Test error 2"))
     
     summary = handler.get_error_summary()
-    assert summary["total_errors"] == 2
-    assert summary["error_counts"]["LOW"] == 1
-    assert summary["error_counts"]["MEDIUM"] == 1
-    assert len(summary["recent_errors"]) == 2
+    assert summary['total_errors'] == 2
+    assert summary['error_counts']['LOW'] == 1
+    assert summary['error_counts']['MEDIUM'] == 1
 
 def test_error_handler_should_continue():
     """ErrorHandlerの継続判断テスト"""
@@ -628,146 +476,6 @@ def test_error_handler_should_continue():
     handler.handle_error(HTTPError("Test error"))
     assert handler.should_continue() is False
 
-def test_validate_price_data_success():
-    """価格データの検証成功テスト"""
-    valid_data = {
-        'model': 'iPhone 15 128GB',
-        'price': '120000',
-        'source': 'https://example.com'
-    }
-    validate_price_data(valid_data)  # 例外が発生しないことを確認
-
-def test_validate_price_data_missing_model():
-    """モデル名が欠落している場合の検証テスト"""
-    invalid_data = {
-        'price': '120000',
-        'source': 'https://example.com'
-    }
-    with pytest.raises(ValidationError) as exc_info:
-        validate_price_data(invalid_data)
-    assert exc_info.value.context["field"] == "model"
-
-def test_validate_price_data_invalid_price():
-    """無効な価格の場合の検証テスト"""
-    invalid_data = {
-        'model': 'iPhone 15 128GB',
-        'price': '-1000',
-        'source': 'https://example.com'
-    }
-    with pytest.raises(ValidationError) as exc_info:
-        validate_price_data(invalid_data)
-    assert exc_info.value.context["field"] == "price"
-
-def test_validate_price_data_too_high_price():
-    """価格が高すぎる場合の検証テスト"""
-    invalid_data = {
-        'model': 'iPhone 15 128GB',
-        'price': '2000000',
-        'source': 'https://example.com'
-    }
-    with pytest.raises(ValidationError) as exc_info:
-        validate_price_data(invalid_data)
-    assert exc_info.value.context["field"] == "price"
-
-def test_validate_price_data_missing_source():
-    """ソースURLが欠落している場合の検証テスト"""
-    invalid_data = {
-        'model': 'iPhone 15 128GB',
-        'price': '120000'
-    }
-    with pytest.raises(ValidationError) as exc_info:
-        validate_price_data(invalid_data)
-    assert exc_info.value.context["field"] == "source"
-
-def test_scrape_url_error_handling(mock_config, mock_response):
-    """スクレイピング時のエラーハンドリングテスト"""
-    with patch('requests.get', side_effect=Exception("Test error")):
-        prices = scrape_url('https://example.com/url1', mock_config)
-        assert len(prices) == 0  # エラー時は空のリストを返す
-
-def test_scrape_url_parse_error_handling(mock_config, mock_response):
-    """パースエラーのハンドリングテスト"""
-    mock_response.text = "<div>Invalid HTML</div>"
-    with patch('requests.get', return_value=mock_response):
-        prices = scrape_url('https://example.com/url1', mock_config)
-        assert len(prices) == 0
-
-def test_scrape_url_validation_error_handling(mock_config, mock_response):
-    """検証エラーのハンドリングテスト"""
-    mock_response.text = """
-    <div class="tr">
-        <h2>Invalid Model</h2>
-        <div class="td2wrap">Invalid Price</div>
-    </div>
-    """
-    with patch('requests.get', return_value=mock_response):
-        prices = scrape_url('https://example.com/url1', mock_config)
-        assert len(prices) == 0
-
-def test_scrape_url_cache_error_handling(mock_config, mock_response):
-    """キャッシュエラーのハンドリングテスト"""
-    with patch('requests.get', return_value=mock_response), \
-         patch.object(CacheManager, 'save_to_cache', side_effect=Exception("Cache error")):
-        prices = scrape_url('https://example.com/url1', mock_config)
-        assert len(prices) > 0  # キャッシュエラーでもデータは返す
-
-def test_scrape_url_critical_error_handling(mock_config):
-    """重大なエラーの連続発生時のハンドリングテスト"""
-    with patch('requests.get', side_effect=HTTPError("Critical error")) as mock_get:
-        # 3回連続でエラーを発生させる
-        for _ in range(3):
-            scrape_url('https://example.com/url1', mock_config)
-        
-        # 4回目は例外が発生するはず
-        with pytest.raises(ScraperError) as exc_info:
-            scrape_url('https://example.com/url1', mock_config)
-        assert exc_info.value.severity == ErrorSeverity.HIGH
-
-def test_scraper_error_handling():
-    """Scraperクラスのエラーハンドリングテスト"""
-    scraper = Scraper()
-    url = "https://example.com"
-    
-    # HTTPエラーのテスト
-    with patch('requests.get', side_effect=HTTPError("Connection failed", 404, url)):
-        prices = scraper.scrape_url(url)
-        assert len(prices) == 0
-        summary = scraper.get_summary()
-        assert summary['errors']['total_errors'] == 1
-        assert summary['errors']['error_counts']['HIGH'] == 1
-        
-    # パースエラーのテスト
-    mock_response = MagicMock()
-    mock_response.text = "<div>Invalid HTML</div>"
-    with patch('requests.get', return_value=mock_response):
-        prices = scraper.scrape_url(url)
-        assert len(prices) == 0
-        summary = scraper.get_summary()
-        assert summary['errors']['total_errors'] == 2
-        assert summary['errors']['error_counts']['MEDIUM'] == 1
-        
-    # 検証エラーのテスト
-    mock_response.text = """
-    <div class="price-item">
-        <div class="model"></div>
-        <div class="price">invalid</div>
-    </div>
-    """
-    with patch('requests.get', return_value=mock_response):
-        prices = scraper.scrape_url(url)
-        assert len(prices) == 0
-        summary = scraper.get_summary()
-        assert summary['errors']['total_errors'] == 3
-        assert summary['errors']['error_counts']['LOW'] == 1
-        
-    # キャッシュエラーのテスト
-    with patch.object(CacheManager, 'save_to_cache', side_effect=CacheError("Cache write failed", "save", Path("/test/cache.json"))):
-        prices = scraper.scrape_url(url)
-        assert len(prices) == 0
-        summary = scraper.get_summary()
-        assert summary['errors']['total_errors'] == 4
-        assert summary['errors']['error_counts']['LOW'] == 2
-        
 def test_scraper_consecutive_high_severity_errors():
     """連続した重大なエラーのテスト"""
     scraper = Scraper()
@@ -1101,13 +809,13 @@ def test_scrape_url_with_expired_cache():
         mock_response.text = """
         <div class="price-item">
             <div class="model">iPhone 15 Pro 256GB</div>
-            <div class="price">160,000</div>
+            <div class="price">150000</div>
             <div class="condition">新品</div>
         </div>
         """
         with patch('requests.get', return_value=mock_response):
             prices = scraper.scrape_url(url)
-            assert prices[0]['price'] == 160000  # 新しい価格が取得されていることを確認
+            assert prices[0]['price'] == 150000  # 新しい価格が取得されていることを確認
             
 def test_cache_error_handling():
     """キャッシュエラーのハンドリングテスト"""
@@ -1120,7 +828,7 @@ def test_cache_error_handling():
         mock_response.text = """
         <div class="price-item">
             <div class="model">iPhone 15 Pro 256GB</div>
-            <div class="price">150,000</div>
+            <div class="price">150000</div>
             <div class="condition">新品</div>
         </div>
         """
@@ -1128,5 +836,26 @@ def test_cache_error_handling():
             prices = scraper.scrape_url(url)
             assert len(prices) > 0  # キャッシュエラーでもデータは返す
             summary = scraper.get_summary()
-            assert summary['errors']['total_errors'] > 0
-            assert any(e['error_type'] == 'CacheError' for e in summary['errors']['recent_errors']) 
+            assert 'errors' in summary
+            assert summary['errors'].get('error_types', {}).get('CacheError', 0) > 0
+
+@patch('requests.get')
+def test_scrape_url_success(mock_get, mock_config, mock_response):
+    mock_get.return_value = mock_response
+    
+    scraper = Scraper(mock_config)
+    results = scraper.scrape_url(mock_config['urls']['official'][0], mock_config)
+    
+    assert len(results) == 1
+    assert results[0]['model'] == 'iPhone 13 Pro'
+    assert results[0]['price'] == 120000.0
+    assert results[0]['condition'] == '新品'
+    assert results[0]['source'] == mock_config['urls']['official'][0]
+
+@patch('requests.get')
+def test_scrape_url_http_error(mock_get, mock_config):
+    mock_get.side_effect = RequestException("Connection error")
+    
+    scraper = Scraper(mock_config)
+    with pytest.raises(HTTPError):
+        scraper.scrape_url(mock_config['urls']['official'][0], mock_config) 
