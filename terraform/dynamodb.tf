@@ -230,6 +230,11 @@ resource "aws_dynamodb_table" "price_history" {
     type = "N"  # 数値型に変更
   }
 
+  attribute {
+    name = "date"
+    type = "S"  # 新しいGSI用の属性
+  }
+
   ttl {
     attribute_name = "expiration_time"  # 属性名を変更
     enabled        = true
@@ -242,10 +247,9 @@ resource "aws_dynamodb_table" "price_history" {
     projection_type = "ALL"
   }
 
-  # 新しいGSIの追加
   global_secondary_index {
     name            = "DateIndex"
-    hash_key        = "date"  # YYYY-MM-DD形式
+    hash_key        = "date"
     range_key       = "model"
     projection_type = "ALL"
   }
