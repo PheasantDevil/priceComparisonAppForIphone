@@ -3,9 +3,12 @@ import hashlib
 import json
 import logging
 import os
+import random
 import re
 import time
 import uuid
+import warnings
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -18,7 +21,7 @@ from typing import Any, ContextManager, Dict, List, Optional, Union
 import requests
 import yaml
 from bs4 import BeautifulSoup
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, validator
 from tenacity import (after_log, before_sleep_log, retry,
                       retry_if_exception_type, stop_after_attempt,
                       wait_exponential)
@@ -132,63 +135,60 @@ def log_validation_error(field: str, value: Any, error: str):
         level=logging.WARNING
     )
 
+class ErrorType(Enum):
+    HTTP = "HTTP"
+    PARSE = "PARSE"
+    VALIDATION = "VALIDATION"
+    CACHE = "CACHE"
+    SCRAPER = "SCRAPER"
+
 class ErrorSeverity(Enum):
-    """エラーの重大度を定義する列挙型"""
-    LOW = "LOW"      # 軽微なエラー、処理は継続可能
-    MEDIUM = "MEDIUM"  # 中程度のエラー、一部の機能に影響
-    HIGH = "HIGH"    # 重大なエラー、処理の中断が必要
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
 
 class ScraperError(Exception):
-    """スクレイピングエラーの基底クラス"""
-    def __init__(self, message: str, severity: ErrorSeverity = ErrorSeverity.MEDIUM, context: Optional[Dict[str, Any]] = None):
+    def __init__(self, message: str, error_type: Union[ErrorType, str] = ErrorType.SCRAPER, severity: ErrorSeverity = ErrorSeverity.HIGH, context: Optional[Dict] = None):
         super().__init__(message)
-        self.severity = severity
+        self.message = message
+        self.error_type = error_type if isinstance(error_type, ErrorType) else ErrorType.SCRAPER
+        self.severity = severity if isinstance(severity, ErrorSeverity) else ErrorSeverity.HIGH
         self.context = context or {}
+        self.error_id = f"ERR-{int(time.time())}-{random.randint(1000, 9999)}"
         self.timestamp = datetime.now(timezone.utc)
-        self.error_id = f"ERR-{int(time.time())}-{hash(message) % 10000:04d}"
-        
-        # エラーログを記録
-        log_error(self)
 
 class HTTPError(ScraperError):
-    """HTTPリクエストエラー"""
     def __init__(self, message: str, status_code: Optional[int] = None, url: Optional[str] = None):
-        super().__init__(message, ErrorSeverity.HIGH)
-        self.status_code = status_code
-        self.url = url
-        self.context = {}
-        if status_code:
-            self.context['status_code'] = status_code
-        if url:
-            self.context['url'] = url
+        context = {
+            'status_code': status_code,
+            'url': url
+        } if status_code and url else {}
+        super().__init__(message, ErrorType.HTTP, ErrorSeverity.HIGH, context)
 
 class ParseError(ScraperError):
-    """データパースエラー"""
-    def __init__(self, message: str, html: Optional[str] = None, selector: Optional[str] = None):
-        context = {}
-        if html:
-            context['html_snippet'] = html[:200]  # 最初の200文字のみを記録
-        if selector:
-            context['selector'] = selector
-        super().__init__(message, ErrorSeverity.MEDIUM, context)
+    def __init__(self, message: str, html: str = '', selector: str = ''):
+        html_snippet = html[:200] if len(html) > 200 else html
+        context = {
+            'html_snippet': html_snippet,
+            'selector': selector
+        }
+        super().__init__(message, ErrorType.PARSE, ErrorSeverity.MEDIUM, context)
 
 class ValidationError(ScraperError):
-    """データ検証エラー"""
-    def __init__(self, message: str, field: Optional[str] = None, value: Optional[Any] = None):
-        context = {}
-        if field:
-            context['field'] = field
-        if value:
-            context['value'] = str(value)
-        super().__init__(message, ErrorSeverity.LOW, context)
+    def __init__(self, message: str, field: Optional[str] = None, value: Optional[str] = None):
+        context = {
+            'field': field,
+            'value': str(value)
+        } if field else {}
+        super().__init__(message, ErrorType.VALIDATION, ErrorSeverity.LOW, context)
 
 class CacheError(ScraperError):
-    """キャッシュ関連のエラー"""
-    def __init__(self, message: str, operation: str, cache_path: Optional[Path] = None):
-        context = {'operation': operation}
-        if cache_path:
-            context['cache_path'] = str(cache_path)
-        super().__init__(message, ErrorSeverity.LOW, context)
+    def __init__(self, message: str, operation: str = '', cache_path: Union[str, Path] = ''):
+        context = {
+            'operation': operation,
+            'cache_path': str(cache_path)
+        }
+        super().__init__(message, ErrorType.CACHE, ErrorSeverity.LOW, context)
 
 class ConfigError(ScraperError):
     """設定ファイルエラー"""
@@ -262,7 +262,7 @@ class PriceData(BaseModel):
     """価格データモデル"""
     model: str
     price: float
-    source: str
+    source: HttpUrl
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     url: Optional[str] = None
     condition: Optional[str] = None
@@ -281,17 +281,11 @@ class PriceData(BaseModel):
             data['timestamp'] = datetime.fromisoformat(data['timestamp'])
         return cls(**data)
 
-    @field_validator('price')
-    @classmethod
-    def validate_price(cls, v: float) -> float:
-        """価格の検証"""
-        if not isinstance(v, (int, float)):
-            raise ValueError("Price must be a number")
+    @validator('price')
+    def validate_price(cls, v):
         if v <= 0:
-            raise ValueError("Price must be positive")
-        if v > 1000000:
-            raise ValueError("Price is unreasonably high")
-        return float(v)
+            raise ValueError('Price must be positive')
+        return v
 
     @field_validator('model')
     @classmethod
@@ -389,165 +383,201 @@ class PerformanceMetrics:
     items_found: int = 0
 
 class PerformanceTracker:
-    """スクレイピングのパフォーマンスを追跡するクラス"""
+    """パフォーマンスメトリクスのトラッキング"""
     def __init__(self):
         self.start_time = None
         self.end_time = None
+        self.request_durations = defaultdict(list)
+        self.cache_hits = defaultdict(int)
+        self.cache_misses = defaultdict(int)
         self.total_requests = 0
         self.successful_requests = 0
         self.failed_requests = 0
-        self.cache_hits = 0
-        self.cache_misses = 0
-        self.request_times = []
-        self.errors = []
 
-    def start_scraping(self) -> None:
+    def start_scraping(self):
         """スクレイピングの開始時刻を記録"""
-        self.start_time = datetime.now()
+        self.start_time = time.time()
 
-    def end_scraping(self, success: bool = True) -> None:
+    def end_scraping(self):
         """スクレイピングの終了時刻を記録"""
-        self.end_time = datetime.now()
-        if success:
-            self.successful_requests += 1
-        else:
-            self.failed_requests += 1
+        self.end_time = time.time()
 
-    def record_request(self, url: str, duration: float, success: bool = True) -> None:
-        """リクエストの結果を記録"""
+    def record_request(self, url: str, duration: float, success: bool = True):
+        """リクエストの実行時間を記録"""
+        self.request_durations[url].append(duration)
         self.total_requests += 1
         if success:
             self.successful_requests += 1
         else:
             self.failed_requests += 1
-        self.request_times.append({
-            'url': url,
-            'duration': duration,
-            'timestamp': datetime.now(),
-            'success': success
-        })
 
-    def record_cache_hit(self, url: str) -> None:
+    def record_cache_hit(self, url: str):
         """キャッシュヒットを記録"""
-        self.cache_hits += 1
-        logger.info(f"Cache hit for URL: {url}")
+        self.cache_hits[url] += 1
 
-    def record_cache_miss(self, url: str) -> None:
+    def record_cache_miss(self, url: str):
         """キャッシュミスを記録"""
-        self.cache_misses += 1
-        logger.info(f"Cache miss for URL: {url}")
+        self.cache_misses[url] += 1
 
-    def record_error(self, error: Exception, url: str) -> None:
-        """エラーを記録"""
-        self.errors.append({
-            'error_type': type(error).__name__,
-            'message': str(error),
-            'url': url,
-            'timestamp': datetime.now()
-        })
-        logger.error(f"Error recorded for {url}: {error}")
+    def get_summary(self) -> Dict:
+        """パフォーマンスメトリクスのサマリーを取得"""
+        if not self.start_time or not self.end_time:
+            return {}
 
-    def get_summary(self) -> Dict[str, Any]:
-        """パフォーマンス指標のサマリーを取得"""
-        if not self.start_time:
-            return {
-                'status': 'Not started',
-                'total_requests': 0,
-                'cache_hits': 0,
-                'cache_misses': 0,
-                'errors': []
-            }
+        total_duration = self.end_time - self.start_time
+        avg_response_time = sum(
+            sum(durations) for durations in self.request_durations.values()
+        ) / max(self.total_requests, 1)
 
-        duration = (self.end_time or datetime.now()) - self.start_time
-        avg_request_time = (
-            sum(r['duration'] for r in self.request_times) / len(self.request_times)
-            if self.request_times else 0
-        )
+        total_cache_hits = sum(self.cache_hits.values())
+        total_cache_misses = sum(self.cache_misses.values())
+        total_cache_requests = total_cache_hits + total_cache_misses
+        cache_hit_ratio = (total_cache_hits / total_cache_requests * 100) if total_cache_requests > 0 else 0
+        success_rate = (self.successful_requests / max(self.total_requests, 1)) * 100
 
         return {
-            'status': 'Completed' if self.end_time else 'In progress',
-            'duration_seconds': duration.total_seconds(),
+            'total_duration': total_duration,
             'total_requests': self.total_requests,
             'successful_requests': self.successful_requests,
             'failed_requests': self.failed_requests,
-            'cache_hits': self.cache_hits,
-            'cache_misses': self.cache_misses,
-            'average_request_time': avg_request_time,
-            'error_count': len(self.errors),
-            'last_errors': self.errors[-5:] if self.errors else []
+            'success_rate': success_rate,
+            'avg_response_time': avg_response_time,
+            'cache_hits': dict(self.cache_hits),
+            'cache_misses': dict(self.cache_misses),
+            'cache_hit_ratio': cache_hit_ratio,
+            'request_durations': dict(self.request_durations)
         }
 
-    @contextmanager
-    def measure_request(self, url: str) -> ContextManager[None]:
-        """リクエストの実行時間を計測するコンテキストマネージャー"""
-        start = time.time()
-        success = True
-        try:
-            yield
-        except Exception:
-            success = False
-            raise
-        finally:
-            duration = time.time() - start
-            self.record_request(url, duration, success)
+    def clear(self):
+        """パフォーマンスメトリクスをクリアする"""
+        self.start_time = None
+        self.end_time = None
+        self.request_durations.clear()
+        self.cache_hits.clear()
+        self.cache_misses.clear()
+        self.total_requests = 0
+        self.successful_requests = 0
+        self.failed_requests = 0
 
-# グローバルなパフォーマンストラッカー
-performance_tracker = PerformanceTracker()
+class ErrorHandler:
+    def __init__(self):
+        self.error_counts = {severity: 0 for severity in ErrorSeverity}
+        self.error_types = {error_type: 0 for error_type in ErrorType}
+        self.recent_errors = []
+        self.max_recent_errors = 10
+        self.errors = []  # 全てのエラーを保持
+
+    def handle_error(self, error: Union[ScraperError, Exception]):
+        """エラーを処理し、ログに記録する"""
+        if not isinstance(error, ScraperError):
+            error = ScraperError(str(error))
+
+        self.error_counts[error.severity] += 1
+        self.error_types[error.error_type] += 1
+        
+        error_info = {
+            'error_id': error.error_id,
+            'severity': error.severity.name,
+            'message': str(error),
+            'timestamp': error.timestamp.isoformat(),
+            'context': error.context
+        }
+        
+        self.recent_errors.append(error_info)
+        self.errors.append(error)
+        if len(self.recent_errors) > self.max_recent_errors:
+            self.recent_errors.pop(0)
+            
+        log_error(error)
+
+    def get_summary(self) -> Dict:
+        """エラーサマリーを取得する"""
+        return {
+            'total_errors': sum(self.error_counts.values()),
+            'error_counts': {severity.name: count for severity, count in self.error_counts.items()},
+            'error_types': {error_type.name: count for error_type, count in self.error_types.items()},
+            'recent_errors': self.recent_errors
+        }
+
+    def should_continue(self) -> bool:
+        """スクレイピングを続行すべきかを判断する"""
+        high_severity_count = self.error_counts[ErrorSeverity.HIGH]
+        return high_severity_count < 3
+
+    def clear(self):
+        """エラー情報をクリアする"""
+        self.error_counts = {severity: 0 for severity in ErrorSeverity}
+        self.error_types = {error_type: 0 for error_type in ErrorType}
+        self.recent_errors = []
+        self.errors = []
 
 class CacheManager:
     """キャッシュを管理するクラス"""
-    def __init__(self, cache_dir: str = "cache", cache_duration: int = CACHE_DURATION):
+    def __init__(self, cache_dir: str = 'cache', cache_ttl: int = 3600, cache_duration: Optional[int] = None):
         self.cache_dir = Path(cache_dir)
-        self.cache_duration = cache_duration
-        self.cache_dir.mkdir(exist_ok=True)
+        # Support legacy cache_duration parameter with deprecation warning
+        if cache_duration is not None:
+            warnings.warn(
+                "The 'cache_duration' parameter is deprecated and will be removed in a future version. "
+                "Use 'cache_ttl' instead.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            self.cache_ttl = cache_duration
+        else:
+            self.cache_ttl = cache_ttl
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_cache_path(self, url: str) -> Path:
-        """URLからキャッシュファイルのパスを生成"""
-        url_hash = hashlib.md5(url.encode(), usedforsecurity=False).hexdigest()
+        """URLに基づいてキャッシュファイルのパスを生成する"""
+        url_hash = str(hash(url))
         return self.cache_dir / f"{url_hash}.json"
 
     def _is_cache_valid(self, cache_path: Path) -> bool:
-        """キャッシュが有効かどうかを確認"""
-        try:
-            if not cache_path.exists():
-                return False
-            
-            mtime = cache_path.stat().st_mtime
-            age = time.time() - mtime
-            return age < self.cache_duration
-            
-        except Exception as e:
-            logger.error(f"Error checking cache validity: {e}")
+        """キャッシュが有効かどうかを確認する"""
+        if not cache_path.exists():
             return False
 
-    def get_cached_data(self, url: str) -> Optional[List[Dict[str, Any]]]:
-        """URLに対応するキャッシュデータを取得"""
+        try:
+            with open(cache_path, 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+            
+            cache_time = datetime.fromisoformat(cache_data['timestamp'])
+            now = datetime.now(timezone.utc)
+            
+            return (now - cache_time).total_seconds() < self.cache_ttl
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            logging.error(f"Cache validation error: {str(e)}")
+            return False
+
+    def get_cached_data(self, url: str) -> Optional[List[Dict]]:
+        """URLに対応するキャッシュデータを取得する"""
         cache_path = self._get_cache_path(url)
         
         if not self._is_cache_valid(cache_path):
             return None
-            
-        try:
-            with cache_path.open('r', encoding='utf-8') as f:
-                data = json.load(f)
-                # Convert ISO format strings back to datetime objects
-                for item in data:
-                    if 'timestamp' in item:
-                        item['timestamp'] = datetime.fromisoformat(item['timestamp'])
-                logger.info(f"Successfully read from cache: {url}")
-                return data
-                
-        except Exception as e:
-            logger.error(f"Error reading from cache: {e}")
-            return None
 
-    def save_to_cache(self, url: str, data: List[Dict[str, Any]]) -> None:
-        """データをキャッシュに保存"""
+        try:
+            with open(cache_path, 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+            
+            # ISO形式の文字列をdatetimeオブジェクトに変換
+            data = cache_data['data']
+            for item in data:
+                if 'timestamp' in item:
+                    item['timestamp'] = datetime.fromisoformat(item['timestamp'])
+            
+            logging.info(f"Successfully read from cache: {url}")
+            return data
+        except (json.JSONDecodeError, KeyError, OSError) as e:
+            raise CacheError(f"Cache read error: {str(e)}", "read", cache_path)
+
+    def save_to_cache(self, url: str, data: List[Dict]):
+        """データをキャッシュに保存する"""
         cache_path = self._get_cache_path(url)
-        temp_path = cache_path.with_suffix('.tmp')
         
         try:
-            # Convert datetime objects to ISO format strings
+            # datetimeオブジェクトをISO形式の文字列に変換
             serializable_data = []
             for item in data:
                 item_copy = item.copy()
@@ -555,241 +585,80 @@ class CacheManager:
                     item_copy['timestamp'] = item_copy['timestamp'].isoformat()
                 serializable_data.append(item_copy)
             
-            # Write to temporary file first
-            with temp_path.open('w', encoding='utf-8') as f:
-                json.dump(serializable_data, f, ensure_ascii=False, indent=2)
+            cache_data = {
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'data': serializable_data
+            }
             
-            # Atomic replace
-            temp_path.replace(cache_path)
-            logger.info(f"Successfully cached data for: {url}")
-            
-        except Exception as e:
-            logger.error(f"Error saving to cache: {e}")
-            if temp_path.exists():
-                try:
-                    temp_path.unlink()
-                except Exception as e:
-                    logger.warning(f"Failed to remove temporary file {temp_path}: {e}")
-            raise CacheError(f"Failed to save data to cache: {e}")
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f, ensure_ascii=False, indent=2)
+            logging.info(f"Successfully cached data for: {url}")
+        except (OSError, TypeError) as e:
+            logging.error(f"Cache write error: {str(e)}")
+            raise CacheError("Cache write failed", "save", cache_path)
 
-    def clear_cache(self) -> None:
-        """キャッシュディレクトリ内のすべてのファイルを削除"""
+    def clear_cache(self):
+        """キャッシュディレクトリ内のすべてのファイルを削除する"""
         try:
             for cache_file in self.cache_dir.glob('*.json'):
-                try:
-                    cache_file.unlink()
-                except Exception as e:
-                    logger.warning(f"Failed to delete cache file {cache_file}: {e}")
-            logger.info("Cache cleared successfully")
-        except Exception as e:
-            logger.error(f"Error clearing cache: {e}")
-            raise CacheError(f"Failed to clear cache: {e}")
-
-# グローバルなキャッシュマネージャー
-cache_manager = CacheManager()
-
-class ErrorHandler:
-    """エラーハンドリングクラス"""
-    def __init__(self):
-        self.errors = []  # List[ScraperError]
-        self.error_counts = {severity: 0 for severity in ErrorSeverity}
-        self.consecutive_high_severity_errors = 0
-        self.max_consecutive_high_severity_errors = 3
-
-    def handle_error(self, error: ScraperError) -> None:
-        """エラーを処理し、ログに記録"""
-        self.errors.append(error)
-        self.error_counts[error.severity] += 1
-
-        # Update consecutive high severity error count
-        if error.severity == ErrorSeverity.HIGH:
-            self.consecutive_high_severity_errors += 1
-        else:
-            self.consecutive_high_severity_errors = 0
-
-        # Log the error
-        log_data = {
-            "error_id": error.error_id,
-            "severity": error.severity.value,
-            "message": str(error),
-            "timestamp": error.timestamp.isoformat(),
-            "context": error.context
-        }
-        logger.error(json.dumps(log_data))
-
-        # Handle critical errors
-        if error.severity == ErrorSeverity.HIGH:
-            logger.error(f"Critical error occurred: {error}")
-            if self.consecutive_high_severity_errors >= self.max_consecutive_high_severity_errors:
-                raise ScraperError("Too many consecutive high severity errors")
-        elif error.severity == ErrorSeverity.MEDIUM:
-            logger.warning(f"Warning: {error}")
-        else:
-            logger.info(f"Minor error: {error}")
-
-    def get_error_summary(self) -> Dict[str, Any]:
-        """エラーサマリーを取得"""
-        return {
-            'errors': {
-                'total_errors': len(self.errors),
-                'error_counts': {severity.value: count for severity, count in self.error_counts.items()},
-                'recent_errors': [
-                    {
-                        'error_id': error.error_id,
-                        'severity': error.severity.value,
-                        'message': str(error),
-                        'timestamp': error.timestamp.isoformat(),
-                        'context': error.context
-                    }
-                    for error in self.errors[-10:]  # 最新の10件のエラーを返す
-                ]
-            }
-        }
-
-    def get_consecutive_high_severity_errors(self) -> int:
-        """連続した重大なエラーの数を取得"""
-        return self.consecutive_high_severity_errors
-
-    def should_continue(self) -> bool:
-        """スクレイピングを続行すべきかを判断"""
-        return self.consecutive_high_severity_errors < self.max_consecutive_high_severity_errors
-
-# グローバルなエラーハンドラー
-error_handler = ErrorHandler()
-
-def validate_price_data(data: Dict[str, Any]) -> bool:
-    """
-    Validate price data to ensure all required fields are present and correctly formatted.
-    
-    Args:
-        data: Dictionary containing price data
-        
-    Returns:
-        bool: True if validation passes, False otherwise
-        
-    Raises:
-        ValidationError: If validation fails
-    """
-    required_fields = ['model', 'price', 'source']
-    for field in required_fields:
-        if field not in data:
-            raise ValidationError(f"Missing required field: {field}")
-            
-    if not isinstance(data['model'], str):
-        raise ValidationError("Model must be a string")
-        
-    if not isinstance(data['price'], (int, float)):
-        raise ValidationError("Price must be a number")
-        
-    if data['price'] <= 0:
-        raise ValidationError("Price must be positive")
-        
-    if not isinstance(data['source'], str):
-        raise ValidationError("Source must be a string")
-        
-    return True
+                cache_file.unlink()
+        except OSError as e:
+            raise CacheError(f"Cache clear error: {str(e)}", "clear", self.cache_dir)
 
 class Scraper:
     """スクレイピングを実行するクラス"""
-    def __init__(self, config=None):
-        self.config = self._load_default_config()
-        if config:
-            self.config.update(config)
+    def __init__(self, config: Optional[Dict] = None):
+        self.config = config or {}
         self.session = requests.Session()
-        self.session.headers.update(self.config.get('headers', {}))
+        self.cache_manager = CacheManager()
         self.error_handler = ErrorHandler()
         self.performance_tracker = PerformanceTracker()
-        self.cache_manager = CacheManager()
-        self.performance_metrics = {
-            'start_time': None,
-            'end_time': None,
-            'total_duration': None,
-            'request_durations': {},
-            'cache_hits': {},
-            'cache_misses': {}
-        }
 
-    def measure_request(self, url: str, start_time: float) -> None:
-        """リクエストの測定を行う"""
-        end_time = time.time()
-        duration = end_time - start_time
-        success = True  # デフォルトはTrue、エラー時にFalseに設定
+    @contextmanager
+    def _measure_request(self, url: str):
+        """リクエストの実行時間を計測するコンテキストマネージャ"""
+        start_time = time.time()
+        success = True
         try:
+            yield
+        except Exception:
+            success = False
+            raise
+        finally:
+            duration = time.time() - start_time
             self.performance_tracker.record_request(url, duration, success)
-            if url not in self.performance_metrics['request_durations']:
-                self.performance_metrics['request_durations'][url] = []
-            self.performance_metrics['request_durations'][url].append(duration)
-        except Exception as e:
-            logger.error(f"Failed to record request metrics: {str(e)}")
 
-    def record_cache_hit(self, url: str) -> None:
-        """キャッシュヒットを記録"""
-        self.performance_tracker.record_cache_hit(url)
-        if url not in self.performance_metrics['cache_hits']:
-            self.performance_metrics['cache_hits'][url] = 0
-        self.performance_metrics['cache_hits'][url] += 1
-
-    def record_cache_miss(self, url: str) -> None:
-        """キャッシュミスを記録"""
-        self.performance_tracker.record_cache_miss(url)
-        if url not in self.performance_metrics['cache_misses']:
-            self.performance_metrics['cache_misses'][url] = 0
-        self.performance_metrics['cache_misses'][url] += 1
-
-    def start_scraping(self) -> None:
-        """スクレイピング開始時の処理"""
-        self.performance_tracker.start_scraping()
-        self.performance_metrics['start_time'] = time.time()
-
-    def end_scraping(self) -> None:
-        """スクレイピング終了時の処理"""
-        self.performance_tracker.end_scraping()
-        self.performance_metrics['end_time'] = time.time()
-        if self.performance_metrics['start_time']:
-            self.performance_metrics['total_duration'] = self.performance_metrics['end_time'] - self.performance_metrics['start_time']
-
-    def scrape_url(self, url: str, source: str = None) -> List[Dict[str, Any]]:
-        """
-        URLをスクレイピングして価格データを取得する
-        
-        Args:
-            url: スクレイピング対象のURL
-            source: データソース（'kaitori'または'official'）
-            
-        Returns:
-            List[Dict[str, Any]]: 価格データのリスト
-        """
-        if source is None:
-            source = 'unknown'
-
+    def scrape_url(self, url: str, source: str = 'unknown') -> List[Dict]:
+        """指定されたURLからデータをスクレイピング"""
         try:
-            # キャッシュをチェック
             cached_data = self.cache_manager.get_cached_data(url)
             if cached_data:
-                self.record_cache_hit(url)
+                self.performance_tracker.record_cache_hit(url)
                 return cached_data
-                
-            self.record_cache_miss(url)
+
+            self.performance_tracker.record_cache_miss(url)
             
-            # リクエストを実行
-            start_time = time.time()
-            response = self.session.get(url, timeout=self.config.get('timeout', 30))
-            response.raise_for_status()
-            self.measure_request(url, start_time)
-            
-            # レスポンスをパース
-            data = self._parse_response(response.text, source)
-            
-            # キャッシュに保存
-            self.cache_manager.save_to_cache(url, data)
-            
-            return data
+            with self._measure_request(url):
+                response = self.session.get(url, timeout=self.config.get('timeout', 30))
+                response.raise_for_status()
+                data = self._parse_response(response.text, source)
+                self.cache_manager.save_to_cache(url, data)
+                return data
         except requests.exceptions.RequestException as e:
-            self.error_handler.handle_error(HTTPError(f"Request failed: {str(e)}", url=url))
-            raise
+            error = HTTPError(f"Request failed: {str(e)}", getattr(e.response, 'status_code', None), url)
+            self.error_handler.handle_error(error)
+            raise error
         except Exception as e:
-            self.error_handler.handle_error(ScraperError(f"Scraping failed: {str(e)}"))
-            raise
+            if not isinstance(e, ScraperError):
+                error = ScraperError(f"Scraping failed: {str(e)}", context={
+                    'url': url,
+                    'source': source,
+                    'error_type': str(type(e).__name__)
+                })
+                self.error_handler.handle_error(error)
+                raise error
+            self.error_handler.handle_error(e)
+            raise e
 
     def scrape_urls(self, urls: List[str], source: str) -> List[List[Dict[str, Any]]]:
         """
@@ -815,113 +684,110 @@ class Scraper:
                     results.append([])
         return results
 
-    def get_kaitori_prices(self) -> List[Dict[str, Any]]:
+    def get_kaitori_prices(self) -> List[Dict]:
         """買取価格を取得する"""
         try:
-            self.start_scraping()
+            self.performance_tracker.start_scraping()
             prices = []
             for url in self.config.get('urls', {}).get('kaitori', []):
                 try:
-                    data = self.scrape_url(url, 'kaitori')
-                    prices.extend(data)
+                    prices.extend(self.scrape_url(url, 'kaitori'))
                 except Exception as e:
-                    self.error_handler.handle_error(ScraperError(str(e), 'kaitori', url))
-                    continue
-
+                    self.error_handler.handle_error(e)
+                    if not self.error_handler.should_continue():
+                        break
             return prices
         finally:
-            self.end_scraping()
+            self.performance_tracker.end_scraping()
 
-    def get_official_prices(self) -> List[Dict[str, Any]]:
+    def get_official_prices(self) -> List[Dict]:
         """公式価格を取得する"""
         try:
-            self.start_scraping()
+            self.performance_tracker.start_scraping()
             prices = []
             for url in self.config.get('urls', {}).get('official', []):
                 try:
-                    data = self.scrape_url(url, 'official')
-                    prices.extend(data)
+                    prices.extend(self.scrape_url(url, 'official'))
                 except Exception as e:
-                    self.error_handler.handle_error(ScraperError(str(e), 'official', url))
-                    continue
-
+                    self.error_handler.handle_error(e)
+                    if not self.error_handler.should_continue():
+                        break
             return prices
         finally:
-            self.end_scraping()
+            self.performance_tracker.end_scraping()
 
-    def _parse_response(self, html: str, source: str) -> List[Dict[str, Any]]:
+    def _parse_response(self, html: str, source: str) -> List[Dict]:
         """HTMLレスポンスをパースする"""
         try:
             soup = BeautifulSoup(html, 'html.parser')
-            prices = []
-            
-            # price-itemクラスを持つ要素を検索
-            items = soup.find_all(class_='price-item')
-            if not items:
-                # 旧フォーマットのチェック
-                items = soup.find_all(class_='rf-productgrid-item')
-            
-            for item in items:
-                try:
-                    # 新フォーマット
-                    model = item.find(class_='model')
-                    price_elem = item.find(class_='price')
-                    condition = item.find(class_='condition')
-                    
-                    # 旧フォーマットのチェック
-                    if not all([model, price_elem, condition]):
-                        model = item.find(class_='rf-productgrid-producttitle')
-                        price_elem = item.find(class_='rf-productgrid-price')
-                        condition = item.find(class_='rf-productgrid-condition')
-                    
-                    if not all([model, price_elem]):
-                        continue
-                    
-                    model_text = model.text.strip()
-                    price_text = price_elem.text.strip().replace('¥', '').replace(',', '')
-                    condition_text = condition.text.strip() if condition else '新品'
-                    
-                    price_data = {
-                        'model': model_text,
-                        'price': float(price_text),
-                        'condition': condition_text,
-                        'source': source,
-                        'timestamp': datetime.now(timezone.utc)
-                    }
-                    
-                    if validate_price_data(price_data):
-                        prices.append(price_data)
-                except (ValueError, AttributeError) as e:
-                    self.error_handler.handle_error(ParseError(str(e), str(item), source))
-                    continue
-            
-            return prices
+            if source == 'kaitori':
+                items = soup.select('.price-item')
+                if not items:
+                    raise ParseError("No price items found", html, '.price-item')
+                
+                prices = []
+                for item in items:
+                    try:
+                        model = item.select_one('.model').text.strip()
+                        price = float(item.select_one('.price').text.strip().replace(',', ''))
+                        condition = item.select_one('.condition').text.strip()
+                        
+                        price_data = {
+                            'model': model,
+                            'price': price,
+                            'source': source,
+                            'condition': condition,
+                            'timestamp': datetime.now(timezone.utc)
+                        }
+                        
+                        if validate_price_data(price_data):
+                            prices.append(price_data)
+                    except (AttributeError, ValueError) as e:
+                        raise ParseError(f"Failed to parse price item: {str(e)}", str(item), source)
+                
+                return prices
+            else:
+                items = soup.select('.product-item')
+                if not items:
+                    raise ParseError("No product items found", html, '.product-item')
+                
+                prices = []
+                for item in items:
+                    try:
+                        model = item.select_one('.model-name').text.strip()
+                        price = float(item.select_one('.price').text.strip().replace(',', ''))
+                        
+                        price_data = {
+                            'model': model,
+                            'price': price,
+                            'source': source,
+                            'timestamp': datetime.now(timezone.utc)
+                        }
+                        
+                        if validate_price_data(price_data):
+                            prices.append(price_data)
+                    except (AttributeError, ValueError) as e:
+                        raise ParseError(f"Failed to parse product item: {str(e)}", str(item), source)
+                
+                return prices
         except Exception as e:
-            self.error_handler.handle_error(ParseError(str(e), html, source))
-            return []
-
-    def _load_default_config(self) -> Dict[str, Any]:
-        """デフォルト設定を読み込む"""
-        return {
-            'headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1'
-            },
-            'selectors': {
-                'price_item': '.price-item',
-                'model': '.model',
-                'price': '.price',
-                'condition': '.condition'
-            },
-            'timeout': 30,
-            'max_retries': 3
-        }
+            if not isinstance(e, ScraperError):
+                e = ParseError(f"Failed to parse HTML: {str(e)}", html, source)
+            self.error_handler.handle_error(e)
+            raise e
 
     def get_summary(self) -> Dict[str, Any]:
+        """スクレイピングの実行結果サマリーを取得"""
         return {
             'performance': self.performance_tracker.get_summary(),
-            'errors': self.error_handler.get_error_summary()
+            'errors': self.error_handler.get_summary()
         }
+
+def validate_price_data(data: Dict[str, Any]) -> bool:
+    """価格データをバリデーションする"""
+    try:
+        PriceData(**data)
+        return True
+    except ValidationError as e:
+        logging.error(f"Price data validation error: {str(e)}")
+        return False
