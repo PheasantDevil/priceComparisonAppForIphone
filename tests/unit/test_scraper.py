@@ -179,14 +179,22 @@ def test_get_kaitori_prices_retry(mock_config):
 
 def test_price_data_validation():
     valid_data = {
-        'model': 'iPhone 15 128GB',
-        'price': 120000.0,
-        'source': 'test_source',
-        'timestamp': datetime.now(timezone.utc)
+        'model': 'iPhone 15',
+        'price': 89800,
+        'source': 'https://example.com',
+        'timestamp': datetime.now()
     }
-    price_data = PriceData(**valid_data)
-    assert price_data.price == 120000.0
-    assert price_data.currency == "JPY"
+    assert validate_price_data(valid_data) is True
+
+    with pytest.raises(ValueError):
+        invalid_data = valid_data.copy()
+        invalid_data['price'] = -1000
+        validate_price_data(invalid_data)
+
+    with pytest.raises(ValueError):
+        invalid_data = valid_data.copy()
+        invalid_data['source'] = 'not_a_url'
+        validate_price_data(invalid_data)
 
 def test_price_data_invalid_model():
     invalid_data = {
@@ -334,25 +342,6 @@ def test_concurrent_scraping(mock_scraper, mock_response):
         assert len(results) == len(urls)
         assert all(isinstance(result, list) for result in results)
         assert all(len(result) > 0 for result in results)
-
-def test_validate_price_data():
-    """Test price data validation"""
-    valid_data = {
-        'model': 'iPhone 12',
-        'price': 120000.0,
-        'source': 'kaitori'
-    }
-    
-    assert validate_price_data(valid_data) is True
-    
-    invalid_data = {
-        'model': 'iPhone 12',
-        'price': -1000,
-        'source': 'kaitori'
-    }
-    
-    with pytest.raises(ValidationError):
-        validate_price_data(invalid_data)
 
 def test_scrape_url_validation_error_handling(mock_config, mock_response):
     """検証エラーのハンドリングテスト"""

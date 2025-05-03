@@ -17,7 +17,7 @@ class ConfigManager:
         """
         self.config = None
         self.config_path = config_path or os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            os.path.dirname(os.path.dirname(__file__)),
             "config",
             "config.yaml"
         )
