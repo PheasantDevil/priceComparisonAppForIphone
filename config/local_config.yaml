@@ -1,0 +1,16 @@
+scraper:
+  user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+  request_timeout: 10
+  kaitori_rudea_urls:
+    - "https://example.com/kaitori1"
+    - "https://example.com/kaitori2"
+  apple_store_url: "https://example.com/apple"
+  cache:
+    enabled: true
+    duration: 3600
+    directory: "cache"
+
+dynamodb:
+  region: "ap-northeast-1"
+  table_name: "iphone_prices"
+  endpoint_url: "http://localhost:8000"  # DynamoDB Localを使用する場合

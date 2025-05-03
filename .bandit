@@ -1,0 +1,17 @@
+{
+  "exclude_dirs": [
+    "tests",
+    "venv",
+    ".venv",
+    ".git",
+    ".github"
+  ],
+  "skips": [
+    "B101"
+  ],
+  "targets": [
+    "src"
+  ],
+  "output_format": "json",
+  "output_file": "bandit-results.json"
+}
