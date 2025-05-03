@@ -14,9 +14,10 @@ def lambda_handler(event, context):
         
         # Get current timestamp
         current_timestamp = int(time.time())
+        current_date = datetime.now().strftime('%Y-%m-%d')
         
-        # Calculate expiration time (2 months from now)
-        expiration_time = int((datetime.now() + timedelta(days=60)).timestamp())
+        # Calculate expiration time (1 month from now)
+        expiration_time = int((datetime.now() + timedelta(days=30)).timestamp())
         
         # Get price data from event
         price_data = event.get('price_data', {})
@@ -44,6 +45,7 @@ def lambda_handler(event, context):
                     item = {
                         'model': f"{model}-{capacity}-{color}",
                         'timestamp': current_timestamp,
+                        'date': current_date,
                         'price': price,
                         'expiration_time': expiration_time
                     }
