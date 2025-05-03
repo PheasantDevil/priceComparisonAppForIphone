@@ -227,11 +227,11 @@ resource "aws_dynamodb_table" "price_history" {
 
   attribute {
     name = "timestamp"
-    type = "S"
+    type = "N"  # 数値型に変更
   }
 
   ttl {
-    attribute_name = "ttl"
+    attribute_name = "expiration_time"  # 属性名を変更
     enabled        = true
   }
 
@@ -239,6 +239,14 @@ resource "aws_dynamodb_table" "price_history" {
     name            = "TimestampIndex"
     hash_key        = "model"
     range_key       = "timestamp"
+    projection_type = "ALL"
+  }
+
+  # 新しいGSIの追加
+  global_secondary_index {
+    name            = "DateIndex"
+    hash_key        = "date"  # YYYY-MM-DD形式
+    range_key       = "model"
     projection_type = "ALL"
   }
 
@@ -250,4 +258,4 @@ resource "aws_dynamodb_table" "price_history" {
     Environment = "production"
     Project     = "iphone_price_tracker"
   }
-} 
+}
