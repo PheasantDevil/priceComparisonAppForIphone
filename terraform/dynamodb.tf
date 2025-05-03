@@ -263,3 +263,34 @@ resource "aws_dynamodb_table" "price_history" {
     Project     = "iphone_price_tracker"
   }
 }
+
+resource "aws_dynamodb_table" "price_predictions" {
+  name           = "price_predictions"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "model_id"
+  range_key      = "prediction_date"
+
+  attribute {
+    name = "model_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "prediction_date"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "expiration_time"
+    enabled        = true
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  tags = {
+    Name        = "price_predictions"
+    Environment = var.environment
+  }
+}

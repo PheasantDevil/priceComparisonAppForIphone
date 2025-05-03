@@ -257,3 +257,61 @@ resource "aws_lambda_function" "get_price_history" {
     }
   }
 }
+
+resource "aws_lambda_function" "predict_prices_lambda" {
+  filename         = "lambdas/predict_prices_lambda/predict_prices.zip"
+  function_name    = "predict_prices_lambda"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "predict_prices.lambda_handler"
+  runtime          = "python3.9"
+  timeout          = 30
+  memory_size      = 256
+
+  environment {
+    variables = {
+      ENVIRONMENT = var.environment
+    }
+  }
+
+  tags = {
+    Name        = "predict_prices_lambda"
+    Environment = var.environment
+  }
+}
+
+resource "aws_lambda_permission" "predict_prices_lambda_permission" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.predict_prices_lambda.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
+}
+
+resource "aws_lambda_function" "compare_prices_lambda" {
+  filename         = "lambdas/compare_prices_lambda/compare_prices.zip"
+  function_name    = "compare_prices_lambda"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "compare_prices.lambda_handler"
+  runtime          = "python3.9"
+  timeout          = 30
+  memory_size      = 256
+
+  environment {
+    variables = {
+      ENVIRONMENT = var.environment
+    }
+  }
+
+  tags = {
+    Name        = "compare_prices_lambda"
+    Environment = var.environment
+  }
+}
+
+resource "aws_lambda_permission" "compare_prices_lambda_permission" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.compare_prices_lambda.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
+}
