@@ -21,15 +21,16 @@ def lambda_handler(event, context):
                 },
                 'body': json.dumps('Missing required parameter: model')
             }
-        days = int(query_params.get('days', 30))  # Default to 30 days
         
-        # Calculate timestamp for the start date
-        start_timestamp = int((datetime.now() - timedelta(days=days)).timestamp())
+        # Calculate date range (2 weeks before and after)
+        today = datetime.now()
+        start_date = (today - timedelta(days=14)).strftime('%Y-%m-%d')
+        end_date = (today + timedelta(days=14)).strftime('%Y-%m-%d')
         
-        # Query DynamoDB
+        # Query DynamoDB using DateIndex
         response = table.query(
-            KeyConditionExpression=Key('model').eq(model) & Key('timestamp').gte(start_timestamp),
-            IndexName='TimestampIndex'
+            IndexName='DateIndex',
+            KeyConditionExpression=Key('date').between(start_date, end_date) & Key('model').eq(model)
         )
         
         # Format response data
@@ -53,7 +54,6 @@ def lambda_handler(event, context):
             },
             'body': json.dumps(formatted_data)
         }
-        
     except Exception as e:
         return {
             'statusCode': 500,

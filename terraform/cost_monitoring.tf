@@ -104,33 +104,6 @@ resource "aws_cloudwatch_metric_alarm" "dynamodb_capacity_units" {
   alarm_actions = [aws_sns_topic.alerts.arn]
 }
 
-# コスト異常検知の設定
-resource "aws_ce_anomaly_monitor" "cost_anomaly" {
-  name         = "cost-anomaly-monitor"
-  monitor_type = "CUSTOM"
-  monitor_specification = jsonencode({
-    "And" = [
-      {
-        "Dimensions" = {
-          "Key" = "SERVICE"
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_ce_anomaly_subscription" "cost_anomaly" {
-  name      = "cost-anomaly-subscription"
-  frequency = "DAILY"
-  monitor_arn_list = [
-    aws_ce_anomaly_monitor.cost_anomaly.arn
-  ]
-  subscriber {
-    type    = "EMAIL"
-    address = var.budget_notification_email
-  }
-}
-
 # リソースタグの設定
 resource "aws_resourcegroups_group" "cost_optimization" {
   name        = "cost-optimization-group"
@@ -151,32 +124,6 @@ resource "aws_resourcegroups_group" "cost_optimization" {
       ]
     })
   }
-}
-
-# コスト最適化のためのタグポリシー
-resource "aws_organizations_policy" "tag_policy" {
-  name        = "cost-optimization-tag-policy"
-  description = "Tag policy for cost optimization"
-  content = jsonencode({
-    "tags" = {
-      "Environment" = {
-        "tag_key" = {
-          "@@assign" = "Environment"
-        }
-        "enforced_for" = {
-          "@@assign" = ["ec2:instance", "lambda:function", "dynamodb:table"]
-        }
-      }
-      "CostCenter" = {
-        "tag_key" = {
-          "@@assign" = "CostCenter"
-        }
-        "enforced_for" = {
-          "@@assign" = ["ec2:instance", "lambda:function", "dynamodb:table"]
-        }
-      }
-    }
-  })
 }
 
 # コスト最適化のためのCloudWatchアラーム

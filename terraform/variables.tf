@@ -47,3 +47,21 @@ variable "aws_region" {
   type        = string
   default     = "ap-northeast-1"
 }
+
+variable "line_channel_access_token" {
+  description = "LINE Messaging API channel access token"
+  type        = string
+  sensitive   = true
+}
+
+variable "line_notify_token" {
+  description = "LINE Notifyのアクセストークン"
+  type        = string
+  sensitive   = true
+}
+
+variable "create_sample_data" {
+  description = "サンプルデータを作成するかどうか"
+  type        = bool
+  default     = false
+}
