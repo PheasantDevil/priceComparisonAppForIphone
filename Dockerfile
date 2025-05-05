@@ -1,7 +1,7 @@
 # Dockerのイメージ名: price-comparison-app:latest
 
 # ベースイメージを安定版のPythonに変更
-FROM python:3.13-slim
+FROM python:3.11-slim
 
 # 必要なシステムパッケージとPlaywrightの依存ライブラリをインストール
 RUN apt-get update && apt-get install -y --no-install-recommends \
