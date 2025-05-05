@@ -101,10 +101,10 @@ resource "aws_cloudwatch_metric_alarm" "dr_verification" {
   evaluation_periods  = 1
   metric_name         = "Errors"
   namespace           = "AWS/Lambda"
-  period             = 300
+  period             = 300  # 5分に変更
   statistic          = "Sum"
   threshold          = 0
-  alarm_description  = "Disaster Recovery verification failed"
+  alarm_description  = "DR verification Lambda function errors"
   alarm_actions      = [aws_sns_topic.alerts.arn]
 
   dimensions = {
@@ -120,35 +120,18 @@ resource "aws_cloudwatch_metric_alarm" "dr_verification" {
 
 # ディザスタリカバリのドキュメント
 resource "aws_ssm_document" "dr_plan" {
-  name            = "price-comparison-dr-plan"
-  document_type   = "Automation"
+  name            = "dr-plan"
+  document_type   = "Command"
   document_format = "YAML"
 
   content = <<DOC
-schemaVersion: '0.3'
-description: Price Comparison App Disaster Recovery Plan
-parameters:
-  Action:
-    type: String
-    description: Action to perform (check_primary, switch_to_backup, verify_backup)
-    allowedValues:
-      - check_primary
-      - switch_to_backup
-      - verify_backup
+schemaVersion: '2.2'
+description: Disaster Recovery Plan
 mainSteps:
-  - name: "InvokeLambda"
-    action: "aws:executeAwsApi"
+  - action: aws:runPowerShellScript
+    name: invokeDRHandler
     inputs:
-      Service: lambda
-      Api: Invoke
-      FunctionName: "${aws_lambda_function.dr_handler.function_name}"
-      Payload: '{"action": "{{Action}}"}'
-  - name: "NotifyTeam"
-    action: "aws:executeAwsApi"
-    inputs:
-      Service: sns
-      Api: Publish
-      TopicArn: "${aws_sns_topic.alerts.arn}"
-      Message: "Disaster Recovery Plan executed with action: {{Action}}"
+      runCommand:
+        - aws lambda invoke --function-name price-comparison-dr-handler response.json
 DOC
 } 

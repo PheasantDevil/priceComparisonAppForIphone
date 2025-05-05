@@ -90,6 +90,7 @@ resource "aws_lambda_function" "price_comparison" {
   runtime       = "python3.9"
   timeout       = 30
   memory_size   = 128
+  publish       = true  # バージョンを公開
 
   environment {
     variables = {
@@ -111,7 +112,7 @@ resource "aws_lambda_alias" "get_prices" {
   name             = "production"
   description      = "Production alias for get_prices Lambda function"
   function_name    = aws_lambda_function.price_comparison.function_name
-  function_version = "$LATEST"
+  function_version = aws_lambda_function.price_comparison.version  # 公開されたバージョンを使用
 }
 
 # Lambda関数のバージョン
@@ -141,31 +142,24 @@ resource "aws_sqs_queue" "lambda_dlq" {
   }
 }
 
-# Lambda関数のコールドスタート対策
-resource "aws_lambda_provisioned_concurrency_config" "get_prices" {
-  function_name                     = aws_lambda_function.price_comparison.function_name
-  provisioned_concurrent_executions = 5
-  qualifier                         = aws_lambda_alias.get_prices.name
-}
-
 # Lambda関数の自動スケーリング設定
 resource "aws_appautoscaling_target" "lambda_target" {
-  max_capacity       = 100
-  min_capacity       = 5
+  max_capacity       = 10
+  min_capacity       = 2
   resource_id        = "function:${aws_lambda_function.price_comparison.function_name}:${aws_lambda_alias.get_prices.name}"
   scalable_dimension = "lambda:function:ProvisionedConcurrency"
   service_namespace  = "lambda"
 }
 
 resource "aws_appautoscaling_policy" "lambda_scaling_policy" {
-  name               = "lambda-concurrency-scaling-policy"
+  name               = "lambda-scaling-policy"
   policy_type        = "TargetTrackingScaling"
   resource_id        = aws_appautoscaling_target.lambda_target.resource_id
   scalable_dimension = aws_appautoscaling_target.lambda_target.scalable_dimension
   service_namespace  = aws_appautoscaling_target.lambda_target.service_namespace
 
   target_tracking_scaling_policy_configuration {
-    target_value       = 70.0
+    target_value       = 0.7  # 70%の使用率を目標に
     scale_in_cooldown  = 300
     scale_out_cooldown = 300
 
@@ -307,24 +301,13 @@ resource "aws_lambda_function" "get_price_history" {
 # 価格予測用のLambda関数
 resource "aws_lambda_function" "predict_prices_lambda" {
   filename         = "../lambdas/predict_prices_lambda.zip"
-  function_name    = "predict_prices_lambda"
+  function_name    = "predict-prices"
   role             = aws_iam_role.lambda_execution_role.arn
-  handler          = "predict_prices.lambda_handler"
+  handler          = "predict_prices.handler"
   runtime          = "python3.9"
-  memory_size      = 256
   timeout          = 30
-
-  environment {
-    variables = {
-      ENVIRONMENT = "production"
-    }
-  }
-
-  tags = {
-    Name        = "predict_prices_lambda"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
+  memory_size      = 256
+  source_code_hash = filebase64sha256("../lambdas/predict_prices_lambda.zip")
 }
 
 # 価格予測用のLambdaパーミッション
@@ -339,24 +322,13 @@ resource "aws_lambda_permission" "predict_prices_lambda_permission" {
 # 価格比較用のLambda関数
 resource "aws_lambda_function" "compare_prices_lambda" {
   filename         = "../lambdas/compare_prices_lambda.zip"
-  function_name    = "compare_prices_lambda"
+  function_name    = "compare-prices"
   role             = aws_iam_role.lambda_execution_role.arn
-  handler          = "compare_prices.lambda_handler"
+  handler          = "compare_prices.handler"
   runtime          = "python3.9"
-  memory_size      = 256
   timeout          = 30
-
-  environment {
-    variables = {
-      ENVIRONMENT = "production"
-    }
-  }
-
-  tags = {
-    Name        = "compare_prices_lambda"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
+  memory_size      = 256
+  source_code_hash = filebase64sha256("../lambdas/compare_prices_lambda.zip")
 }
 
 # 価格比較用のLambdaパーミッション
@@ -371,25 +343,13 @@ resource "aws_lambda_permission" "compare_prices_lambda_permission" {
 # LINE通知用のLambda関数
 resource "aws_lambda_function" "line_notification_lambda" {
   filename         = "../lambdas/line_notification_lambda.zip"
-  function_name    = "line-notification-lambda"
+  function_name    = "line-notification"
   role             = aws_iam_role.lambda_execution_role.arn
-  handler          = "main.lambda_handler"
+  handler          = "line_notification.handler"
   runtime          = "python3.9"
-  memory_size      = 128
   timeout          = 30
-
-  environment {
-    variables = {
-      ENVIRONMENT               = "production"
-      LINE_CHANNEL_ACCESS_TOKEN = var.line_channel_access_token
-    }
-  }
-
-  tags = {
-    Name        = "line-notification-lambda"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
+  memory_size      = 256
+  source_code_hash = filebase64sha256("../lambdas/line_notification_lambda.zip")
 }
 
 # LINE通知用のLambdaパーミッション
@@ -403,7 +363,7 @@ resource "aws_lambda_permission" "line_notification_lambda" {
 
 # 価格チェック用のLambda関数
 resource "aws_lambda_function" "check_prices_lambda" {
-  filename      = "check_prices.zip"
+  filename      = "../lambdas/check_prices.zip"
   function_name = "check-prices"
   role          = aws_iam_role.lambda_execution_role.arn
   handler       = "check_prices.lambda_handler"

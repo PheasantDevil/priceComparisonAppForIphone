@@ -9,7 +9,7 @@ resource "aws_securityhub_standards_subscription" "cis" {
 }
 
 resource "aws_securityhub_standards_subscription" "pci" {
-  standards_arn = "arn:aws:securityhub:::ruleset/pci-dss/v/3.2.1"
+  standards_arn = "arn:aws:securityhub:ap-northeast-1::standards/pci-dss/v/3.2.1"
   depends_on    = [aws_securityhub_account.main]
 }
 
@@ -74,8 +74,8 @@ resource "aws_config_delivery_channel" "main" {
 
 # 設定ファイル用のS3バケット
 resource "aws_s3_bucket" "config_bucket" {
-  bucket = "price-comparison-config-${var.environment}"
-  force_destroy = false
+  bucket        = "price-comparison-config-production"
+  force_destroy = true  # 一時的に有効化
 
   tags = {
     Name        = "price-comparison-config"
@@ -332,8 +332,13 @@ resource "aws_wafv2_web_acl" "api_gateway" {
 }
 
 resource "aws_wafv2_web_acl_association" "api_gateway" {
-  resource_arn = "arn:aws:apigateway:ap-northeast-1::/restapis/lhayvbyupi/stages/production"
+  resource_arn = aws_api_gateway_stage.production.arn
   web_acl_arn  = aws_wafv2_web_acl.api_gateway.arn
+
+  depends_on = [
+    aws_api_gateway_stage.production,
+    aws_wafv2_web_acl.api_gateway
+  ]
 }
 
 # セキュリティグループの設定
@@ -384,7 +389,7 @@ resource "aws_security_group" "api_gateway" {
   }
 }
 
-# KMSキーの設定
+# KMSキー
 resource "aws_kms_key" "data_encryption" {
   description             = "KMS key for data encryption"
   deletion_window_in_days = 7
@@ -401,6 +406,23 @@ resource "aws_kms_key" "data_encryption" {
         }
         Action   = "kms:*"
         Resource = "*"
+      },
+      {
+        Sid    = "Allow CloudTrail to encrypt logs"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudtrail.amazonaws.com"
+        }
+        Action = [
+          "kms:GenerateDataKey*",
+          "kms:Decrypt"
+        ]
+        Resource = "*"
+        Condition = {
+          StringLike = {
+            "kms:EncryptionContext:aws:cloudtrail:arn" = "arn:aws:cloudtrail:*:${data.aws_caller_identity.current.account_id}:trail/*"
+          }
+        }
       }
     ]
   })
@@ -412,6 +434,7 @@ resource "aws_kms_key" "data_encryption" {
   }
 }
 
+# KMSキーのエイリアス
 resource "aws_kms_alias" "data_encryption" {
   name          = "alias/data-encryption-key"
   target_key_id = aws_kms_key.data_encryption.key_id
@@ -494,4 +517,42 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
       }
     ]
   })
+}
+
+provider "aws" {
+  alias  = "ap-southeast-1"
+  region = "ap-southeast-1"
+}
+
+resource "aws_kms_key" "data_encryption_replica" {
+  provider = aws.ap-southeast-1
+  description = "KMS key for encrypting DynamoDB data in ap-southeast-1"
+  enable_key_rotation = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid = "Enable IAM User Permissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::273354647319:root"
+        }
+        Action = "kms:*"
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "data-encryption-key-replica"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
+}
+
+resource "aws_kms_alias" "data_encryption_replica" {
+  provider = aws.ap-southeast-1
+  name          = "alias/data-encryption-key-replica"
+  target_key_id = aws_kms_key.data_encryption_replica.key_id
 } 

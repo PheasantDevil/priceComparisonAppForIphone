@@ -56,7 +56,7 @@ resource "aws_dynamodb_table" "iphone_prices" {
       write_capacity,
       billing_mode
     ]
-    prevent_destroy = true
+    # prevent_destroy = true  # 一時的に無効化
   }
 
   tags = {
@@ -99,7 +99,7 @@ resource "aws_dynamodb_table" "official_prices" {
       write_capacity,
       billing_mode
     ]
-    prevent_destroy = true
+    # prevent_destroy = true  # 一時的に無効化
   }
 
   tags = {
@@ -111,39 +111,31 @@ resource "aws_dynamodb_table" "official_prices" {
 
 # 価格情報を格納するメインテーブル
 resource "aws_dynamodb_table" "price_comparison" {
-  name         = "price-comparison"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "id"
-  range_key    = "timestamp"
+  name           = "price-comparison"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "id"
+  stream_enabled = true
+  stream_view_type = "NEW_AND_OLD_IMAGES"
 
   attribute {
     name = "id"
     type = "S"
   }
 
-  attribute {
-    name = "timestamp"
-    type = "S"
+  server_side_encryption {
+    enabled = true
+    kms_key_arn = aws_kms_key.data_encryption.arn
   }
 
-  ttl {
-    attribute_name = "ttl"
-    enabled        = true
+  replica {
+    region_name = "ap-southeast-1"
+    kms_key_arn = aws_kms_key.data_encryption_replica.arn
   }
 
   tags = {
     Name        = "price-comparison"
     Environment = "production"
     Project     = "iphone_price_tracker"
-  }
-
-  lifecycle {
-    ignore_changes = [
-      read_capacity,
-      write_capacity,
-      billing_mode
-    ]
-    prevent_destroy = true
   }
 }
 
@@ -225,7 +217,7 @@ resource "aws_dynamodb_table" "price_history" {
       write_capacity,
       billing_mode
     ]
-    prevent_destroy = true
+    # prevent_destroy = true  # 一時的に無効化
   }
 
   tags = {
@@ -257,7 +249,7 @@ resource "aws_dynamodb_table" "price_predictions" {
       write_capacity,
       billing_mode
     ]
-    prevent_destroy = true
+    # prevent_destroy = true  # 一時的に無効化
   }
 
   tags = {

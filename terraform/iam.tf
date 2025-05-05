@@ -28,6 +28,30 @@ resource "aws_iam_role_policy_attachment" "lambda_execution_basic" {
   role       = aws_iam_role.lambda_execution_role.name
 }
 
+# Lambda実行ロールにSQS権限を付与
+resource "aws_iam_role_policy" "lambda_sqs_policy" {
+  name = "lambda_sqs_policy"
+  role = aws_iam_role.lambda_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = [
+          aws_sqs_queue.lambda_dlq.arn
+        ]
+      }
+    ]
+  })
+}
+
 # Lambda実行用のIAMロール
 resource "aws_iam_role" "get_prices_lambda_role" {
   name = "get_prices_lambda_role"
@@ -46,7 +70,7 @@ resource "aws_iam_role" "get_prices_lambda_role" {
   })
 
   lifecycle {
-    prevent_destroy = true
+    # prevent_destroy = true  # 一時的に無効化
   }
 
   tags = {

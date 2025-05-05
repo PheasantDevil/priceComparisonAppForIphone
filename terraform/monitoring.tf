@@ -235,7 +235,7 @@ resource "aws_cloudwatch_log_group" "api_gateway_logs" {
   retention_in_days = 30
 
   lifecycle {
-    prevent_destroy = true
+    # prevent_destroy = true  # 一時的に無効化
   }
 
   tags = {
