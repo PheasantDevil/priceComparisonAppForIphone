@@ -2698,6 +2698,62 @@
             alert('エラーが発生しました');
           }
         });
+
+      function updatePriceDisplay(series, capacity, data) {
+        const container = document.getElementById(`${series}-${capacity}`);
+        if (!container) return;
+
+        const kaitoriMin = data.kaitori_price_min;
+        const kaitoriMax = data.kaitori_price_max;
+        const officialPrice = data.official_price;
+        const profitMin = kaitoriMin - officialPrice;
+        const profitMax = kaitoriMax - officialPrice;
+
+        // 価格表示の更新
+        container.querySelector(
+          '.kaitori-price'
+        ).textContent = `${kaitoriMin.toLocaleString()}円 〜 ${kaitoriMax.toLocaleString()}円`;
+        container.querySelector(
+          '.official-price'
+        ).textContent = `${officialPrice.toLocaleString()}円`;
+        container.querySelector(
+          '.profit'
+        ).textContent = `${profitMin.toLocaleString()}円 〜 ${profitMax.toLocaleString()}円`;
+
+        // 色ごとの価格を更新
+        const colorPricesContainer = container.querySelector('.color-prices');
+        colorPricesContainer.innerHTML = '';
+
+        Object.entries(data.colors).forEach(([color, priceInfo]) => {
+          const colorDiv = document.createElement('div');
+          colorDiv.className = 'color-price';
+          colorDiv.innerHTML = `
+                <span class="color-name">${color}</span>
+                <span class="color-value">${priceInfo.price_text}</span>
+            `;
+          colorPricesContainer.appendChild(colorDiv);
+        });
+
+        // 利益率の計算と表示
+        const profitRateMin = ((profitMin / officialPrice) * 100).toFixed(1);
+        const profitRateMax = ((profitMax / officialPrice) * 100).toFixed(1);
+        container.querySelector(
+          '.profit-rate'
+        ).textContent = `${profitRateMin}% 〜 ${profitRateMax}%`;
+
+        // 利益率に応じた色付け
+        const profitRateElement = container.querySelector('.profit-rate');
+        const avgProfitRate =
+          (parseFloat(profitRateMin) + parseFloat(profitRateMax)) / 2;
+
+        if (avgProfitRate >= 20) {
+          profitRateElement.className = 'profit-rate high-profit';
+        } else if (avgProfitRate >= 10) {
+          profitRateElement.className = 'profit-rate medium-profit';
+        } else {
+          profitRateElement.className = 'profit-rate low-profit';
+        }
+      }
     </script>
   </body>
 </html>
