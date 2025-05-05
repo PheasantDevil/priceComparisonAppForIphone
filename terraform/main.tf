@@ -40,4 +40,11 @@ resource "aws_lambda_permission" "cloudwatch" {
   function_name = aws_lambda_function.check_prices_lambda.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.check_prices.arn
+}
+
+# IAM OpenID Connect Provider for GitHub Actions
+resource "aws_iam_openid_connect_provider" "github_actions" {
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 } 

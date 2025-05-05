@@ -1,8 +1,13 @@
-# CloudWatch Log Group for API Gateway
-resource "aws_cloudwatch_log_group" "api_gateway" {
-  name              = "/aws/apigateway/price-comparison-api"
-  retention_in_days = 30
-}
+# CloudWatch Log Group is already defined in monitoring.tf
+# resource "aws_cloudwatch_log_group" "api_gateway" {
+#   name              = "/aws/apigateway/price-comparison-api"
+#   retention_in_days = 30
+#   tags = {
+#     Name        = "api-gateway-logs"
+#     Environment = "production"
+#     Project     = "iphone_price_tracker"
+#   }
+# }
 
 # HTTP API Gateway
 resource "aws_apigatewayv2_api" "main" {
@@ -13,25 +18,31 @@ resource "aws_apigatewayv2_api" "main" {
 
 # API Gateway Stage
 resource "aws_api_gateway_stage" "production" {
-  stage_name    = "production"
-  rest_api_id   = aws_api_gateway_rest_api.price_comparison.id
   deployment_id = aws_api_gateway_deployment.price_comparison.id
+  rest_api_id   = aws_api_gateway_rest_api.price_comparison.id
+  stage_name    = "production"
 
   access_log_settings {
-    destination_arn = aws_cloudwatch_log_group.api_gateway.arn
-    format = jsonencode({
-      requestId      = "$context.requestId"
-      ip             = "$context.identity.sourceIp"
-      caller         = "$context.identity.caller"
-      user           = "$context.identity.user"
-      requestTime    = "$context.requestTime"
-      httpMethod     = "$context.httpMethod"
-      resourcePath   = "$context.resourcePath"
-      status         = "$context.status"
-      protocol       = "$context.protocol"
-      responseLength = "$context.responseLength"
+    destination_arn = aws_cloudwatch_log_group.api_gateway_logs.arn
+    format         = jsonencode({
+      requestId               = "$context.requestId"
+      sourceIp               = "$context.identity.sourceIp"
+      requestTime            = "$context.requestTime"
+      protocol              = "$context.protocol"
+      httpMethod            = "$context.httpMethod"
+      resourcePath          = "$context.resourcePath"
+      routeKey              = "$context.routeKey"
+      status                = "$context.status"
+      responseLength        = "$context.responseLength"
+      integrationErrorMessage = "$context.integrationErrorMessage"
     })
   }
+
+  xray_tracing_enabled = true
+
+  depends_on = [
+    aws_api_gateway_deployment.price_comparison
+  ]
 }
 
 resource "aws_api_gateway_rest_api" "price_comparison" {

@@ -310,6 +310,7 @@ terraform/lambda/*/
 .terraform/
 .terraform.lock.hcl
 tfplan
+terraform/layer/*
 
 # Lambda deployment packages
 *.zip
@@ -333,3 +334,5 @@ package-lock.json
 # Temporary files
 *.bak
 *.backup
+dynamodb_local/
+cache/

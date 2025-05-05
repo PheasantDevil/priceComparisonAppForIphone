@@ -1,56 +1,104 @@
-# DynamoDBのグローバルテーブル設定（マルチリージョン）
-resource "aws_dynamodb_global_table" "price_comparison" {
-  depends_on = [
-    aws_dynamodb_table.price_comparison
-  ]
-
-  name = "price-comparison"
-
-  replica {
-    region_name = "ap-northeast-1" # プライマリリージョン
-  }
-
-  # replica {
-  #   region_name = "ap-southeast-1" # セカンダリリージョン
-  # }
-
-  lifecycle {
-    prevent_destroy = true
-    ignore_changes = [
-      replica
-    ]
-  }
-}
+# プライマリテーブルを先に作成
+# resource "aws_dynamodb_table" "price_comparison_primary" {
+#   name           = "price-comparison"
+#   billing_mode   = "PAY_PER_REQUEST"
+#   hash_key       = "id"
+#   range_key      = "timestamp"
+# 
+#   attribute {
+#     name = "id"
+#     type = "S"
+#   }
+# 
+#   attribute {
+#     name = "timestamp"
+#     type = "S"
+#   }
+# 
+#   tags = {
+#     Name        = "price-comparison"
+#     Environment = "production"
+#   }
+# }
+# 
+# # グローバルテーブルの設定
+# resource "aws_dynamodb_table" "price_comparison" {
+#   name           = "price-comparison"
+#   billing_mode   = "PAY_PER_REQUEST"
+#   hash_key       = "id"
+#   stream_enabled = true
+#   stream_view_type = "NEW_AND_OLD_IMAGES"
+# 
+#   attribute {
+#     name = "id"
+#     type = "S"
+#   }
+# 
+#   server_side_encryption {
+#     enabled = true
+#     kms_key_arn = aws_kms_key.data_encryption.arn
+#   }
+# 
+#   replica {
+#     region_name = "ap-southeast-1"
+#   }
+# 
+#   tags = {
+#     Name        = "price-comparison"
+#     Environment = "production"
+#     Project     = "iphone_price_tracker"
+#   }
+# }
 
 # DynamoDBのバックアップ設定
 resource "aws_dynamodb_table" "price_comparison_backup" {
-  name         = "${aws_dynamodb_table.price_comparison.name}-backup"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "model"
-  range_key    = "timestamp"
+  name           = "price-comparison-backup"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "model"
+  stream_enabled = true
+  stream_view_type = "NEW_AND_OLD_IMAGES"
 
   attribute {
     name = "model"
     type = "S"
   }
 
-  attribute {
-    name = "timestamp"
-    type = "S"
-  }
-
-  point_in_time_recovery {
+  server_side_encryption {
     enabled = true
+    kms_key_arn = aws_kms_key.data_encryption.arn
   }
 
   tags = {
-    Name        = "${aws_dynamodb_table.price_comparison.name}-backup"
-    Environment = var.environment
+    Name        = "price-comparison-backup"
     Purpose     = "backup"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
+}
+
+# 新しいバックアップテーブルの設定
+resource "aws_dynamodb_table" "price_comparison_backup_v2" {
+  name           = "price-comparison-backup-v2"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "model"
+  stream_enabled = true
+  stream_view_type = "NEW_AND_OLD_IMAGES"
+
+  attribute {
+    name = "model"
+    type = "S"
   }
 
-  lifecycle {
-    prevent_destroy = true
+  server_side_encryption {
+    enabled = true
+    kms_key_arn = aws_kms_key.data_encryption.arn
+  }
+
+  tags = {
+    Name        = "price-comparison-backup-v2"
+    Purpose     = "backup"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
   }
 }
 
