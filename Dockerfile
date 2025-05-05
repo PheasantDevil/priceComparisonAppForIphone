@@ -1,10 +1,10 @@
 # Dockerのイメージ名: price-comparison-app:latest
 
-# ベースイメージ
-FROM python:3.13-slim
+# ベースイメージを安定版のPythonに変更
+FROM python:3.11-slim
 
 # 必要なシステムパッケージとPlaywrightの依存ライブラリをインストール
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libnss3 \
     libnspr4 \
     libatk1.0-0 \
@@ -21,22 +21,26 @@ RUN apt-get update && apt-get install -y \
     libgbm1 \
     libasound2 \
     libcurl4 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # 作業ディレクトリを設定
 WORKDIR /app
 
-# プロジェクトのファイルをコピー
-COPY . /app
+# 依存関係ファイルを先にコピーしてキャッシュを活用
+COPY requirements.txt .
 
 # Pythonパッケージのインストール
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Playwrightの環境変数を設定
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright
 
 # Playwrightブラウザのインストール
 RUN playwright install chromium
+
+# プロジェクトのファイルをコピー
+COPY . .
 
 # アプリケーションを起動
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers=3", "--timeout=60"]
