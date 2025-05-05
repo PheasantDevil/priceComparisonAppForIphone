@@ -25,9 +25,40 @@ env:
   PYTHON_VERSION: '3.9'
 
 jobs:
+  prepare:
+    name: Prepare Lambda Functions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r terraform/requirements.txt
+
+      - name: Package Lambda functions
+        run: |
+          cd terraform/scripts
+          python package_lambda.py
+
+      - name: Upload Lambda packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: lambda-packages
+          path: |
+            terraform/*.zip
+            !terraform/terraform.*.zip
+
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    needs: prepare
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -43,24 +74,20 @@ jobs:
           pip install -r terraform/requirements.txt
           pip install pytest pytest-cov python-dotenv
 
-      # [tips_20250503：一時的にコメントアウト]
-      # - name: Run Python tests
-      #   run: |
-      #     python -m pip install --upgrade pip
-      #     pip install -r terraform/requirements.txt
-      #     PYTHONPATH=$PYTHONPATH:$(pwd) pytest tests/unit/ -v --cov=src --cov-report=xml --cov-report=term-missing --tb=short
+      - name: Run Python tests
+        run: |
+          PYTHONPATH=$PYTHONPATH:$(pwd) pytest tests/unit/ -v --cov=src --cov-report=xml --cov-report=term-missing --tb=short
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-          slug: PheasantDevil/priceComparisonAppForIphone
 
   security:
     name: Security Scan
     runs-on: ubuntu-latest
+    needs: test
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -72,8 +99,7 @@ jobs:
 
       - name: Install security tools
         run: |
-          pip install bandit
-          # Install tfsec using the official installation script
+          pip install bandit safety
           curl -L -o tfsec https://github.com/aquasecurity/tfsec/releases/download/v1.28.1/tfsec-linux-amd64
           chmod +x tfsec
           sudo mv tfsec /usr/local/bin/
@@ -81,37 +107,63 @@ jobs:
       - name: Run Bandit security scan
         run: |
           bandit -r src/ -f json -o bandit-results.json -c .bandit || true
-          cat bandit-results.json
+
+      - name: Run dependency security check
+        run: |
+          safety check -r terraform/requirements.txt --json > safety-results.json || true
 
       - name: Run Terraform security scan
         run: |
-          tfsec terraform/ --format json --out tfsec-results.json --tfvars-file terraform/terraform.tfvars || true
-          cat tfsec-results.json
+          tfsec terraform/ --format json --out tfsec-results.json || true
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-scan-results
+          path: |
+            bandit-results.json
+            safety-results.json
+            tfsec-results.json
 
   validate:
     name: Validate Terraform
     runs-on: ubuntu-latest
-    needs: [test, security]
+    needs: security
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Download Lambda packages
+        uses: actions/download-artifact@v3
+        with:
+          name: lambda-packages
+          path: terraform/
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.0
 
-      - name: Terraform Init
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActionsSession
+
+      - name: Initialize Terraform
         working-directory: terraform
         run: |
+          # Remove any existing .terraform directory and .terraform.lock.hcl
+          rm -rf .terraform .terraform.lock.hcl
           terraform init -input=false
 
-      - name: Terraform Validate
+      - name: Validate Terraform configuration
         working-directory: terraform
         run: |
           terraform validate
 
-      - name: Terraform Format
+      - name: Check Terraform formatting
         working-directory: terraform
         run: |
           terraform fmt -check -recursive -diff
@@ -124,33 +176,54 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Download Lambda packages
+        uses: actions/download-artifact@v3
+        with:
+          name: lambda-packages
+          path: terraform/
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::273354647319:role/github-actions-role
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: GitHubActionsSession
-        env:
-          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ secrets.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
-          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ secrets.ACTIONS_ID_TOKEN_REQUEST_URL }}
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.0
 
-      - name: Terraform Init
+      - name: Initialize Terraform
         working-directory: terraform
         run: |
           terraform init -input=false
 
+      - name: Handle existing resources
+        working-directory: terraform
+        run: |
+          # Import existing DynamoDB tables if they exist
+          terraform import aws_dynamodb_table.iphone_prices iphone_prices || true
+          terraform import aws_dynamodb_table.official_prices official_prices || true
+          terraform import aws_dynamodb_table.price_history price_history || true
+          terraform import aws_dynamodb_table.price_predictions price_predictions || true
+          
+          # Import existing IAM roles if they exist
+          terraform import aws_iam_role.lambda_role get_prices_lambda_role || true
+          terraform import aws_iam_openid_connect_provider.github_actions https://token.actions.githubusercontent.com || true
+
       - name: Terraform Plan
         working-directory: terraform
         run: |
-          terraform plan -input=false -out=tfplan
+          terraform plan \
+            -input=false \
+            -var="skip_organization_policy=true" \
+            -var="evaluation_periods=120" \
+            -var="period=300" \
+            -out=tfplan
 
       - name: Upload Plan Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: tfplan
           path: terraform/tfplan
@@ -160,126 +233,22 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, security, validate, plan]
     if: github.ref == 'refs/heads/main'
-    env:
-      API_GATEWAY_URL: ${{ vars.API_GATEWAY_URL }}
+    environment: production
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Download Lambda packages
+        uses: actions/download-artifact@v3
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: GitHubActionsSession
-          audience: sts.amazonaws.com
-          role-duration-seconds: 3600
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r terraform/requirements.txt
-
-      - name: Package Lambda functions
-        working-directory: terraform/scripts
-        run: |
-          python package_lambda.py
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.0
+          name: lambda-packages
+          path: terraform/
 
       - name: Download Plan Artifact
         uses: actions/download-artifact@v3
         with:
           name: tfplan
-          path: terraform
-
-      - name: Terraform Apply
-        working-directory: terraform
-        run: |
-          terraform apply -auto-approve tfplan
-
-      - name: Deploy Lambda functions
-        working-directory: terraform
-        run: |
-          aws lambda update-function-code \
-            --function-name deployment-verification \
-            --zip-file fileb://scripts/verify_deployment.zip
-          aws lambda update-function-code \
-            --function-name smoke-test \
-            --zip-file fileb://scripts/run_smoke_tests.zip
-
-      - name: Verify Deployment
-        run: |
-          cd terraform
-          aws lambda invoke \
-            --function-name deployment-verification \
-            --payload '{}' \
-            response.json
-          cat response.json
-
-      - name: Run Smoke Tests
-        run: |
-          cd terraform
-          aws lambda invoke \
-            --function-name smoke-test \
-            --payload '{}' \
-            response.json
-          cat response.json
-
-      - name: Update DynamoDB Data
-        run: |
-          cd terraform
-          python3 scripts/migrate_to_dynamodb.py
-
-      - name: Cleanup API Gateway
-        run: |
-          cd terraform
-          python3 scripts/cleanup_api_gateway.py
-
-      - name: Notify Deployment Status
-        if: always()
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const status = '${{ job.status }}';
-            const runId = '${{ github.run_id }}';
-            const repo = '${{ github.repository }}';
-            const commit = '${{ github.sha }}';
-            
-            if (status === 'success') {
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `✅ デプロイメントが正常に完了しました\n\n- 実行ID: ${runId}\n- コミット: ${commit}\n- 環境: production`
-              });
-            } else {
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `❌ デプロイメントが失敗しました\n\n- 実行ID: ${runId}\n- コミット: ${commit}\n- 環境: production\n\n詳細は[こちら](https://github.com/${repo}/actions/runs/${runId})を確認してください`
-              });
-            }
-
-  rollback:
-    name: Rollback
-    runs-on: ubuntu-latest
-    needs: deploy
-    if: failure() && needs.deploy.result == 'failure'
-    env:
-      API_GATEWAY_URL: ${{ vars.API_GATEWAY_URL }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+          path: terraform/
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -287,80 +256,52 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: GitHubActionsSession
-          audience: sts.amazonaws.com
-          role-duration-seconds: 3600
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.0
 
-      - name: Rollback to Previous State
+      - name: Initialize Terraform
         working-directory: terraform
         run: |
-          terraform state pull > current.tfstate
-          terraform state push previous.tfstate
-          terraform apply -auto-approve
+          terraform init -input=false
 
-      - name: Notify Rollback Status
-        uses: actions/github-script@v6
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `🔄 デプロイメントのロールバックを実行しました\n\n- 実行ID: ${{ github.run_id }}\n- コミット: ${{ github.sha }}\n- 環境: production`
-            });
+      - name: Apply Terraform changes
+        working-directory: terraform
+        run: |
+          terraform apply -auto-approve tfplan
+
+      - name: Verify deployment
+        working-directory: terraform
+        run: |
+          # Invoke deployment verification Lambda
+          aws lambda invoke \
+            --function-name deployment-verification \
+            --payload '{}' \
+            response.json
+          cat response.json
+
+      - name: Run smoke tests
+        working-directory: terraform
+        run: |
+          # Invoke smoke test Lambda
+          aws lambda invoke \
+            --function-name smoke-test \
+            --payload '{}' \
+            response.json
+          cat response.json
 
   cleanup:
     name: Cleanup
     runs-on: ubuntu-latest
-    needs: [deploy, rollback]
+    needs: deploy
     if: always()
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Delete artifacts
+        uses: geekyeggo/delete-artifact@v2
         with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref || github.ref_name }}
-
-      - name: Cleanup Python cache
-        run: |
-          find . -type d -name "__pycache__" -exec rm -rf {} +
-          find . -type f -name "*.pyc" -delete
-
-      - name: Cleanup temporary files
-        run: |
-          # Remove Terraform state files
-          rm -f terraform/terraform.tfstate*
-          rm -f terraform/.terraform.lock.hcl
-          
-          # Remove Lambda deployment packages
-          rm -f terraform/lambda_function.zip
-          rm -f terraform/layer.zip
-          
-          # Remove backup files
-          rm -f terraform/*.bak
-          rm -f terraform/*.backup
-          
-          # Remove empty directories
-          find . -type d -empty -delete
-
-      - name: Configure Git
-        run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-
-      - name: Commit and push cleanup changes
-        run: |
-          git add .
-          if git diff --quiet && git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "chore: cleanup temporary files [skip ci]"
-            git push origin HEAD:${{ github.head_ref || github.ref_name }}
-          fi
+          name: |
+            lambda-packages
+            tfplan
+            security-scan-results
