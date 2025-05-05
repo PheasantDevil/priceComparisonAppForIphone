@@ -1,12 +1,25 @@
 locals {
   lambda_src_dir = "${path.module}/.."
-  lambda_files = [
-    "lambdas/get_prices_lambda/lambda_function.py",
-    "lambdas/save_price_history_lambda/save_price_history.py",
-    "lambdas/get_price_history_lambda/get_price_history.py",
-    "src/apple_scraper_for_rudea.py",
-    "config/config.production.yaml"
-  ]
+  lambda_files = {
+    get_prices = [
+      "lambdas/get_prices_lambda/lambda_function.py"
+    ]
+    predict_prices = [
+      "lambdas/predict_prices_lambda/predict_prices.py"
+    ]
+    compare_prices = [
+      "lambdas/compare_prices_lambda/compare_prices.py"
+    ]
+    check_prices = [
+      "lambdas/check_prices_lambda/check_prices.py"
+    ]
+    save_price_history = [
+      "lambdas/save_price_history_lambda/save_price_history.py"
+    ]
+    get_price_history = [
+      "lambdas/get_price_history_lambda/get_price_history.py"
+    ]
+  }
   layer_build_dir = "${path.module}/layer"
   layer_zip_path  = "${path.module}/layer.zip"
 }
@@ -19,35 +32,43 @@ resource "null_resource" "install_lambda_layer_packages" {
 
   provisioner "local-exec" {
     command = <<EOF
+rm -rf ${local.layer_build_dir}
 mkdir -p ${local.layer_build_dir}/python
 pip install -r ${path.module}/requirements.txt -t ${local.layer_build_dir}/python
-cd ${local.layer_build_dir} && zip -r ${local.layer_zip_path} .
+cd ${local.layer_build_dir}
+zip -r ../layer.zip .
+cd ..
 EOF
   }
+}
 
-  lifecycle {
-    create_before_destroy = true
-  }
+# Lambda Layer用のZIPファイルを作成
+data "archive_file" "layer_zip" {
+  depends_on = [null_resource.install_lambda_layer_packages]
+  type        = "zip"
+  output_path = local.layer_zip_path
+  source_dir  = local.layer_build_dir
 }
 
 # Lambda Layer
 resource "aws_lambda_layer_version" "dependencies" {
+  depends_on = [data.archive_file.layer_zip]
+  
   layer_name          = "get_prices_dependencies"
   description         = "Dependencies for get_prices Lambda function"
   compatible_runtimes = ["python3.9"]
-  filename            = local.layer_zip_path
-  source_code_hash    = null_resource.install_lambda_layer_packages.id
-
-  depends_on = [null_resource.install_lambda_layer_packages]
+  filename            = data.archive_file.layer_zip.output_path
+  source_code_hash    = data.archive_file.layer_zip.output_base64sha256
 }
 
 # Lambda関数のソースコードをZIP化
-data "archive_file" "lambda_get_prices" {
+data "archive_file" "lambda_zips" {
+  for_each = local.lambda_files
   type        = "zip"
-  output_path = "${path.module}/lambda_function.zip"
+  output_path = "${path.module}/${each.key}.zip"
 
   dynamic "source" {
-    for_each = local.lambda_files
+    for_each = each.value
     content {
       content  = file("${local.lambda_src_dir}/${source.value}")
       filename = basename(source.value)
@@ -57,12 +78,12 @@ data "archive_file" "lambda_get_prices" {
 
 # Get Prices Lambda Function
 resource "aws_lambda_function" "get_prices" {
-  filename         = "./lambda_function.zip"
+  filename         = data.archive_file.lambda_zips["get_prices"].output_path
   function_name    = "get_prices"
   role             = aws_iam_role.get_prices_lambda_role.arn
   handler          = "lambda_function.lambda_handler"
   runtime          = "python3.9"
-  source_code_hash = filebase64sha256("./lambda_function.zip")
+  source_code_hash = data.archive_file.lambda_zips["get_prices"].output_base64sha256
   timeout          = 30
   memory_size      = 128
 
@@ -82,15 +103,16 @@ resource "aws_lambda_function" "get_prices" {
 
 # Lambda関数のメモリとタイムアウトの最適化
 resource "aws_lambda_function" "price_comparison" {
-  filename      = "lambda_function.zip"
-  function_name = "price-comparison-function"
-  description   = "Lambda function for price comparison"
-  role          = aws_iam_role.lambda_execution_role.arn
-  handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.9"
-  timeout       = 30
-  memory_size   = 128
-  publish       = true  # バージョンを公開
+  filename         = data.archive_file.lambda_zips["get_prices"].output_path
+  function_name    = "price-comparison-function"
+  description      = "Lambda function for price comparison"
+  role             = aws_iam_role.lambda_execution_role.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.9"
+  timeout          = 30
+  memory_size      = 128
+  publish          = true
+  source_code_hash = data.archive_file.lambda_zips["get_prices"].output_base64sha256
 
   environment {
     variables = {
@@ -300,14 +322,14 @@ resource "aws_lambda_function" "get_price_history" {
 
 # 価格予測用のLambda関数
 resource "aws_lambda_function" "predict_prices_lambda" {
-  filename         = "../lambdas/predict_prices_lambda.zip"
+  filename         = data.archive_file.lambda_zips["predict_prices"].output_path
   function_name    = "predict-prices"
   role             = aws_iam_role.lambda_execution_role.arn
   handler          = "predict_prices.handler"
   runtime          = "python3.9"
   timeout          = 30
   memory_size      = 256
-  source_code_hash = filebase64sha256("../lambdas/predict_prices_lambda.zip")
+  source_code_hash = data.archive_file.lambda_zips["predict_prices"].output_base64sha256
 }
 
 # 価格予測用のLambdaパーミッション
@@ -321,14 +343,14 @@ resource "aws_lambda_permission" "predict_prices_lambda_permission" {
 
 # 価格比較用のLambda関数
 resource "aws_lambda_function" "compare_prices_lambda" {
-  filename         = "../lambdas/compare_prices_lambda.zip"
+  filename         = data.archive_file.lambda_zips["compare_prices"].output_path
   function_name    = "compare-prices"
   role             = aws_iam_role.lambda_execution_role.arn
   handler          = "compare_prices.handler"
   runtime          = "python3.9"
   timeout          = 30
   memory_size      = 256
-  source_code_hash = filebase64sha256("../lambdas/compare_prices_lambda.zip")
+  source_code_hash = data.archive_file.lambda_zips["compare_prices"].output_base64sha256
 }
 
 # 価格比較用のLambdaパーミッション
@@ -342,14 +364,13 @@ resource "aws_lambda_permission" "compare_prices_lambda_permission" {
 
 # LINE通知用のLambda関数
 resource "aws_lambda_function" "line_notification_lambda" {
-  filename         = "../lambdas/line_notification_lambda.zip"
-  function_name    = "line-notification"
-  role             = aws_iam_role.lambda_execution_role.arn
-  handler          = "line_notification.handler"
-  runtime          = "python3.9"
-  timeout          = 30
-  memory_size      = 256
-  source_code_hash = filebase64sha256("../lambdas/line_notification_lambda.zip")
+  filename      = "line_notification_lambda.zip"
+  function_name = "line-notification"
+  role          = aws_iam_role.lambda_execution_role.arn
+  handler       = "line_notification.handler"
+  runtime       = "python3.9"
+  timeout       = 30
+  memory_size   = 256
 }
 
 # LINE通知用のLambdaパーミッション
@@ -363,13 +384,14 @@ resource "aws_lambda_permission" "line_notification_lambda" {
 
 # 価格チェック用のLambda関数
 resource "aws_lambda_function" "check_prices_lambda" {
-  filename      = "../lambdas/check_prices.zip"
-  function_name = "check-prices"
-  role          = aws_iam_role.lambda_execution_role.arn
-  handler       = "check_prices.lambda_handler"
-  runtime       = "python3.9"
-  timeout       = 300
-  memory_size   = 128
+  filename         = data.archive_file.lambda_zips["check_prices"].output_path
+  function_name    = "check-prices"
+  role             = aws_iam_role.lambda_execution_role.arn
+  handler          = "check_prices.lambda_handler"
+  runtime          = "python3.9"
+  timeout          = 300
+  memory_size      = 128
+  source_code_hash = data.archive_file.lambda_zips["check_prices"].output_base64sha256
 
   environment {
     variables = {

@@ -67,87 +67,120 @@ def create_zip_file(source_dir, output_file):
         logger.error(f"Error creating ZIP file: {e}")
         raise
 
-def deploy_lambda_function(function_name, zip_file):
-    """Lambda関数をデプロイ"""
+def package_lambda_function(lambda_dir, output_dir, output_file=None):
+    """Lambda関数をパッケージ化"""
     try:
-        logger.info(f"Deploying Lambda function {function_name}...")
-        lambda_client = boto3.client('lambda')
+        logger.info(f"Packaging Lambda function from {lambda_dir}...")
         
-        with open(zip_file, 'rb') as f:
-            zip_content = f.read()
-        
-        response = lambda_client.update_function_code(
-            FunctionName=function_name,
-            ZipFile=zip_content
-        )
-        
-        logger.info(f"Successfully deployed Lambda function {function_name}")
-        return response
-    except Exception as e:
-        logger.error(f"Error deploying Lambda function {function_name}: {e}")
-        raise
+        # 一時ディレクトリの作成
+        temp_dir = os.path.join(output_dir, f"temp_{os.path.basename(lambda_dir)}")
+        os.makedirs(temp_dir, exist_ok=True)
 
-def package_and_deploy_lambda(script_name, requirements_file):
-    """Lambda関数をパッケージ化してデプロイ"""
-    # スクリプトのディレクトリを取得
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # 一時ディレクトリの作成
-    temp_dir = os.path.join(script_dir, f"temp_{script_name}")
-    os.makedirs(temp_dir, exist_ok=True)
+        try:
+            # Lambda関数のコードをコピー
+            for item in os.listdir(lambda_dir):
+                src_path = os.path.join(lambda_dir, item)
+                dst_path = os.path.join(temp_dir, item)
+                if os.path.isfile(src_path):
+                    shutil.copy2(src_path, dst_path)
+                elif os.path.isdir(src_path):
+                    shutil.copytree(src_path, dst_path)
 
-    try:
-        # スクリプトをコピー
-        script_path = os.path.join(script_dir, f"{script_name}.py")
-        if not os.path.exists(script_path):
-            raise FileNotFoundError(f"Script file not found: {script_path}")
-        
-        shutil.copy2(script_path, os.path.join(temp_dir, f"{script_name}.py"))
-        logger.info(f"Copied script file: {script_path}")
+            # requirements.txtが存在する場合は依存関係をインストール
+            requirements_file = os.path.join(lambda_dir, "requirements.txt")
+            if os.path.exists(requirements_file):
+                install_dependencies(requirements_file, temp_dir)
 
-        # 依存関係をインストール
-        install_dependencies(requirements_file, temp_dir)
+            # ZIPファイルを作成
+            if output_file is None:
+                output_file = os.path.join(output_dir, f"{os.path.basename(lambda_dir)}.zip")
+            zip_path = create_zip_file(temp_dir, output_file)
 
-        # ZIPファイルを作成
-        output_file = os.path.join(script_dir, f"{script_name}.zip")
-        zip_path = create_zip_file(temp_dir, output_file)
+            logger.info(f"Successfully packaged Lambda function: {os.path.basename(lambda_dir)}")
+            return zip_path
 
-        if not os.path.exists(zip_path):
-            raise FileNotFoundError(f"ZIP file not created: {zip_path}")
-
-        # Lambda関数をデプロイ
-        deploy_lambda_function(script_name, zip_path)
-
-        logger.info(f"Successfully packaged and deployed {script_name}.py")
-        return zip_path
+        finally:
+            # 一時ディレクトリを削除
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+                logger.info(f"Cleaned up temporary directory: {temp_dir}")
 
     except Exception as e:
-        logger.error(f"Error packaging and deploying Lambda function {script_name}: {e}")
+        logger.error(f"Error packaging Lambda function {lambda_dir}: {e}")
         raise
-    finally:
-        # 一時ディレクトリを削除
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
-            logger.info(f"Cleaned up temporary directory: {temp_dir}")
 
 def main():
     """メイン関数"""
     try:
         # スクリプトのディレクトリを取得
         script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(script_dir))
         
-        # requirements.txtのパスを設定
-        requirements_path = os.path.join(script_dir, "requirements.txt")
-        if not os.path.exists(requirements_path):
-            raise FileNotFoundError(f"Requirements file not found: {requirements_path}")
+        # Lambda関数のディレクトリと出力ファイル名のマッピング
+        lambda_mappings = {
+            "get_prices_lambda": "lambda_function.zip",
+            "predict_prices_lambda": "predict_prices_lambda.zip",
+            "compare_prices_lambda": "compare_prices_lambda.zip",
+            "line_notification_lambda": "line_notification_lambda.zip",
+            "deployment_verification_lambda": "deployment_verification.zip",
+            "smoke_test_lambda": "smoke_test.zip",
+            "save_price_history_lambda": "save_price_history.zip",
+            "get_price_history_lambda": "get_price_history.zip",
+            "check_prices_lambda": "check_prices.zip"
+        }
         
-        # デプロイメント検証用のLambda関数をパッケージ化してデプロイ
-        package_and_deploy_lambda("deployment-verification", requirements_path)
+        # 出力ディレクトリをterraformディレクトリに設定
+        output_dir = os.path.join(project_root, "terraform")
+        os.makedirs(output_dir, exist_ok=True)
         
-        # スモークテスト用のLambda関数をパッケージ化してデプロイ
-        package_and_deploy_lambda("smoke-test", requirements_path)
+        # 既存のZIPファイルをクリーンアップ
+        logger.info("Cleaning up existing ZIP files...")
+        for file in os.listdir(output_dir):
+            if file.endswith('.zip'):
+                file_path = os.path.join(output_dir, file)
+                try:
+                    os.remove(file_path)
+                    logger.info(f"Removed existing ZIP file: {file}")
+                except Exception as e:
+                    logger.warning(f"Failed to remove {file}: {e}")
         
-        logger.info("All Lambda functions packaged and deployed successfully")
+        # 各Lambda関数をパッケージ化
+        logger.info("Starting Lambda function packaging...")
+        for lambda_dir_name, output_file in lambda_mappings.items():
+            lambda_dir = os.path.join(project_root, "lambdas", lambda_dir_name)
+            if os.path.exists(lambda_dir):
+                output_path = os.path.join(output_dir, output_file)
+                try:
+                    package_lambda_function(lambda_dir, output_dir, output_path)
+                    logger.info(f"Successfully packaged {lambda_dir_name} to {output_file}")
+                except Exception as e:
+                    logger.error(f"Failed to package {lambda_dir_name}: {e}")
+                    raise
+            else:
+                logger.error(f"Lambda directory not found: {lambda_dir}")
+                raise FileNotFoundError(f"Lambda directory not found: {lambda_dir}")
+        
+        # 生成されたZIPファイルの検証
+        logger.info("Validating generated ZIP files...")
+        missing_files = []
+        corrupted_files = []
+        
+        for output_file in lambda_mappings.values():
+            zip_path = os.path.join(output_dir, output_file)
+            if not os.path.exists(zip_path):
+                missing_files.append(output_file)
+                continue
+            
+            if not zipfile.is_zipfile(zip_path):
+                corrupted_files.append(output_file)
+        
+        if missing_files:
+            raise FileNotFoundError(f"Missing ZIP files: {', '.join(missing_files)}")
+        
+        if corrupted_files:
+            raise ValueError(f"Corrupted ZIP files: {', '.join(corrupted_files)}")
+        
+        logger.info("All Lambda functions packaged and validated successfully")
 
     except Exception as e:
         logger.error(f"Error in main function: {e}")

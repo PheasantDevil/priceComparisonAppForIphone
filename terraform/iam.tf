@@ -242,7 +242,9 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
           "iam:TagRole",
           "iam:UntagRole",
           "iam:TagPolicy",
-          "iam:UntagPolicy"
+          "iam:UntagPolicy",
+          "sts:TagSession",
+          "sts:AssumeRole"
         ]
         Resource = "*"
       }
@@ -384,6 +386,26 @@ resource "aws_iam_role_policy" "smoke_test_policy" {
           "dynamodb:Query",
           "dynamodb:BatchWriteItem",
           "dynamodb:BatchGetItem"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# IAMユーザー用のポリシー
+resource "aws_iam_user_policy" "user_sts_policy" {
+  name = "user-sts-policy"
+  user = "konishi.b0engineer"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sts:TagSession",
+          "sts:AssumeRole"
         ]
         Resource = "*"
       }
