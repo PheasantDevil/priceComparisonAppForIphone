@@ -12,4 +12,10 @@ scraper:
   apple_store_url: https://www.apple.com/jp/shop/buy-iphone
   request_timeout: 60
   retry_count: 5
-  user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+
+price_alert:
+  check_interval: 3600 # 1時間ごとにチェック
+  notification:
+    enabled: true
+    # LINE Notifyトークンは環境変数から取得するため、ここには記載しない

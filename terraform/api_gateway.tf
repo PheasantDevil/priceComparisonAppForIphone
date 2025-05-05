@@ -1,30 +1,48 @@
-# CloudWatch Log Group for API Gateway
-resource "aws_cloudwatch_log_group" "api_gateway" {
-  name              = "/aws/apigateway/price-comparison-api"
-  retention_in_days = 30
+# CloudWatch Log Group is already defined in monitoring.tf
+# resource "aws_cloudwatch_log_group" "api_gateway" {
+#   name              = "/aws/apigateway/price-comparison-api"
+#   retention_in_days = 30
+#   tags = {
+#     Name        = "api-gateway-logs"
+#     Environment = "production"
+#     Project     = "iphone_price_tracker"
+#   }
+# }
+
+# HTTP API Gateway
+resource "aws_apigatewayv2_api" "main" {
+  name          = "price-comparison-http-api"
+  protocol_type = "HTTP"
+  description   = "HTTP API for iPhone price comparison"
 }
 
 # API Gateway Stage
 resource "aws_api_gateway_stage" "production" {
-  stage_name    = "production"
-  rest_api_id   = aws_api_gateway_rest_api.price_comparison.id
   deployment_id = aws_api_gateway_deployment.price_comparison.id
+  rest_api_id   = aws_api_gateway_rest_api.price_comparison.id
+  stage_name    = "production"
 
   access_log_settings {
-    destination_arn = aws_cloudwatch_log_group.api_gateway.arn
-    format = jsonencode({
-      requestId      = "$context.requestId"
-      ip             = "$context.identity.sourceIp"
-      caller         = "$context.identity.caller"
-      user           = "$context.identity.user"
-      requestTime    = "$context.requestTime"
-      httpMethod     = "$context.httpMethod"
-      resourcePath   = "$context.resourcePath"
-      status         = "$context.status"
-      protocol       = "$context.protocol"
-      responseLength = "$context.responseLength"
+    destination_arn = aws_cloudwatch_log_group.api_gateway_logs.arn
+    format         = jsonencode({
+      requestId               = "$context.requestId"
+      sourceIp               = "$context.identity.sourceIp"
+      requestTime            = "$context.requestTime"
+      protocol              = "$context.protocol"
+      httpMethod            = "$context.httpMethod"
+      resourcePath          = "$context.resourcePath"
+      routeKey              = "$context.routeKey"
+      status                = "$context.status"
+      responseLength        = "$context.responseLength"
+      integrationErrorMessage = "$context.integrationErrorMessage"
     })
   }
+
+  xray_tracing_enabled = true
+
+  depends_on = [
+    aws_api_gateway_deployment.price_comparison
+  ]
 }
 
 resource "aws_api_gateway_rest_api" "price_comparison" {
@@ -109,4 +127,52 @@ resource "aws_lambda_permission" "api_gateway_price_history" {
   function_name = aws_lambda_function.get_price_history.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.price_comparison.execution_arn}/*/*"
+}
+
+resource "aws_apigatewayv2_route" "predict_prices" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /predict-prices"
+  target    = "integrations/${aws_apigatewayv2_integration.predict_prices.id}"
+}
+
+resource "aws_apigatewayv2_integration" "predict_prices" {
+  api_id           = aws_apigatewayv2_api.main.id
+  integration_type = "AWS_PROXY"
+
+  connection_type    = "INTERNET"
+  description        = "Predict prices integration"
+  integration_method = "POST"
+  integration_uri    = aws_lambda_function.predict_prices_lambda.invoke_arn
+}
+
+resource "aws_apigatewayv2_route" "compare_prices" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /compare-prices"
+  target    = "integrations/${aws_apigatewayv2_integration.compare_prices.id}"
+}
+
+resource "aws_apigatewayv2_integration" "compare_prices" {
+  api_id           = aws_apigatewayv2_api.main.id
+  integration_type = "AWS_PROXY"
+
+  connection_type    = "INTERNET"
+  description        = "Compare prices integration"
+  integration_method = "POST"
+  integration_uri    = aws_lambda_function.compare_prices_lambda.invoke_arn
+}
+
+resource "aws_apigatewayv2_route" "line_notification" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /line-notification"
+  target    = "integrations/${aws_apigatewayv2_integration.line_notification.id}"
+}
+
+resource "aws_apigatewayv2_integration" "line_notification" {
+  api_id           = aws_apigatewayv2_api.main.id
+  integration_type = "AWS_PROXY"
+
+  connection_type    = "INTERNET"
+  description        = "LINE notification integration"
+  integration_method = "POST"
+  integration_uri    = aws_lambda_function.line_notification_lambda.invoke_arn
 }

@@ -97,52 +97,41 @@ resource "aws_cloudwatch_event_target" "dr_test" {
 # ディザスタリカバリの検証
 resource "aws_cloudwatch_metric_alarm" "dr_verification" {
   alarm_name          = "dr-verification"
-  comparison_operator = "LessThanThreshold"
-  evaluation_periods  = "1"
-  metric_name         = "Invocations"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Errors"
   namespace           = "AWS/Lambda"
-  period              = "2592000" # 30日
-  statistic           = "Sum"
-  threshold           = "1" # 1回以上の実行
-  alarm_description   = "ディザスタリカバリテストが30日以内に実行されていません"
-  treat_missing_data  = "breaching"
+  period             = 300  # 5分に変更
+  statistic          = "Sum"
+  threshold          = 0
+  alarm_description  = "DR verification Lambda function errors"
+  alarm_actions      = [aws_sns_topic.alerts.arn]
 
   dimensions = {
     FunctionName = aws_lambda_function.dr_handler.function_name
   }
 
-  alarm_actions = [aws_sns_topic.alerts.arn]
+  tags = {
+    Name        = "dr-verification"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
 }
 
 # ディザスタリカバリのドキュメント
 resource "aws_ssm_document" "dr_plan" {
-  name            = "price-comparison-dr-plan"
+  name            = "dr-plan"
   document_type   = "Command"
   document_format = "YAML"
 
   content = <<DOC
 schemaVersion: '2.2'
-description: Price Comparison App Disaster Recovery Plan
+description: Disaster Recovery Plan
 mainSteps:
-  - name: "CheckPrimaryRegion"
-    action: "aws:invokeLambdaFunction"
+  - action: aws:runPowerShellScript
+    name: invokeDRHandler
     inputs:
-      FunctionName: ${aws_lambda_function.dr_handler.function_name}
-      Payload: '{"action": "check_primary"}'
-  - name: "SwitchToBackup"
-    action: "aws:invokeLambdaFunction"
-    inputs:
-      FunctionName: ${aws_lambda_function.dr_handler.function_name}
-      Payload: '{"action": "switch_to_backup"}'
-  - name: "VerifyBackup"
-    action: "aws:invokeLambdaFunction"
-    inputs:
-      FunctionName: ${aws_lambda_function.dr_handler.function_name}
-      Payload: '{"action": "verify_backup"}'
-  - name: "NotifyTeam"
-    action: "aws:sns"
-    inputs:
-      TopicArn: ${aws_sns_topic.alerts.arn}
-      Message: "Disaster Recovery Plan executed"
+      runCommand:
+        - aws lambda invoke --function-name price-comparison-dr-handler response.json
 DOC
 } 

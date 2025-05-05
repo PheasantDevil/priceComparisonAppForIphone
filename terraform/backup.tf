@@ -28,20 +28,20 @@ resource "aws_kms_key" "backup" {
 
 # バックアップポリシー
 resource "aws_backup_selection" "dynamodb" {
-  iam_role_arn = aws_iam_role.backup.arn
-  name         = "dynamodb-backup-selection"
+  name         = "dynamodb-backup"
   plan_id      = aws_backup_plan.dynamodb_backup.id
+  iam_role_arn = aws_iam_role.backup.arn
+
+  resources = [
+    aws_dynamodb_table.price_comparison_backup_v2.arn,
+    aws_dynamodb_table.price_comparison.arn
+  ]
 
   selection_tag {
     type  = "STRINGEQUALS"
-    key   = "Backup"
-    value = "true"
+    key   = "Environment"
+    value = "production"
   }
-
-  resources = [
-    aws_dynamodb_table.iphone_prices.arn,
-    aws_dynamodb_table.official_prices.arn
-  ]
 }
 
 # バックアップ用IAMロール
@@ -83,6 +83,13 @@ resource "aws_iam_role_policy" "backup" {
           aws_dynamodb_table.iphone_prices.arn,
           aws_dynamodb_table.official_prices.arn
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "tag:GetResources"
+        ]
+        Resource = "*"
       },
       {
         Effect = "Allow"
