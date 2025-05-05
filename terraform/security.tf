@@ -1,6 +1,5 @@
 # AWS Security Hubの設定
 resource "aws_securityhub_account" "main" {
-  enable_default_standards = true
 }
 
 # Security Hubの標準を有効化
@@ -55,22 +54,51 @@ resource "aws_cloudwatch_metric_alarm" "security_findings" {
 resource "aws_config_configuration_recorder" "main" {
   name     = "price-comparison-recorder"
   role_arn = aws_iam_role.config_role.arn
+
+  recording_group {
+    all_supported = true
+  }
 }
 
 resource "aws_config_delivery_channel" "main" {
   name           = "price-comparison-delivery"
   s3_bucket_name = aws_s3_bucket.config_bucket.id
-  depends_on     = [aws_config_configuration_recorder.main]
+  s3_key_prefix  = "config"
+
+  snapshot_delivery_properties {
+    delivery_frequency = "Six_Hours"
+  }
+
+  depends_on = [aws_config_configuration_recorder.main]
 }
 
 # 設定ファイル用のS3バケット
 resource "aws_s3_bucket" "config_bucket" {
   bucket = "price-comparison-config-${var.environment}"
+  force_destroy = false
+
+  tags = {
+    Name        = "price-comparison-config"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
 }
 
-resource "aws_s3_bucket_acl" "config_bucket_acl" {
+resource "aws_s3_bucket_versioning" "config_bucket" {
   bucket = aws_s3_bucket.config_bucket.id
-  acl    = "private"
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "config_bucket" {
+  bucket = aws_s3_bucket.config_bucket.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
 }
 
 # ConfigのIAMロール
@@ -89,11 +117,44 @@ resource "aws_iam_role" "config_role" {
       }
     ]
   })
+
+  tags = {
+    Name        = "price-comparison-config-role"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
 }
 
-resource "aws_iam_role_policy_attachment" "config_policy" {
-  role       = aws_iam_role.config_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSConfigRole"
+resource "aws_iam_role_policy" "config_policy" {
+  name = "config-policy"
+  role = aws_iam_role.config_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetBucketAcl"
+        ]
+        Resource = [
+          aws_s3_bucket.config_bucket.arn,
+          "${aws_s3_bucket.config_bucket.arn}/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "config:Put*",
+          "config:Get*",
+          "config:List*",
+          "config:Describe*"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 }
 
 # WAF Web ACLの設定
@@ -262,11 +323,16 @@ resource "aws_wafv2_web_acl" "api_gateway" {
     metric_name                = "WAF"
     sampled_requests_enabled   = true
   }
+
+  tags = {
+    Name        = "api-gateway-waf"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
 }
 
-# WAFとAPI Gatewayの関連付け
 resource "aws_wafv2_web_acl_association" "api_gateway" {
-  resource_arn = aws_api_gateway_stage.production.arn
+  resource_arn = "arn:aws:apigateway:ap-northeast-1::/restapis/lhayvbyupi/stages/production"
   web_acl_arn  = aws_wafv2_web_acl.api_gateway.arn
 }
 
@@ -276,13 +342,12 @@ resource "aws_security_group" "lambda" {
   description = "Security group for Lambda functions"
   vpc_id      = var.vpc_id
 
-  # API Gatewayからのインバウンドトラフィックを許可
   ingress {
+    description     = "Allow HTTPS traffic from API Gateway"
     from_port       = 443
     to_port         = 443
     protocol        = "tcp"
     security_groups = [aws_security_group.api_gateway.id]
-    description     = "Allow HTTPS traffic from API Gateway"
   }
 
   egress {
@@ -294,105 +359,118 @@ resource "aws_security_group" "lambda" {
 
   tags = {
     Name        = "lambda-security-group"
-    Environment = var.environment
+    Environment = "production"
+    Project     = "iphone_price_tracker"
   }
 }
 
-# API Gateway用のセキュリティグループ
 resource "aws_security_group" "api_gateway" {
   name        = "api-gateway-security-group"
   description = "Security group for API Gateway"
   vpc_id      = var.vpc_id
 
-  # インターネットからのHTTPSアクセスを許可
   ingress {
+    description = "Allow HTTPS traffic from internet"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow HTTPS traffic from internet"
   }
 
   tags = {
     Name        = "api-gateway-security-group"
-    Environment = var.environment
+    Environment = "production"
+    Project     = "iphone_price_tracker"
   }
 }
 
-# データ暗号化用のKMSキー
+# KMSキーの設定
 resource "aws_kms_key" "data_encryption" {
   description             = "KMS key for data encryption"
   deletion_window_in_days = 7
   enable_key_rotation     = true
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "Enable IAM User Permissions"
         Effect = "Allow"
         Principal = {
-          AWS = "*"
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
         }
-        Action = [
-          "kms:Encrypt",
-          "kms:Decrypt",
-          "kms:ReEncrypt*",
-          "kms:GenerateDataKey*",
-          "kms:DescribeKey"
-        ]
+        Action   = "kms:*"
         Resource = "*"
-        Condition = {
-          StringEquals = {
-            "kms:CallerAccount" = var.aws_account_id
-          }
-        }
       }
     ]
   })
+
+  tags = {
+    Name        = "data-encryption-key"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
 }
 
-# KMSキーのエイリアス
 resource "aws_kms_alias" "data_encryption" {
   name          = "alias/data-encryption-key"
   target_key_id = aws_kms_key.data_encryption.key_id
 }
 
-# セキュリティ監査用のCloudTrail設定
+# CloudTrailの設定
 resource "aws_cloudtrail" "security_audit" {
   name                          = "security-audit-trail"
-  s3_bucket_name                = aws_s3_bucket.cloudtrail.id
+  s3_bucket_name               = aws_s3_bucket.cloudtrail.id
   include_global_service_events = true
-  is_multi_region_trail         = true
-  enable_logging                = true
-
-  event_selector {
-    read_write_type           = "All"
-    include_management_events = true
-  }
+  is_multi_region_trail        = true
+  enable_logging               = true
+  kms_key_id                   = aws_kms_key.data_encryption.arn
 
   tags = {
-    Environment = var.environment
-    Purpose     = "SecurityAudit"
+    Name        = "security-audit-trail"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
   }
 }
 
 # CloudTrail用のS3バケット
 resource "aws_s3_bucket" "cloudtrail" {
-  bucket        = "security-audit-trail-${var.aws_account_id}"
+  bucket        = "security-audit-trail-${data.aws_caller_identity.current.account_id}"
   force_destroy = true
 
   tags = {
-    Environment = var.environment
+    Name        = "security-audit-trail"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
     Purpose     = "SecurityAudit"
   }
 }
 
-# CloudTrail用のS3バケットポリシー
+resource "aws_s3_bucket_versioning" "cloudtrail" {
+  bucket = aws_s3_bucket.cloudtrail.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
+  bucket = aws_s3_bucket.cloudtrail.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
 resource "aws_s3_bucket_policy" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "AWSCloudTrailAclCheck"
         Effect = "Allow"
         Principal = {
           Service = "cloudtrail.amazonaws.com"
@@ -401,6 +479,7 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
         Resource = aws_s3_bucket.cloudtrail.arn
       },
       {
+        Sid    = "AWSCloudTrailWrite"
         Effect = "Allow"
         Principal = {
           Service = "cloudtrail.amazonaws.com"

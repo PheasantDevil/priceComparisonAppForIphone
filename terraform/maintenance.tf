@@ -28,6 +28,8 @@ resource "aws_ssm_maintenance_window_task" "lambda_cleanup" {
   task_arn         = "AWS-RunShellScript"
   priority         = 1
   service_role_arn = aws_iam_role.maintenance_window.arn
+  max_concurrency  = "1"
+  max_errors       = "1"
 
   targets {
     key    = "WindowTargetIds"

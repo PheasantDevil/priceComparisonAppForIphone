@@ -769,93 +769,109 @@
     </style>
   </head>
   <body>
-    <h1>iPhone 16シリーズ 買取価格比較</h1>
+    <div class="container mt-4">
+      <h1 class="mb-4">iPhone価格比較</h1>
 
-    <!-- ローディング中の表示 -->
-    <div id="loading" style="display: none">
-      <p>データを読み込んでいます...</p>
-      <div class="loader"></div>
-    </div>
-
-    <!-- エラーメッセージ表示エリア -->
-    <div id="error-message" style="display: none; color: red"></div>
-
-    <!-- 価格テーブル -->
-    <div id="content">
-      <div id="priceTablesContainer" class="tables-container">
-        <!-- iPhone 16 -->
-        <div class="series-section">
-          <h2>iPhone 16</h2>
-          <div class="table-wrapper">
-            <table id="iPhone16-prices" class="price-table">
-              <thead>
-                <tr>
-                  <th>容量</th>
-                  <th>公式価格</th>
-                  <th>買取価格</th>
-                  <th>収支</th>
-                  <th>楽天錬金時収支</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
+      <!-- 価格アラート設定セクション -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">価格アラート設定</h5>
         </div>
-
-        <!-- iPhone 16 Pro -->
-        <div class="series-section">
-          <h2>iPhone 16 Pro</h2>
-          <div class="table-wrapper">
-            <table id="iPhone16Pro-prices" class="price-table">
-              <thead>
-                <tr>
-                  <th>容量</th>
-                  <th>公式価格</th>
-                  <th>買取価格</th>
-                  <th>収支</th>
-                  <th>楽天錬金時収支</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
+        <div class="card-body">
+          <form id="alertForm">
+            <div class="form-group">
+              <label for="alertThreshold">アラート閾値（円）</label>
+              <input
+                type="number"
+                class="form-control"
+                id="alertThreshold"
+                required
+              />
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">
+              アラートを設定
+            </button>
+          </form>
         </div>
+      </div>
 
-        <!-- iPhone 16 Pro Max -->
-        <div class="series-section">
-          <h2>iPhone 16 Pro Max</h2>
-          <div class="table-wrapper">
-            <table id="iPhone16ProMax-prices" class="price-table">
-              <thead>
-                <tr>
-                  <th>容量</th>
-                  <th>公式価格</th>
-                  <th>買取価格</th>
-                  <th>収支</th>
-                  <th>楽天錬金時収支</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+      <!-- 価格比較セクション -->
+      <div id="content">
+        <div id="priceTablesContainer" class="tables-container">
+          <!-- iPhone 16 -->
+          <div class="series-section">
+            <h2>iPhone 16</h2>
+            <div class="table-wrapper">
+              <table id="iPhone16-prices" class="price-table">
+                <thead>
+                  <tr>
+                    <th>容量</th>
+                    <th>公式価格</th>
+                    <th>買取価格</th>
+                    <th>収支</th>
+                    <th>楽天錬金時収支</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
-        </div>
 
-        <!-- iPhone 16e -->
-        <div class="series-section">
-          <h2>iPhone 16e</h2>
-          <div class="table-wrapper">
-            <table id="iPhone16e-prices" class="price-table">
-              <thead>
-                <tr>
-                  <th>容量</th>
-                  <th>公式価格</th>
-                  <th>買取価格</th>
-                  <th>収支</th>
-                  <th>楽天錬金時収支</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+          <!-- iPhone 16 Pro -->
+          <div class="series-section">
+            <h2>iPhone 16 Pro</h2>
+            <div class="table-wrapper">
+              <table id="iPhone16Pro-prices" class="price-table">
+                <thead>
+                  <tr>
+                    <th>容量</th>
+                    <th>公式価格</th>
+                    <th>買取価格</th>
+                    <th>収支</th>
+                    <th>楽天錬金時収支</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- iPhone 16 Pro Max -->
+          <div class="series-section">
+            <h2>iPhone 16 Pro Max</h2>
+            <div class="table-wrapper">
+              <table id="iPhone16ProMax-prices" class="price-table">
+                <thead>
+                  <tr>
+                    <th>容量</th>
+                    <th>公式価格</th>
+                    <th>買取価格</th>
+                    <th>収支</th>
+                    <th>楽天錬金時収支</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- iPhone 16e -->
+          <div class="series-section">
+            <h2>iPhone 16e</h2>
+            <div class="table-wrapper">
+              <table id="iPhone16e-prices" class="price-table">
+                <thead>
+                  <tr>
+                    <th>容量</th>
+                    <th>公式価格</th>
+                    <th>買取価格</th>
+                    <th>収支</th>
+                    <th>楽天錬金時収支</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -2655,6 +2671,33 @@
         createPurchaseTimingSection();
         updatePurchaseTiming();
       });
+
+      // 価格アラート設定の処理
+      document
+        .getElementById('alertForm')
+        .addEventListener('submit', async function (e) {
+          e.preventDefault();
+          const threshold = document.getElementById('alertThreshold').value;
+
+          try {
+            const response = await fetch('/set-alert', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ threshold: threshold }),
+            });
+
+            if (response.ok) {
+              alert('アラートを設定しました');
+            } else {
+              alert('アラートの設定に失敗しました');
+            }
+          } catch (error) {
+            console.error('Error:', error);
+            alert('エラーが発生しました');
+          }
+        });
     </script>
   </body>
 </html>

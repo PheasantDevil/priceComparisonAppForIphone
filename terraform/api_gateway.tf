@@ -4,6 +4,13 @@ resource "aws_cloudwatch_log_group" "api_gateway" {
   retention_in_days = 30
 }
 
+# HTTP API Gateway
+resource "aws_apigatewayv2_api" "main" {
+  name          = "price-comparison-http-api"
+  protocol_type = "HTTP"
+  description   = "HTTP API for iPhone price comparison"
+}
+
 # API Gateway Stage
 resource "aws_api_gateway_stage" "production" {
   stage_name    = "production"
@@ -141,4 +148,20 @@ resource "aws_apigatewayv2_integration" "compare_prices" {
   description        = "Compare prices integration"
   integration_method = "POST"
   integration_uri    = aws_lambda_function.compare_prices_lambda.invoke_arn
+}
+
+resource "aws_apigatewayv2_route" "line_notification" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /line-notification"
+  target    = "integrations/${aws_apigatewayv2_integration.line_notification.id}"
+}
+
+resource "aws_apigatewayv2_integration" "line_notification" {
+  api_id           = aws_apigatewayv2_api.main.id
+  integration_type = "AWS_PROXY"
+
+  connection_type    = "INTERNET"
+  description        = "LINE notification integration"
+  integration_method = "POST"
+  integration_uri    = aws_lambda_function.line_notification_lambda.invoke_arn
 }

@@ -303,89 +303,33 @@ terraform/lambda/*/
 
 
 # Terraform
-terraform.tfstate
 *.tfstate
 *.tfstate.*
+*.tfstate.backup
+*.tfstate.1746368792.backup
 .terraform/
 .terraform.lock.hcl
-terraform/*.backup
-terraform/*.bak
+tfplan
 
-# Lambda
-terraform/lambda_function.zip
-terraform/layer.zip
-terraform/layer/
-terraform/lambda/
-
-# DynamoDB Local files
-dynamodb_local/
+# Lambda deployment packages
+*.zip
+lambda_function.zip
+layer.zip
 
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 *.pyc
 *.pyo
 *.pyd
-.cache/
-.venv/
-.env
-.DS_Store
-
-# Coverage
+.Python
+.pytest_cache/
 .coverage
 coverage.xml
-
-# Test/pytest
-.pytest_cache/
-
-# Virtual Environment
-venv/
-ENV/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Project specific
-cache/
-.coverage
-coverage.xml
-.pytest_cache/
-
-# Terraform
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfvars
-.terraform.lock.hcl
 
 # Node
 node_modules/
 package-lock.json
+
+# Temporary files
+*.bak
+*.backup
