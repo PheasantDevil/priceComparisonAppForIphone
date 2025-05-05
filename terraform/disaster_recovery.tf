@@ -1,13 +1,24 @@
 # DynamoDBのグローバルテーブル設定（マルチリージョン）
 resource "aws_dynamodb_global_table" "price_comparison" {
-  name = aws_dynamodb_table.price_comparison.name
+  depends_on = [
+    aws_dynamodb_table.price_comparison
+  ]
+
+  name = "price-comparison"
 
   replica {
     region_name = "ap-northeast-1" # プライマリリージョン
   }
 
-  replica {
-    region_name = "ap-southeast-1" # セカンダリリージョン
+  # replica {
+  #   region_name = "ap-southeast-1" # セカンダリリージョン
+  # }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes = [
+      replica
+    ]
   }
 }
 
@@ -36,6 +47,10 @@ resource "aws_dynamodb_table" "price_comparison_backup" {
     Name        = "${aws_dynamodb_table.price_comparison.name}-backup"
     Environment = var.environment
     Purpose     = "backup"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 

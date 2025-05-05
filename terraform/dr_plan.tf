@@ -97,52 +97,58 @@ resource "aws_cloudwatch_event_target" "dr_test" {
 # ディザスタリカバリの検証
 resource "aws_cloudwatch_metric_alarm" "dr_verification" {
   alarm_name          = "dr-verification"
-  comparison_operator = "LessThanThreshold"
-  evaluation_periods  = "1"
-  metric_name         = "Invocations"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Errors"
   namespace           = "AWS/Lambda"
-  period              = "2592000" # 30日
-  statistic           = "Sum"
-  threshold           = "1" # 1回以上の実行
-  alarm_description   = "ディザスタリカバリテストが30日以内に実行されていません"
-  treat_missing_data  = "breaching"
+  period             = 300
+  statistic          = "Sum"
+  threshold          = 0
+  alarm_description  = "Disaster Recovery verification failed"
+  alarm_actions      = [aws_sns_topic.alerts.arn]
 
   dimensions = {
     FunctionName = aws_lambda_function.dr_handler.function_name
   }
 
-  alarm_actions = [aws_sns_topic.alerts.arn]
+  tags = {
+    Name        = "dr-verification"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
 }
 
 # ディザスタリカバリのドキュメント
 resource "aws_ssm_document" "dr_plan" {
   name            = "price-comparison-dr-plan"
-  document_type   = "Command"
+  document_type   = "Automation"
   document_format = "YAML"
 
   content = <<DOC
-schemaVersion: '2.2'
+schemaVersion: '0.3'
 description: Price Comparison App Disaster Recovery Plan
+parameters:
+  Action:
+    type: String
+    description: Action to perform (check_primary, switch_to_backup, verify_backup)
+    allowedValues:
+      - check_primary
+      - switch_to_backup
+      - verify_backup
 mainSteps:
-  - name: "CheckPrimaryRegion"
-    action: "aws:invokeLambdaFunction"
+  - name: "InvokeLambda"
+    action: "aws:executeAwsApi"
     inputs:
-      FunctionName: ${aws_lambda_function.dr_handler.function_name}
-      Payload: '{"action": "check_primary"}'
-  - name: "SwitchToBackup"
-    action: "aws:invokeLambdaFunction"
-    inputs:
-      FunctionName: ${aws_lambda_function.dr_handler.function_name}
-      Payload: '{"action": "switch_to_backup"}'
-  - name: "VerifyBackup"
-    action: "aws:invokeLambdaFunction"
-    inputs:
-      FunctionName: ${aws_lambda_function.dr_handler.function_name}
-      Payload: '{"action": "verify_backup"}'
+      Service: lambda
+      Api: Invoke
+      FunctionName: "${aws_lambda_function.dr_handler.function_name}"
+      Payload: '{"action": "{{Action}}"}'
   - name: "NotifyTeam"
-    action: "aws:sns"
+    action: "aws:executeAwsApi"
     inputs:
-      TopicArn: ${aws_sns_topic.alerts.arn}
-      Message: "Disaster Recovery Plan executed"
+      Service: sns
+      Api: Publish
+      TopicArn: "${aws_sns_topic.alerts.arn}"
+      Message: "Disaster Recovery Plan executed with action: {{Action}}"
 DOC
 } 

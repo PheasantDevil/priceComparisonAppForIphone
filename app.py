@@ -1,8 +1,11 @@
+import json
 import logging
 import os
 import re
+from datetime import datetime
 
-from flask import Flask, jsonify, render_template, send_from_directory
+import boto3
+from flask import Flask, jsonify, render_template, request, send_from_directory
 from playwright.sync_api import sync_playwright
 
 from config import config
@@ -25,6 +28,13 @@ def create_app():
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
+    # DynamoDBの設定
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table('price_history')
+
+    # Lambdaクライアントの設定
+    lambda_client = boto3.client('lambda')
+
     @app.route("/favicon.ico")
     def favicon():
         try:
@@ -36,6 +46,64 @@ def create_app():
         except Exception as e:
             app.logger.error(f"Favicon error: {str(e)}")
             return "", 204  # No Content
+
+    @app.route('/')
+    def index():
+        return render_template('index.html')
+
+    @app.route('/set-alert', methods=['POST'])
+    def set_alert():
+        try:
+            data = request.get_json()
+            threshold = data.get('threshold')
+            
+            if not threshold:
+                return jsonify({'error': '閾値が指定されていません'}), 400
+            
+            # 閾値をDynamoDBに保存
+            table.put_item(
+                Item={
+                    'id': 'alert_threshold',
+                    'threshold': int(threshold),
+                    'timestamp': str(datetime.now())
+                }
+            )
+            
+            return jsonify({'message': 'アラートを設定しました'}), 200
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/check-prices', methods=['GET'])
+    def check_prices():
+        try:
+            # 価格データを取得
+            response = table.scan()
+            items = response.get('Items', [])
+            
+            # アラート閾値を取得
+            alert_response = table.get_item(Key={'id': 'alert_threshold'})
+            threshold = alert_response.get('Item', {}).get('threshold')
+            
+            if not threshold:
+                return jsonify({'message': 'アラート閾値が設定されていません'}), 200
+            
+            # 価格が閾値を下回っているかチェック
+            for item in items:
+                if item.get('price', float('inf')) < threshold:
+                    # LINE通知を送信
+                    lambda_client.invoke(
+                        FunctionName='line_notification_lambda',
+                        InvocationType='Event',
+                        Payload=json.dumps({
+                            'message': f'価格アラート: {item.get("model")}の価格が{threshold}円を下回りました。現在の価格: {item.get("price")}円'
+                        })
+                    )
+            
+            return jsonify({'message': '価格チェックを完了しました'}), 200
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
     return app
 
@@ -131,10 +199,6 @@ def get_kaitori_prices():
         browser.close()
 
     return all_product_details
-
-@app.route("/")
-def home():
-    return render_template("index.html")
 
 @app.route("/get_prices")
 def get_prices():

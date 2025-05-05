@@ -231,8 +231,18 @@ resource "aws_cloudwatch_log_group" "lambda_logs" {
 }
 
 resource "aws_cloudwatch_log_group" "api_gateway_logs" {
-  name              = "/aws/apigateway/${aws_api_gateway_rest_api.price_comparison.name}"
+  name              = "/aws/apigateway/price-comparison-api"
   retention_in_days = 30
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  tags = {
+    Name        = "api-gateway-logs"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
 }
 
 # カスタムメトリクスの定義

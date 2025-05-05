@@ -1,5 +1,7 @@
 # DynamoDBテーブルのデータ管理
 resource "aws_dynamodb_table_item" "iphone_prices_data" {
+  count = var.create_sample_data ? 1 : 0
+
   table_name = aws_dynamodb_table.iphone_prices.name
   hash_key   = "series"
   range_key  = "capacity"
@@ -22,10 +24,10 @@ resource "aws_dynamodb_table_item" "iphone_prices_data" {
 
 # DynamoDBテーブルの定義
 resource "aws_dynamodb_table" "iphone_prices" {
-  name         = "iphone_prices"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "series"
-  range_key    = "capacity"
+  name           = "iphone_prices"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "series"
+  range_key      = "capacity"
 
   attribute {
     name = "series"
@@ -48,17 +50,27 @@ resource "aws_dynamodb_table" "iphone_prices" {
     enabled = true
   }
 
+  lifecycle {
+    ignore_changes = [
+      read_capacity,
+      write_capacity,
+      billing_mode
+    ]
+    prevent_destroy = true
+  }
+
   tags = {
+    Name        = "iphone_prices"
     Environment = "production"
     Project     = "iphone_price_tracker"
   }
 }
 
 resource "aws_dynamodb_table" "official_prices" {
-  name         = "official_prices"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "series"
-  range_key    = "capacity"
+  name           = "official_prices"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "series"
+  range_key      = "capacity"
 
   attribute {
     name = "series"
@@ -81,13 +93,21 @@ resource "aws_dynamodb_table" "official_prices" {
     enabled = true
   }
 
+  lifecycle {
+    ignore_changes = [
+      read_capacity,
+      write_capacity,
+      billing_mode
+    ]
+    prevent_destroy = true
+  }
+
   tags = {
+    Name        = "official_prices"
     Environment = "production"
     Project     = "iphone_price_tracker"
   }
 }
-
-# DynamoDBテーブルの設定
 
 # 価格情報を格納するメインテーブル
 resource "aws_dynamodb_table" "price_comparison" {
@@ -113,63 +133,20 @@ resource "aws_dynamodb_table" "price_comparison" {
 
   tags = {
     Name        = "price-comparison"
-    Environment = var.environment
-    Project     = var.project
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
+
+  lifecycle {
+    ignore_changes = [
+      read_capacity,
+      write_capacity,
+      billing_mode
+    ]
+    prevent_destroy = true
   }
 }
 
-# DynamoDBのオートスケーリング設定
-resource "aws_appautoscaling_target" "dynamodb_table_read_target" {
-  max_capacity       = 50
-  min_capacity       = 5
-  resource_id        = "table/${aws_dynamodb_table.price_comparison.name}"
-  scalable_dimension = "dynamodb:table:ReadCapacityUnits"
-  service_namespace  = "dynamodb"
-}
-
-resource "aws_appautoscaling_policy" "dynamodb_table_read_policy" {
-  name               = "dynamodb-read-capacity-scaling-policy"
-  policy_type        = "TargetTrackingScaling"
-  resource_id        = aws_appautoscaling_target.dynamodb_table_read_target.resource_id
-  scalable_dimension = aws_appautoscaling_target.dynamodb_table_read_target.scalable_dimension
-  service_namespace  = aws_appautoscaling_target.dynamodb_table_read_target.service_namespace
-
-  target_tracking_scaling_policy_configuration {
-    target_value       = 70.0
-    scale_in_cooldown  = 300
-    scale_out_cooldown = 300
-
-    predefined_metric_specification {
-      predefined_metric_type = "DynamoDBReadCapacityUtilization"
-    }
-  }
-}
-
-resource "aws_appautoscaling_target" "dynamodb_table_write_target" {
-  max_capacity       = 25
-  min_capacity       = 5
-  resource_id        = "table/${aws_dynamodb_table.price_comparison.name}"
-  scalable_dimension = "dynamodb:table:WriteCapacityUnits"
-  service_namespace  = "dynamodb"
-}
-
-resource "aws_appautoscaling_policy" "dynamodb_table_write_policy" {
-  name               = "dynamodb-write-capacity-scaling-policy"
-  policy_type        = "TargetTrackingScaling"
-  resource_id        = aws_appautoscaling_target.dynamodb_table_write_target.resource_id
-  scalable_dimension = aws_appautoscaling_target.dynamodb_table_write_target.scalable_dimension
-  service_namespace  = aws_appautoscaling_target.dynamodb_table_write_target.service_namespace
-
-  target_tracking_scaling_policy_configuration {
-    target_value       = 70.0
-    scale_in_cooldown  = 300
-    scale_out_cooldown = 300
-
-    predefined_metric_specification {
-      predefined_metric_type = "DynamoDBWriteCapacityUtilization"
-    }
-  }
-}
 # 公式価格データの登録
 locals {
   official_prices = jsondecode(file("${path.module}/../data/official_prices.json"))
@@ -188,37 +165,37 @@ locals {
 }
 
 resource "aws_dynamodb_table_item" "official_prices_data" {
-  for_each = local.flattened_prices
+  for_each = var.create_sample_data ? local.flattened_prices : {}
 
-  table_name = aws_dynamodb_table.price_comparison.name
-  hash_key   = "model"
-  range_key  = "timestamp"
+  table_name = aws_dynamodb_table.official_prices.name
+  hash_key   = "series"
+  range_key  = "capacity"
 
   item = jsonencode({
-    model = {
-      S = "${each.value.series} ${each.value.capacity}"
+    series = {
+      S = each.value.series
     }
-    timestamp = {
-      S = timestamp()
-    }
-    store = {
-      S = "Apple"
+    capacity = {
+      S = each.value.capacity
     }
     colors = {
       M = {
         for color, price in each.value.colors : color => {
-          N = tostring(price)
+          S = tostring(price)  # 数値を文字列として保存
         }
       }
+    }
+    timestamp = {
+      S = timestamp()
     }
   })
 }
 
 resource "aws_dynamodb_table" "price_history" {
-  name         = "price_history"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "model"
-  range_key    = "timestamp"
+  name           = "price_history"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "model"
+  range_key      = "timestamp"
 
   attribute {
     name = "model"
@@ -227,17 +204,7 @@ resource "aws_dynamodb_table" "price_history" {
 
   attribute {
     name = "timestamp"
-    type = "N"  # 数値型に変更
-  }
-
-  attribute {
-    name = "date"
-    type = "S"  # 新しいGSI用の属性
-  }
-
-  ttl {
-    attribute_name = "expiration_time"  # 属性名を変更
-    enabled        = true
+    type = "N"
   }
 
   global_secondary_index {
@@ -247,18 +214,22 @@ resource "aws_dynamodb_table" "price_history" {
     projection_type = "ALL"
   }
 
-  global_secondary_index {
-    name            = "DateIndex"
-    hash_key        = "date"
-    range_key       = "model"
-    projection_type = "ALL"
+  ttl {
+    attribute_name = "expiration_time"
+    enabled        = true
   }
 
-  point_in_time_recovery {
-    enabled = true
+  lifecycle {
+    ignore_changes = [
+      read_capacity,
+      write_capacity,
+      billing_mode
+    ]
+    prevent_destroy = true
   }
 
   tags = {
+    Name        = "price_history"
     Environment = "production"
     Project     = "iphone_price_tracker"
   }
@@ -267,30 +238,31 @@ resource "aws_dynamodb_table" "price_history" {
 resource "aws_dynamodb_table" "price_predictions" {
   name           = "price_predictions"
   billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "model_id"
-  range_key      = "prediction_date"
+  hash_key       = "series"
+  range_key      = "timestamp"
 
   attribute {
-    name = "model_id"
+    name = "series"
     type = "S"
   }
 
   attribute {
-    name = "prediction_date"
+    name = "timestamp"
     type = "S"
   }
 
-  ttl {
-    attribute_name = "expiration_time"
-    enabled        = true
-  }
-
-  point_in_time_recovery {
-    enabled = true
+  lifecycle {
+    ignore_changes = [
+      read_capacity,
+      write_capacity,
+      billing_mode
+    ]
+    prevent_destroy = true
   }
 
   tags = {
     Name        = "price_predictions"
-    Environment = var.environment
+    Environment = "production"
+    Project     = "iphone_price_tracker"
   }
 }
