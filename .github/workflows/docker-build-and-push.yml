@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - ci/fix_workflow_error_docker-build-and-push # ciがpass次第削除
 
 jobs:
   build-and-push:
@@ -26,9 +27,12 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
+          context: .
           push: true
-          tags: |
-            koninji/price-comparison-app:latest
+          tags: koninji/price-comparison-app:latest
+          cache-from: type=registry,ref=koninji/price-comparison-app:latest
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
 
       # Renderのサービス一覧からサービスIDを取得
       - name: Fetch Render Service ID
