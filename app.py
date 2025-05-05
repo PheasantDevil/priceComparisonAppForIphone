@@ -202,22 +202,52 @@ def get_kaitori_prices():
 
 @app.route("/get_prices")
 def get_prices():
-    """買取価格と公式価格を取得して統合"""
+    """DynamoDBから最新の価格情報を取得"""
     try:
-        kaitori_prices = get_kaitori_prices()
-        official_prices = get_prices_by_series()  # DynamoDBから公式価格を取得
+        # DynamoDBから価格データを取得
+        dynamodb = boto3.resource('dynamodb')
+        table = dynamodb.Table('iphone_prices')
+        
+        # 最新の価格データを取得
+        response = table.scan()
+        items = response.get('Items', [])
+        
+        # データを整形
+        price_data = {}
+        for item in items:
+            series = item.get('series')
+            capacity = item.get('capacity')
+            color = item.get('color')
+            kaitori_price = item.get('kaitori_price')
+            official_price = item.get('official_price')
+            
+            if series not in price_data:
+                price_data[series] = {}
+            
+            if capacity not in price_data[series]:
+                price_data[series][capacity] = {
+                    'colors': {},
+                    'kaitori_price_min': None,
+                    'kaitori_price_max': None,
+                    'official_price': official_price
+                }
+            
+            # 色ごとの価格を保存
+            price_data[series][capacity]['colors'][color] = {
+                'price_text': f"{kaitori_price:,}円",
+                'price_value': kaitori_price
+            }
+            
+            # 最小・最大価格を更新
+            current_min = price_data[series][capacity]['kaitori_price_min']
+            current_max = price_data[series][capacity]['kaitori_price_max']
+            
+            if current_min is None or kaitori_price < current_min:
+                price_data[series][capacity]['kaitori_price_min'] = kaitori_price
+            if current_max is None or kaitori_price > current_max:
+                price_data[series][capacity]['kaitori_price_max'] = kaitori_price
 
-        # データ統合処理
-        for series, capacities in kaitori_prices.items():
-            if series in official_prices:
-                for capacity, details in capacities.items():
-                    if capacity in official_prices[series]:
-                        official_price = min(official_prices[series][capacity].values())
-                        details["official_price"] = official_price
-                        details["profit_min"] = details["kaitori_price_min"] - official_price
-                        details["profit_max"] = details["kaitori_price_max"] - official_price
-
-        return jsonify(kaitori_prices), 200
+        return jsonify(price_data), 200
 
     except Exception as e:
         app.logger.error(f"エラー: {str(e)}")
