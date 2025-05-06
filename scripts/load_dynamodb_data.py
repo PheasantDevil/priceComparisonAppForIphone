@@ -27,6 +27,18 @@ def load_json_file(file_path):
 def write_to_official_prices(table, data):
     """公式価格データをDynamoDBに書き込む"""
     try:
+        # 既存のデータを削除
+        scan = table.scan()
+        with table.batch_writer() as batch:
+            for item in scan['Items']:
+                batch.delete_item(
+                    Key={
+                        'series': item['series'],
+                        'capacity': item['capacity']
+                    }
+                )
+        
+        # 新しいデータを書き込む
         for series, capacities in data.items():
             for capacity, details in capacities.items():
                 item = {

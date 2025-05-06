@@ -20,7 +20,7 @@ resource "null_resource" "install_lambda_layer_packages" {
   provisioner "local-exec" {
     command = <<EOF
 mkdir -p ${local.layer_build_dir}/python
-pip install -r ${path.module}/requirements.txt -t ${local.layer_build_dir}/python
+pip install --no-cache-dir --platform manylinux2014_x86_64 --target=${local.layer_build_dir}/python --implementation cp --python-version 3.9 --only-binary=:all: --upgrade -r ${path.module}/requirements.txt
 cd ${local.layer_build_dir} && zip -r ${local.layer_zip_path} .
 EOF
   }
@@ -57,12 +57,12 @@ data "archive_file" "lambda_get_prices" {
 
 # Get Prices Lambda Function
 resource "aws_lambda_function" "get_prices" {
-  filename         = "./lambda_function.zip"
+  filename         = "./get_prices_lambda.zip"
   function_name    = "get_prices"
   role             = aws_iam_role.get_prices_lambda_role.arn
   handler          = "lambda_function.lambda_handler"
   runtime          = "python3.9"
-  source_code_hash = filebase64sha256("./lambda_function.zip")
+  source_code_hash = filebase64sha256("./get_prices_lambda.zip")
   timeout          = 30
   memory_size      = 128
 
@@ -300,70 +300,43 @@ resource "aws_lambda_function" "get_price_history" {
 
 # 価格予測用のLambda関数
 resource "aws_lambda_function" "predict_prices_lambda" {
-  filename         = "../lambdas/predict_prices_lambda.zip"
+  filename         = "predict_prices_lambda.zip"
   function_name    = "predict-prices"
   role             = aws_iam_role.lambda_execution_role.arn
   handler          = "predict_prices.handler"
   runtime          = "python3.9"
   timeout          = 30
   memory_size      = 256
-  source_code_hash = filebase64sha256("../lambdas/predict_prices_lambda.zip")
-}
-
-# 価格予測用のLambdaパーミッション
-resource "aws_lambda_permission" "predict_prices_lambda_permission" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.predict_prices_lambda.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.price_comparison.execution_arn}/*/*"
+  source_code_hash = filebase64sha256("predict_prices_lambda.zip")
 }
 
 # 価格比較用のLambda関数
 resource "aws_lambda_function" "compare_prices_lambda" {
-  filename         = "../lambdas/compare_prices_lambda.zip"
+  filename         = "compare_prices_lambda.zip"
   function_name    = "compare-prices"
   role             = aws_iam_role.lambda_execution_role.arn
   handler          = "compare_prices.handler"
   runtime          = "python3.9"
   timeout          = 30
   memory_size      = 256
-  source_code_hash = filebase64sha256("../lambdas/compare_prices_lambda.zip")
-}
-
-# 価格比較用のLambdaパーミッション
-resource "aws_lambda_permission" "compare_prices_lambda_permission" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.compare_prices_lambda.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.price_comparison.execution_arn}/*/*"
+  source_code_hash = filebase64sha256("compare_prices_lambda.zip")
 }
 
 # LINE通知用のLambda関数
 resource "aws_lambda_function" "line_notification_lambda" {
-  filename         = "../lambdas/line_notification_lambda.zip"
+  filename         = "line_notification_lambda.zip"
   function_name    = "line-notification"
   role             = aws_iam_role.lambda_execution_role.arn
   handler          = "line_notification.handler"
   runtime          = "python3.9"
   timeout          = 30
   memory_size      = 256
-  source_code_hash = filebase64sha256("../lambdas/line_notification_lambda.zip")
-}
-
-# LINE通知用のLambdaパーミッション
-resource "aws_lambda_permission" "line_notification_lambda" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.line_notification_lambda.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.price_comparison.execution_arn}/*/*"
+  source_code_hash = filebase64sha256("line_notification_lambda.zip")
 }
 
 # 価格チェック用のLambda関数
 resource "aws_lambda_function" "check_prices_lambda" {
-  filename      = "../lambdas/check_prices.zip"
+  filename      = "check_prices.zip"
   function_name = "check-prices"
   role          = aws_iam_role.lambda_execution_role.arn
   handler       = "check_prices.lambda_handler"
