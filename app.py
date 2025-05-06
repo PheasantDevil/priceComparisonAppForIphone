@@ -206,51 +206,86 @@ def get_prices():
     try:
         # DynamoDBから価格データを取得
         dynamodb = boto3.resource('dynamodb')
-        table = dynamodb.Table('iphone_prices')
+        kaitori_table = dynamodb.Table('kaitori_prices')
+        official_table = dynamodb.Table('official_prices')
         
-        # 最新の価格データを取得
-        response = table.scan()
-        items = response.get('Items', [])
+        app.logger.info("Fetching data from kaitori_prices table...")
+        # 買取価格データを取得
+        kaitori_response = kaitori_table.scan()
+        kaitori_items = kaitori_response.get('Items', [])
+        app.logger.info(f"Found {len(kaitori_items)} items in kaitori_prices table")
+        
+        app.logger.info("Fetching data from official_prices table...")
+        # 公式価格データを取得
+        official_response = official_table.scan()
+        official_items = official_response.get('Items', [])
+        app.logger.info(f"Found {len(official_items)} items in official_prices table")
+        app.logger.debug(f"Official prices data: {json.dumps(official_items, indent=2)}")
+        
+        # 公式価格をマッピング
+        official_prices = {}
+        for item in official_items:
+            series = item.get('series')
+            capacity = item.get('capacity')
+            colors = item.get('colors', {})
+            
+            if series and capacity:
+                if series not in official_prices:
+                    official_prices[series] = {}
+                official_prices[series][capacity] = colors
+        
+        app.logger.debug(f"Mapped official prices: {json.dumps(official_prices, indent=2)}")
         
         # データを整形
         price_data = {}
-        for item in items:
-            series = item.get('series')
+        for item in kaitori_items:
+            model = item.get('model')
             capacity = item.get('capacity')
-            color = item.get('color')
-            kaitori_price = item.get('kaitori_price')
-            official_price = item.get('official_price')
+            price = item.get('price')
+            
+            app.logger.debug(f"Processing kaitori item: {json.dumps(item, indent=2)}")
+            
+            # モデル名からシリーズを判定
+            if "Pro Max" in model:
+                series = "iPhone 16 Pro Max"
+            elif "Pro" in model:
+                series = "iPhone 16 Pro"
+            elif "16" in model:
+                series = "iPhone 16"
+            else:
+                app.logger.warning(f"Skipping unknown model: {model}")
+                continue
             
             if series not in price_data:
                 price_data[series] = {}
             
             if capacity not in price_data[series]:
+                # 公式価格を取得
+                official_colors = official_prices.get(series, {}).get(capacity, {})
+                app.logger.debug(f"Found official colors for {series} {capacity}: {official_colors}")
+                
                 price_data[series][capacity] = {
-                    'colors': {},
-                    'kaitori_price_min': None,
-                    'kaitori_price_max': None,
-                    'official_price': official_price
+                    'colors': {'不明': {'price_text': f"{price:,}円", 'price_value': price}},
+                    'kaitori_price_min': price,
+                    'kaitori_price_max': price,
+                    'official_prices': official_colors
                 }
-            
-            # 色ごとの価格を保存
-            price_data[series][capacity]['colors'][color] = {
-                'price_text': f"{kaitori_price:,}円",
-                'price_value': kaitori_price
-            }
-            
-            # 最小・最大価格を更新
-            current_min = price_data[series][capacity]['kaitori_price_min']
-            current_max = price_data[series][capacity]['kaitori_price_max']
-            
-            if current_min is None or kaitori_price < current_min:
-                price_data[series][capacity]['kaitori_price_min'] = kaitori_price
-            if current_max is None or kaitori_price > current_max:
-                price_data[series][capacity]['kaitori_price_max'] = kaitori_price
+            else:
+                # 最小・最大価格を更新
+                current_min = price_data[series][capacity]['kaitori_price_min']
+                current_max = price_data[series][capacity]['kaitori_price_max']
+                
+                if price < current_min:
+                    price_data[series][capacity]['kaitori_price_min'] = price
+                if price > current_max:
+                    price_data[series][capacity]['kaitori_price_max'] = price
 
+        app.logger.debug(f"Final price data: {json.dumps(price_data, indent=2)}")
         return jsonify(price_data), 200
 
     except Exception as e:
         app.logger.error(f"エラー: {str(e)}")
+        app.logger.exception("Detailed error information:")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
