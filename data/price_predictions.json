@@ -1,0 +1,30 @@
+{
+  "iPhone 16": {
+    "predictions": [
+      {
+        "timestamp": "1746368793",
+        "predicted_price": 85000,
+        "confidence": "0.85",
+        "factors": {
+          "market_trend": "stable",
+          "seasonal_factor": "high",
+          "model_age": "new"
+        }
+      }
+    ]
+  },
+  "iPhone 16 Pro": {
+    "predictions": [
+      {
+        "timestamp": "1746368793",
+        "predicted_price": 120000,
+        "confidence": "0.82",
+        "factors": {
+          "market_trend": "stable",
+          "seasonal_factor": "high",
+          "model_age": "new"
+        }
+      }
+    ]
+  }
+}

@@ -1,4 +1,25 @@
 #!/usr/bin/env python3
+
+"""
+使用方法:
+このスクリプトは、デプロイメントの検証に使用されます。
+以下のコマンドで実行します：
+    python3 verify_deployment.py
+
+必要な環境変数:
+- AWS_ACCESS_KEY_ID
+- AWS_SECRET_ACCESS_KEY
+- AWS_DEFAULT_REGION
+- LAMBDA_FUNCTION_NAME: 検証対象のLambda関数名
+- DYNAMODB_TABLES: 検証対象のDynamoDBテーブル名のJSON配列
+- API_ID: 検証対象のAPI Gateway ID
+
+検証内容:
+1. Lambda関数の状態確認
+2. DynamoDBテーブルの状態確認
+3. API Gatewayのデプロイメント状態確認
+"""
+
 import json
 import logging
 import os
@@ -61,8 +82,8 @@ def verify_api_gateway(api_id):
         logger.error(f"Error verifying API Gateway: {str(e)}")
         return False
 
-def lambda_handler(event, context):
-    """Lambdaハンドラー関数"""
+def main():
+    """メイン関数"""
     try:
         # 環境変数から設定を取得
         lambda_function_name = os.environ['LAMBDA_FUNCTION_NAME']
@@ -119,4 +140,5 @@ def lambda_handler(event, context):
         }
 
 if __name__ == "__main__":
-    lambda_handler(None, None) 
+    result = main()
+    print(json.dumps(result)) 

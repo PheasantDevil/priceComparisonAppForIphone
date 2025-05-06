@@ -1,4 +1,22 @@
 #!/usr/bin/env python3
+
+"""
+使用方法:
+このスクリプトは、スモークテストの実装に使用されます。
+以下のコマンドで実行します：
+    python3 smoke-test.py
+
+必要な環境変数:
+- AWS_ACCESS_KEY_ID
+- AWS_SECRET_ACCESS_KEY
+- AWS_DEFAULT_REGION
+
+テスト内容:
+1. Lambda関数の呼び出しテスト
+2. DynamoDBの基本操作テスト
+3. APIエンドポイントのテスト（APIキー認証付き）
+"""
+
 import json
 import logging
 import os
