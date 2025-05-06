@@ -1,0 +1,20 @@
+{
+  "iPhone 16-128GB-Black": {
+    "prices": [
+      {
+        "timestamp": 1746368793,
+        "price": 85000,
+        "source": "kaitori"
+      }
+    ]
+  },
+  "iPhone 16 Pro-256GB-Natural Titanium": {
+    "prices": [
+      {
+        "timestamp": 1746368793,
+        "price": 120000,
+        "source": "kaitori"
+      }
+    ]
+  }
+}

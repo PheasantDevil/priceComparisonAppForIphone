@@ -258,3 +258,55 @@ resource "aws_dynamodb_table" "price_predictions" {
     Project     = "iphone_price_tracker"
   }
 }
+
+resource "aws_dynamodb_table" "kaitori_prices" {
+  name           = "kaitori_prices"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "model"
+  range_key      = "timestamp"
+
+  attribute {
+    name = "model"
+    type = "S"
+  }
+
+  attribute {
+    name = "timestamp"
+    type = "S"
+  }
+
+  attribute {
+    name = "capacity"
+    type = "S"
+  }
+
+  attribute {
+    name = "color"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "ModelCapacityIndex"
+    hash_key        = "model"
+    range_key       = "capacity"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  lifecycle {
+    ignore_changes = [
+      read_capacity,
+      write_capacity,
+      billing_mode
+    ]
+  }
+
+  tags = {
+    Name        = "kaitori_prices"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
+}
