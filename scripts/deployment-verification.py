@@ -1,4 +1,22 @@
 #!/usr/bin/env python3
+
+"""
+使用方法:
+このスクリプトは、デプロイメント検証の実装に使用されます。
+以下のコマンドで実行します：
+    python3 deployment-verification.py
+
+必要な環境変数:
+- AWS_ACCESS_KEY_ID
+- AWS_SECRET_ACCESS_KEY
+- AWS_DEFAULT_REGION
+
+検証内容:
+1. Lambda関数の状態確認
+2. DynamoDBテーブルの状態確認
+3. API Gatewayの状態確認
+"""
+
 import json
 import logging
 import os
