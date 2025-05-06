@@ -1,102 +1,72 @@
-name: Scrape and Store iPhone Prices
+name: Scrape iPhone Prices
 
 on:
-  push:
-    branches:
-      - 'ci/bug-fix-scrape-and-store'
-    schedule:
-    - cron: '0 3 * * *'  # 日本時間12時 (UTC+9)
-    - cron: '0 11 * * *' # 日本時間20時 (UTC+9)
-  workflow_dispatch:  # 手動実行用
+  schedule:
+    - cron: '0 */6 * * *'  # 6時間ごとに実行
+  workflow_dispatch:  # 手動実行も可能
 
 env:
   AWS_REGION: ap-northeast-1
-  DYNAMODB_TABLE: price_history
-  PYTHON_VERSION: '3.9'
+  PYTHONPATH: ${{ github.workspace }}
 
 jobs:
-  scrape-and-store:
-    name: Scrape and Store Prices
+  scrape:
     runs-on: ubuntu-latest
-    environment: production
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: '3.11'
+          cache: 'pip'
 
-      - name: Install dependencies
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install base dependencies
         run: |
-          python3 -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install boto3 playwright
-          playwright install chromium
+          python -m pip install --upgrade pip
+          pip install -r requirements-base.txt
+
+      - name: Install web dependencies
+        run: |
+          pip install -r requirements-web.txt
+          playwright install chromium --with-deps
+
+      - name: Install test dependencies
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          pip install -r requirements-test.txt
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: GitHubActionsSession
 
-      - name: Run scraper
+      - name: Run price scraping
         run: |
-          cd src
-          python -c "
-          import json
-          from apple_scraper_for_rudea import get_kaitori_prices
-          from datetime import datetime
-          import boto3
+          python src/lambda_functions/get_prices_lambda/lambda_function.py
 
-          # スクレイピング実行
-          prices = get_kaitori_prices()
-          
-          # DynamoDBクライアントの初期化
-          dynamodb = boto3.resource('dynamodb')
-          table = dynamodb.Table('${{ env.DYNAMODB_TABLE }}')
-          
-          # 現在のタイムスタンプ
-          timestamp = int(datetime.now().timestamp())
-          
-          # データの保存
-          for series, capacities in prices.items():
-              for capacity, details in capacities.items():
-                  for color, price_info in details['colors'].items():
-                      item = {
-                          'id': f'{series}-{capacity}-{color}',
-                          'timestamp': timestamp,
-                          'series': series,
-                          'capacity': capacity,
-                          'color': color,
-                          'price': price_info['price_value'],
-                          'price_text': price_info['price_text']
-                      }
-                      table.put_item(Item=item)
-          
-          print('Data successfully stored in DynamoDB')
-          "
-
-      - name: Verify data
+      - name: Run tests
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
-          aws dynamodb scan \
-            --table-name ${{ env.DYNAMODB_TABLE }} \
-            --filter-expression "timestamp = :ts" \
-            --expression-attribute-values '{":ts": {"N": "'$(date +%s)'"}}' \
-            --query "Count" \
-            --output text
+          pytest tests/ --cov=src --cov-report=xml
 
-      - name: Notify on failure
-        if: failure()
-        uses: actions/github-script@v6
+      - name: Upload coverage report
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: codecov/codecov-action@v4
         with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `❌ スクレイピングが失敗しました\n\n- 実行ID: ${{ github.run_id }}\n- 時刻: ${{ github.event.schedule }}`
-            }) 
+          file: ./coverage.xml
+          fail_ci_if_error: true 
