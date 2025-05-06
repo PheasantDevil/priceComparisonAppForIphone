@@ -1,4 +1,26 @@
 #!/usr/bin/env python3
+
+"""
+使用方法:
+このスクリプトは、Lambda関数のパッケージングとデプロイに使用されます。
+以下のコマンドで実行します：
+    python3 package_lambda.py
+
+必要な環境変数:
+- AWS_ACCESS_KEY_ID
+- AWS_SECRET_ACCESS_KEY
+- AWS_DEFAULT_REGION
+
+パッケージングされるLambda関数:
+- deployment-verification: デプロイメント検証用
+- smoke-test: スモークテスト用
+
+各Lambda関数は以下の手順でパッケージングされます：
+1. 依存関係のインストール
+2. ZIPファイルの作成
+3. Lambda関数のデプロイ
+"""
+
 import logging
 import os
 import shutil

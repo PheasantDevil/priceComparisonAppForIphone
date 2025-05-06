@@ -1,154 +1,134 @@
 {
-  "products": [
-    {
-      "model": "iPhone 16",
-      "capacity": "128GB",
-      "color": "black",
-      "color_ja": "黒",
-      "model_number": "MYDQ3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 124800
+  "iPhone 16": {
+    "128GB": {
+      "colors": {
+        "Black": 124800,
+        "White": 124800,
+        "Blue": 124800,
+        "Green": 124800
+      }
     },
-    {
-      "model": "iPhone 16",
-      "capacity": "128GB",
-      "color": "pink",
-      "color_ja": "桃",
-      "model_number": "MYDT3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 124800
+    "256GB": {
+      "colors": {
+        "Black": 139800,
+        "White": 139800,
+        "Blue": 139800,
+        "Green": 139800
+      }
     },
-    {
-      "model": "iPhone 16",
-      "capacity": "128GB",
-      "color": "teal",
-      "color_ja": "緑",
-      "model_number": "MYDV3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 124800
-    },
-    {
-      "model": "iPhone 16",
-      "capacity": "128GB",
-      "color": "ultramarine",
-      "color_ja": "青",
-      "model_number": "MYDU3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 124800
-    },
-    {
-      "model": "iPhone 16",
-      "capacity": "128GB",
-      "color": "white",
-      "color_ja": "白",
-      "model_number": "MYDR3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 124800
-    },
-    {
-      "model": "iPhone 16",
-      "capacity": "256GB",
-      "color": "black",
-      "color_ja": "黒",
-      "model_number": "MYDW3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 139800
-    },
-    {
-      "model": "iPhone 16",
-      "capacity": "256GB",
-      "color": "pink",
-      "color_ja": "桃",
-      "model_number": "MYDY3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 139800
-    },
-    {
-      "model": "iPhone 16",
-      "capacity": "256GB",
-      "color": "teal",
-      "color_ja": "緑",
-      "model_number": "MYDZ3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 139800
-    },
-    {
-      "model": "iPhone 16",
-      "capacity": "256GB",
-      "color": "ultramarine",
-      "color_ja": "青",
-      "model_number": "MYDX3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 139800
-    },
-    {
-      "model": "iPhone 16",
-      "capacity": "256GB",
-      "color": "white",
-      "color_ja": "白",
-      "model_number": "MYDW3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 139800
-    },
-    {
-      "model": "iPhone 16",
-      "capacity": "512GB",
-      "color": "black",
-      "color_ja": "黒",
-      "model_number": "MYDQ3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 169800
-    },
-    {
-      "model": "iPhone 16",
-      "capacity": "512GB",
-      "color": "pink",
-      "color_ja": "桃",
-      "model_number": "MYDT3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 169800
-    },
-    {
-      "model": "iPhone 16",
-      "capacity": "512GB",
-      "color": "teal",
-      "color_ja": "緑",
-      "model_number": "MYDV3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 169800
-    },
-    {
-      "model": "iPhone 16",
-      "capacity": "512GB",
-      "color": "ultramarine",
-      "color_ja": "青",
-      "model_number": "MYDU3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 169800
-    },
-    {
-      "model": "iPhone 16",
-      "capacity": "512GB",
-      "color": "white",
-      "color_ja": "白",
-      "model_number": "MYDR3J/A",
-      "condition": "未開封",
-      "carrier": "SIMフリー",
-      "price": 169800
+    "512GB": {
+      "colors": {
+        "Black": 169800,
+        "White": 169800,
+        "Blue": 169800,
+        "Green": 169800
+      }
     }
-  ]
+  },
+  "iPhone 16 Plus": {
+    "128GB": {
+      "colors": {
+        "Black": 139800,
+        "White": 139800,
+        "Blue": 139800,
+        "Green": 139800
+      }
+    },
+    "256GB": {
+      "colors": {
+        "Black": 154800,
+        "White": 154800,
+        "Blue": 154800,
+        "Green": 154800
+      }
+    },
+    "512GB": {
+      "colors": {
+        "Black": 184800,
+        "White": 184800,
+        "Blue": 184800,
+        "Green": 184800
+      }
+    }
+  },
+  "iPhone 16 Pro": {
+    "128GB": {
+      "colors": {
+        "Natural Titanium": 159800,
+        "Blue Titanium": 159800,
+        "White Titanium": 159800,
+        "Black Titanium": 159800
+      }
+    },
+    "256GB": {
+      "colors": {
+        "Natural Titanium": 174800,
+        "Blue Titanium": 174800,
+        "White Titanium": 174800,
+        "Black Titanium": 174800
+      }
+    },
+    "512GB": {
+      "colors": {
+        "Natural Titanium": 204800,
+        "Blue Titanium": 204800,
+        "White Titanium": 204800,
+        "Black Titanium": 204800
+      }
+    },
+    "1TB": {
+      "colors": {
+        "Natural Titanium": 234800,
+        "Blue Titanium": 234800,
+        "White Titanium": 234800,
+        "Black Titanium": 234800
+      }
+    }
+  },
+  "iPhone 16 Pro Max": {
+    "256GB": {
+      "colors": {
+        "Natural Titanium": 189800,
+        "Blue Titanium": 189800,
+        "White Titanium": 189800,
+        "Black Titanium": 189800
+      }
+    },
+    "512GB": {
+      "colors": {
+        "Natural Titanium": 219800,
+        "Blue Titanium": 219800,
+        "White Titanium": 219800,
+        "Black Titanium": 219800
+      }
+    },
+    "1TB": {
+      "colors": {
+        "Natural Titanium": 249800,
+        "Blue Titanium": 249800,
+        "White Titanium": 249800,
+        "Black Titanium": 249800
+      }
+    }
+  },
+  "iPhone 16 e": {
+    "128GB": {
+      "colors": {
+        "Black": 99800,
+        "White": 99800
+      }
+    },
+    "256GB": {
+      "colors": {
+        "Black": 114800,
+        "White": 114800
+      }
+    },
+    "512GB": {
+      "colors": {
+        "Black": 144800,
+        "White": 144800
+      }
+    }
+  }
 }
