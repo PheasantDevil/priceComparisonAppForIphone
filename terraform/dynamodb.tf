@@ -262,16 +262,11 @@ resource "aws_dynamodb_table" "price_predictions" {
 resource "aws_dynamodb_table" "kaitori_prices" {
   name           = "kaitori_prices"
   billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "model"
-  range_key      = "timestamp"
+  hash_key       = "series"
+  range_key      = "capacity"
 
   attribute {
-    name = "model"
-    type = "S"
-  }
-
-  attribute {
-    name = "timestamp"
+    name = "series"
     type = "S"
   }
 
@@ -286,10 +281,10 @@ resource "aws_dynamodb_table" "kaitori_prices" {
   }
 
   global_secondary_index {
-    name            = "ModelCapacityIndex"
-    hash_key        = "model"
-    range_key       = "capacity"
-    projection_type = "ALL"
+    name               = "ColorIndex"
+    hash_key           = "color"
+    range_key          = "series"
+    projection_type    = "ALL"
   }
 
   point_in_time_recovery {
@@ -297,6 +292,7 @@ resource "aws_dynamodb_table" "kaitori_prices" {
   }
 
   lifecycle {
+    prevent_destroy = false
     ignore_changes = [
       read_capacity,
       write_capacity,

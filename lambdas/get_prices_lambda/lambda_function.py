@@ -19,65 +19,81 @@ def lambda_handler(event, context):
     Lambda関数のメインハンドラー
     """
     try:
-        logger.info("Starting price scraping process")
+        logger.info("Starting price retrieval process")
         
-        # 現在の日付を取得
-        current_date = datetime.now(timezone.utc).date()
+        # クエリパラメータからシリーズを取得
+        series = event.get('queryStringParameters', {}).get('series', 'iPhone 16')
+        capacity = event.get('queryStringParameters', {}).get('capacity', '128GB')
         
-        # 当日のデータが存在するか確認
-        if check_today_data(current_date):
-            logger.info("Today's data already exists")
-            return {
-                'statusCode': 200,
-                'body': json.dumps('Today\'s data already exists')
-            }
-        
-        # スクレイピング処理を実行
-        prices = scrape_prices()
-        
-        # データを保存
-        save_prices(prices)
+        # 価格情報を取得
+        prices = get_prices(series, capacity)
         
         return {
             'statusCode': 200,
-            'body': json.dumps('Price scraping completed successfully')
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                'Access-Control-Allow-Methods': 'GET,OPTIONS'
+            },
+            'body': json.dumps(prices)
         }
         
     except Exception as e:
         logger.error(f"Error in lambda_handler: {str(e)}")
         return {
             'statusCode': 500,
-            'body': json.dumps(f'Error: {str(e)}')
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                'Access-Control-Allow-Methods': 'GET,OPTIONS'
+            },
+            'body': json.dumps({'error': str(e)})
         }
 
-def check_today_data(current_date):
+def get_prices(series, capacity):
     """
-    当日のデータが存在するか確認
+    指定されたシリーズと容量の価格情報を取得
     """
     try:
-        response = table.query(
-            KeyConditionExpression='model = :model',
-            FilterExpression='begins_with(timestamp, :date)',
+        response = table.scan(
+            FilterExpression='#s = :series AND #c = :capacity',
+            ExpressionAttributeNames={
+                '#s': 'series',
+                '#c': 'capacity'
+            },
             ExpressionAttributeValues={
-                ':model': 'iPhone 16 128GB',  # テスト用のモデル
-                ':date': current_date.isoformat()
+                ':series': series,
+                ':capacity': capacity
             }
         )
-        return len(response['Items']) > 0
+        
+        if not response['Items']:
+            return {
+                'series': series,
+                'capacity': capacity,
+                'prices': [],
+                'message': 'No prices found for this series and capacity'
+            }
+        
+        # レスポンスを整形
+        items = []
+        for item in response['Items']:
+            formatted_item = {
+                'series': item['series'],
+                'capacity': item['capacity'],
+                'price': item['price'],
+                'store': item['store'],
+                'updated_at': item.get('updated_at', '')
+            }
+            items.append(formatted_item)
+        
+        return {
+            'series': series,
+            'capacity': capacity,
+            'prices': items,
+            'message': 'Successfully retrieved prices'
+        }
+        
     except ClientError as e:
-        logger.error(f"Error checking today's data: {str(e)}")
+        logger.error(f"Error getting prices: {str(e)}")
         raise
-
-def scrape_prices():
-    """
-    価格情報をスクレイピング
-    """
-    # TODO: スクレイピングロジックの実装
-    return []
-
-def save_prices(prices):
-    """
-    価格情報をDynamoDBに保存
-    """
-    # TODO: 保存ロジックの実装
-    pass
