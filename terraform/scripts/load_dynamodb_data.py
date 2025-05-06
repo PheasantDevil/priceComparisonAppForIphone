@@ -15,7 +15,7 @@
 - official_prices.json: 公式価格データ
 - price_history.json: 価格履歴データ
 - price_predictions.json: 価格予測データ
-- kaitori-rudea_prices.json: 買取価格データ
+- kaitori-rudea_sample-prices.json: 買取価格データ
 """
 
 import json
@@ -134,7 +134,7 @@ def main():
         official_prices = load_json_file(data_dir / 'official_prices.json')
         price_history = load_json_file(data_dir / 'price_history.json')
         price_predictions = load_json_file(data_dir / 'price_predictions.json')
-        kaitori_prices = load_json_file(data_dir / 'kaitori-rudea_prices.json')
+        kaitori_prices = load_json_file(data_dir / 'kaitori-rudea_sample-prices.json')
         
         # データの書き込み
         logger.info("Writing data to DynamoDB...")
