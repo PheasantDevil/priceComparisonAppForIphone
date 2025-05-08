@@ -35,6 +35,15 @@ class PriceScraper:
         self.dynamodb = boto3.resource('dynamodb')
         self.kaitori_table = self.dynamodb.Table('kaitori_prices')
         self.history_table = self.dynamodb.Table('price_history')
+        
+        # 各モデルの有効な容量を定義
+        self.valid_capacities = {
+            "iPhone 16": ["128GB", "256GB", "512GB"],
+            "iPhone 16 Plus": ["128GB", "256GB", "512GB"],
+            "iPhone 16 Pro": ["128GB", "256GB", "512GB", "1TB"],
+            "iPhone 16 Pro Max": ["256GB", "512GB", "1TB"],
+            "iPhone 16 e": ["128GB", "256GB", "512GB"]
+        }
 
     def _load_config(self) -> dict:
         """設定ファイルの読み込み"""
@@ -75,7 +84,7 @@ class PriceScraper:
         wait=wait_exponential(multiplier=1, min=4, max=10),
         reraise=True
     )
-    async def scrape_url(self, url: str) -> Dict:
+    async def scrape_url(self, url: str) -> List[Dict]:
         """指定されたURLから価格データをスクレイピング"""
         async with async_playwright() as p:
             browser = await p.chromium.launch()
@@ -87,10 +96,13 @@ class PriceScraper:
                 items = await page.query_selector_all(".tr")
                 if not items:
                     error_msg = f"価格要素が見つかりません (URL: {url})"
-                    logger.warning(error_msg)
+                    logger.error(error_msg)
                     self._send_error_notification('scraping', error_msg)
-                    return {}
+                    raise ValueError(error_msg)
 
+                results = []
+                current_series = None
+                current_capacity = None
                 product_details = {
                     "colors": {},
                     "kaitori_price_min": None,
@@ -109,46 +121,80 @@ class PriceScraper:
                             series = "iPhone 16 Pro Max"
                         elif "Pro" in model_name:
                             series = "iPhone 16 Pro"
+                        elif "Plus" in model_name:
+                            series = "iPhone 16 Plus"
+                        elif "16 e" in model_name or "16e" in model_name:
+                            series = "iPhone 16 e"
                         elif "16" in model_name:
                             series = "iPhone 16"
-                        elif "16" in model_name:
-                            series = "iPhone 16 e"
                         else:
+                            logger.warning(f"未知のモデル名: {model_name}")
                             continue
 
                         # 容量を抽出
                         capacity_match = re.search(r"(\d+)(GB|TB)", model_name)
                         if not capacity_match:
+                            logger.warning(f"容量が見つかりません: {model_name}")
                             continue
                         capacity = capacity_match.group(0)  # "128GB" or "1TB"
+
+                        # 容量の組み合わせを検証
+                        if not self._is_valid_capacity(series, capacity):
+                            continue
+
+                        # 新しいシリーズまたは容量の場合、前のデータを保存
+                        if (current_series and current_series != series) or \
+                           (current_capacity and current_capacity != capacity):
+                            if product_details["colors"]:
+                                result = {
+                                    "id": f"{current_series}_{current_capacity}",
+                                    "series": current_series,
+                                    "capacity": current_capacity,
+                                    **product_details
+                                }
+                                results.append(result)
+                                product_details = {
+                                    "colors": {},
+                                    "kaitori_price_min": None,
+                                    "kaitori_price_max": None,
+                                }
+
+                        current_series = series
+                        current_capacity = capacity
 
                         # 価格を取得
                         price_element = await item.query_selector(".td.td2 .td2wrap")
                         price_text = await price_element.inner_text() if price_element else ""
                         price_text = price_text.strip()
 
-                        if model_name and price_text and "円" in price_text:
-                            # カラーを抽出
-                            color_match = re.search(r"(黒|白|桃|緑|青|金|灰)", model_name)
-                            color = color_match.group(1) if color_match else "不明"
+                        if not price_text or "円" not in price_text:
+                            logger.warning(f"価格が見つかりません: {model_name}")
+                            continue
 
-                            # 価格を数値に変換
-                            price_value = self._price_text_to_int(price_text)
+                        # カラーを抽出
+                        color_match = re.search(r"(黒|白|桃|緑|青|金|灰)", model_name)
+                        color = color_match.group(1) if color_match else "不明"
 
-                            # 色ごとの価格を保存
-                            product_details["colors"][color] = {
-                                "price_text": price_text,
-                                "price_value": price_value,
-                            }
+                        # 価格を数値に変換
+                        price_value = self._price_text_to_int(price_text)
+                        if price_value == 0:
+                            logger.warning(f"無効な価格: {price_text} ({model_name})")
+                            continue
 
-                            # 最小・最大価格を更新
-                            current_min = product_details["kaitori_price_min"]
-                            current_max = product_details["kaitori_price_max"]
+                        # 色ごとの価格を保存
+                        product_details["colors"][color] = {
+                            "price_text": price_text,
+                            "price_value": price_value,
+                        }
 
-                            if current_min is None or price_value < current_min:
-                                product_details["kaitori_price_min"] = price_value
-                            if current_max is None or price_value > current_max:
-                                product_details["kaitori_price_max"] = price_value
+                        # 最小・最大価格を更新
+                        current_min = product_details["kaitori_price_min"]
+                        current_max = product_details["kaitori_price_max"]
+
+                        if current_min is None or price_value < current_min:
+                            product_details["kaitori_price_min"] = price_value
+                        if current_max is None or price_value > current_max:
+                            product_details["kaitori_price_max"] = price_value
 
                     except Exception as e:
                         error_msg = f"要素の処理中にエラー (URL: {url}): {e}"
@@ -156,16 +202,24 @@ class PriceScraper:
                         self._send_error_notification('scraping', error_msg)
                         continue
 
-                # 結果を整形
-                result = {
-                    "id": f"{series}_{capacity}",
-                    "series": series,
-                    "capacity": capacity,
-                    **product_details
-                }
+                # 最後のデータを保存
+                if product_details["colors"]:
+                    result = {
+                        "id": f"{current_series}_{current_capacity}",
+                        "series": current_series,
+                        "capacity": current_capacity,
+                        **product_details
+                    }
+                    results.append(result)
 
-                logger.info(f"スクレイピング成功 (URL: {url}): {json.dumps(result, ensure_ascii=False)}")
-                return result
+                if not results:
+                    error_msg = f"有効な価格データが見つかりません (URL: {url})"
+                    logger.error(error_msg)
+                    self._send_error_notification('scraping', error_msg)
+                    raise ValueError(error_msg)
+
+                logger.info(f"スクレイピング成功 (URL: {url}): {json.dumps(results, ensure_ascii=False)}")
+                return results
 
             except Exception as e:
                 error_msg = f"スクレイピングエラー (URL: {url}): {e}"
@@ -180,7 +234,20 @@ class PriceScraper:
         tasks = []
         for url in self.config['scraper']['kaitori_rudea_urls']:
             tasks.append(self.scrape_url(url))
-        return await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # 結果を平坦化
+        flattened_results = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(f"スクレイピング失敗: {result}")
+                continue
+            if isinstance(result, list):
+                flattened_results.extend(result)
+            else:
+                flattened_results.append(result)
+        
+        return flattened_results
 
     def save_to_dynamodb(self, data: Dict) -> None:
         """DynamoDBにデータを保存"""
@@ -255,6 +322,14 @@ class PriceScraper:
             self._send_error_notification('dynamodb', error_msg)
             # 削除処理の失敗は他の処理に影響を与えない
             pass
+
+    def _is_valid_capacity(self, series: str, capacity: str) -> bool:
+        """指定されたモデルと容量の組み合わせが有効かどうかを検証"""
+        valid_capacities = self.valid_capacities.get(series, [])
+        is_valid = capacity in valid_capacities
+        if not is_valid:
+            logger.warning(f"無効な容量の組み合わせ: {series} {capacity} (有効な容量: {valid_capacities})")
+        return is_valid
 
 async def main():
     try:

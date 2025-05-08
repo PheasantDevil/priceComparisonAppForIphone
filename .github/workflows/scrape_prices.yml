@@ -69,7 +69,29 @@ jobs:
           TEST_ENV: true
           PYTHONPATH: ${{ github.workspace }}
           PYTHONUNBUFFERED: 1
+          CONFIG_FILE: config/config.testing.yaml  # テスト用設定ファイルを指定
         run: |
+          # テスト用設定ファイルの作成
+          mkdir -p config
+          cat > config/config.testing.yaml << 'EOL'
+          app:
+            debug: true
+            log_level: DEBUG
+            secret_key: test-secret-key-16ch
+
+          scraper:
+            kaitori_rudea_urls:
+              - "https://kaitori-rudeya.com/category/detail/183"  # iPhone 16
+              - "https://kaitori-rudeya.com/category/detail/185"  # iPhone 16 Pro
+              - "https://kaitori-rudeya.com/category/detail/186"  # iPhone 16 Pro Max
+              - "https://kaitori-rudeya.com/category/detail/205"  # iPhone 16 e
+            apple_store_url: "https://www.apple.com/jp/shop/buy-iphone"
+            request_timeout: 30
+            retry_count: 3
+            user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+          EOL
+          
+          # テストの実行
           pip install pytest pytest-cov pytest-asyncio
           pytest tests/ --cov=src --cov-report=xml -v --tb=short --capture=no
 
