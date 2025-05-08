@@ -99,7 +99,6 @@ resource "aws_dynamodb_table" "official_prices" {
       write_capacity,
       billing_mode
     ]
-    # prevent_destroy = true  # 一時的に無効化
   }
 
   tags = {
@@ -217,7 +216,6 @@ resource "aws_dynamodb_table" "price_history" {
       write_capacity,
       billing_mode
     ]
-    # prevent_destroy = true  # 一時的に無効化
   }
 
   tags = {
@@ -249,7 +247,6 @@ resource "aws_dynamodb_table" "price_predictions" {
       write_capacity,
       billing_mode
     ]
-    # prevent_destroy = true  # 一時的に無効化
   }
 
   tags = {
@@ -262,37 +259,14 @@ resource "aws_dynamodb_table" "price_predictions" {
 resource "aws_dynamodb_table" "kaitori_prices" {
   name           = "kaitori_prices"
   billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "series"
-  range_key      = "capacity"
+  hash_key       = "id"
 
   attribute {
-    name = "series"
+    name = "id"
     type = "S"
-  }
-
-  attribute {
-    name = "capacity"
-    type = "S"
-  }
-
-  attribute {
-    name = "color"
-    type = "S"
-  }
-
-  global_secondary_index {
-    name               = "ColorIndex"
-    hash_key           = "color"
-    range_key          = "series"
-    projection_type    = "ALL"
-  }
-
-  point_in_time_recovery {
-    enabled = true
   }
 
   lifecycle {
-    prevent_destroy = false
     ignore_changes = [
       read_capacity,
       write_capacity,
