@@ -35,8 +35,7 @@ resource "aws_backup_selection" "dynamodb" {
   resources = [
     aws_dynamodb_table.kaitori_prices.arn,
     aws_dynamodb_table.official_prices.arn,
-    aws_dynamodb_table.price_history.arn,
-    aws_dynamodb_table.price_predictions.arn
+    aws_dynamodb_table.price_history.arn
   ]
 
   selection_tag {
@@ -84,8 +83,7 @@ resource "aws_iam_role_policy" "backup" {
         Resource = [
           aws_dynamodb_table.kaitori_prices.arn,
           aws_dynamodb_table.official_prices.arn,
-          aws_dynamodb_table.price_history.arn,
-          aws_dynamodb_table.price_predictions.arn
+          aws_dynamodb_table.price_history.arn
         ]
       },
       {

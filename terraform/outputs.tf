@@ -22,18 +22,6 @@ output "dynamodb_table_arn" {
   value = aws_dynamodb_table.kaitori_prices.arn
 }
 
-output "official_prices_table_arn" {
-  value = aws_dynamodb_table.official_prices.arn
-}
-
-output "price_history_table_arn" {
-  value = aws_dynamodb_table.price_history.arn
-}
-
-output "price_predictions_table_arn" {
-  value = aws_dynamodb_table.price_predictions.arn
-}
-
 output "lambda_function_arn" {
   value = aws_lambda_function.get_prices.arn
 }
