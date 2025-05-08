@@ -171,6 +171,18 @@ resource "aws_dynamodb_table" "kaitori_prices" {
     type = "S"
   }
 
+  attribute {
+    name = "price"
+    type = "N"
+  }
+
+  global_secondary_index {
+    name            = "PriceIndex"
+    hash_key        = "id"
+    range_key       = "price"
+    projection_type = "ALL"
+  }
+
   lifecycle {
     ignore_changes = [
       read_capacity,

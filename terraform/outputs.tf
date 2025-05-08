@@ -5,7 +5,7 @@ output "api_gateway_url" {
 
 output "dynamodb_table_name" {
   description = "DynamoDBテーブルの名前"
-  value       = aws_dynamodb_table.price_comparison.name
+  value       = aws_dynamodb_table.kaitori_prices.name
 }
 
 output "lambda_function_name" {
@@ -19,11 +19,19 @@ output "lambda_execution_role_arn" {
 }
 
 output "dynamodb_table_arn" {
-  value = aws_dynamodb_table.iphone_prices.arn
+  value = aws_dynamodb_table.kaitori_prices.arn
 }
 
 output "official_prices_table_arn" {
   value = aws_dynamodb_table.official_prices.arn
+}
+
+output "price_history_table_arn" {
+  value = aws_dynamodb_table.price_history.arn
+}
+
+output "price_predictions_table_arn" {
+  value = aws_dynamodb_table.price_predictions.arn
 }
 
 output "lambda_function_arn" {

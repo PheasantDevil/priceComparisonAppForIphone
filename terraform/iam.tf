@@ -107,7 +107,7 @@ resource "aws_iam_role_policy" "dynamodb_access" {
           "dynamodb:BatchWriteItem"
         ]
         Resource = [
-          aws_dynamodb_table.iphone_prices.arn,
+          aws_dynamodb_table.kaitori_prices.arn,
           aws_dynamodb_table.official_prices.arn,
           aws_dynamodb_table.price_history.arn,
           aws_dynamodb_table.price_predictions.arn
@@ -162,7 +162,20 @@ resource "aws_iam_policy" "github_actions_policy" {
           "dynamodb:BatchWriteItem",
           "dynamodb:BatchGetItem"
         ]
-        Resource = "*"
+        Resource = [
+          aws_dynamodb_table.kaitori_prices.arn,
+          aws_dynamodb_table.official_prices.arn,
+          aws_dynamodb_table.price_history.arn,
+          aws_dynamodb_table.price_predictions.arn,
+          aws_lambda_function.get_prices.arn,
+          aws_lambda_function.price_comparison.arn,
+          aws_lambda_function.save_price_history.arn,
+          aws_lambda_function.get_price_history.arn,
+          aws_lambda_function.predict_prices_lambda.arn,
+          aws_lambda_function.compare_prices_lambda.arn,
+          aws_lambda_function.line_notification_lambda.arn,
+          aws_lambda_function.check_prices_lambda.arn
+        ]
       }
     ]
   })

@@ -68,7 +68,7 @@ resource "aws_lambda_function" "get_prices" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE = "iphone_prices"
+      DYNAMODB_TABLE = aws_dynamodb_table.kaitori_prices.name
       ENVIRONMENT    = "production"
     }
   }
@@ -94,7 +94,7 @@ resource "aws_lambda_function" "price_comparison" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE = aws_dynamodb_table.iphone_prices.name
+      DYNAMODB_TABLE = aws_dynamodb_table.kaitori_prices.name
       ENVIRONMENT    = "production"
     }
   }
@@ -182,7 +182,7 @@ resource "aws_lambda_function" "deployment_verification" {
   environment {
     variables = {
       LAMBDA_FUNCTION_NAME = aws_lambda_function.price_comparison.function_name
-      DYNAMODB_TABLES      = jsonencode([aws_dynamodb_table.iphone_prices.name, aws_dynamodb_table.official_prices.name])
+      DYNAMODB_TABLES      = jsonencode([aws_dynamodb_table.kaitori_prices.name, aws_dynamodb_table.official_prices.name])
       API_ID               = aws_api_gateway_rest_api.price_comparison.id
       ENVIRONMENT          = "production"
     }
@@ -208,7 +208,7 @@ resource "aws_lambda_function" "smoke_test" {
   environment {
     variables = {
       LAMBDA_FUNCTION_NAME = aws_lambda_function.price_comparison.function_name
-      DYNAMODB_TABLES      = jsonencode([aws_dynamodb_table.iphone_prices.name, aws_dynamodb_table.official_prices.name])
+      DYNAMODB_TABLES      = jsonencode([aws_dynamodb_table.kaitori_prices.name, aws_dynamodb_table.official_prices.name])
       API_URL              = "https://${aws_api_gateway_rest_api.price_comparison.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/production/prices"
       ENVIRONMENT          = "production"
     }
@@ -233,7 +233,7 @@ resource "aws_lambda_function" "save_price_history" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE = aws_dynamodb_table.iphone_prices.name
+      DYNAMODB_TABLE = aws_dynamodb_table.price_history.name
       ENVIRONMENT    = "production"
     }
   }
@@ -250,12 +250,6 @@ resource "aws_cloudwatch_event_rule" "save_price_history_schedule" {
   name                = "save-price-history-schedule"
   description         = "Schedule for saving price history"
   schedule_expression = "rate(1 hour)"
-
-  tags = {
-    Name        = "save-price-history-schedule"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
 }
 
 # 価格履歴保存用のCloudWatchイベントターゲット
@@ -265,7 +259,7 @@ resource "aws_cloudwatch_event_target" "save_price_history_target" {
   arn       = aws_lambda_function.save_price_history.arn
 }
 
-# 価格履歴保存用のLambdaパーミッション
+# Lambda関数のCloudWatchイベント実行権限
 resource "aws_lambda_permission" "allow_cloudwatch" {
   statement_id  = "AllowExecutionFromCloudWatch"
   action        = "lambda:InvokeFunction"
@@ -286,7 +280,7 @@ resource "aws_lambda_function" "get_price_history" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE = aws_dynamodb_table.iphone_prices.name
+      DYNAMODB_TABLE = aws_dynamodb_table.price_history.name
       ENVIRONMENT    = "production"
     }
   }
@@ -300,38 +294,74 @@ resource "aws_lambda_function" "get_price_history" {
 
 # 価格予測用のLambda関数
 resource "aws_lambda_function" "predict_prices_lambda" {
-  filename         = "predict_prices_lambda.zip"
-  function_name    = "predict-prices"
-  role             = aws_iam_role.lambda_execution_role.arn
-  handler          = "predict_prices.handler"
-  runtime          = "python3.9"
-  timeout          = 30
-  memory_size      = 256
-  source_code_hash = filebase64sha256("predict_prices_lambda.zip")
+  filename      = "predict_prices.zip"
+  function_name = "predict-prices"
+  role          = aws_iam_role.lambda_execution_role.arn
+  handler       = "predict_prices.lambda_handler"
+  runtime       = "python3.9"
+  timeout       = 300
+  memory_size   = 128
+
+  environment {
+    variables = {
+      DYNAMODB_TABLE = aws_dynamodb_table.price_predictions.name
+      ENVIRONMENT    = "production"
+    }
+  }
+
+  tags = {
+    Name        = "predict-prices"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
 }
 
 # 価格比較用のLambda関数
 resource "aws_lambda_function" "compare_prices_lambda" {
-  filename         = "compare_prices_lambda.zip"
-  function_name    = "compare-prices"
-  role             = aws_iam_role.lambda_execution_role.arn
-  handler          = "compare_prices.handler"
-  runtime          = "python3.9"
-  timeout          = 30
-  memory_size      = 256
-  source_code_hash = filebase64sha256("compare_prices_lambda.zip")
+  filename      = "compare_prices.zip"
+  function_name = "compare-prices"
+  role          = aws_iam_role.lambda_execution_role.arn
+  handler       = "compare_prices.lambda_handler"
+  runtime       = "python3.9"
+  timeout       = 300
+  memory_size   = 128
+
+  environment {
+    variables = {
+      DYNAMODB_TABLE = aws_dynamodb_table.kaitori_prices.name
+      ENVIRONMENT    = "production"
+    }
+  }
+
+  tags = {
+    Name        = "compare-prices"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
 }
 
 # LINE通知用のLambda関数
 resource "aws_lambda_function" "line_notification_lambda" {
-  filename         = "line_notification_lambda.zip"
-  function_name    = "line-notification"
-  role             = aws_iam_role.lambda_execution_role.arn
-  handler          = "line_notification.handler"
-  runtime          = "python3.9"
-  timeout          = 30
-  memory_size      = 256
-  source_code_hash = filebase64sha256("line_notification_lambda.zip")
+  filename      = "line_notification_lambda.zip"
+  function_name = "line-notification"
+  role          = aws_iam_role.lambda_execution_role.arn
+  handler       = "line_notification.lambda_handler"
+  runtime       = "python3.9"
+  timeout       = 300
+  memory_size   = 128
+
+  environment {
+    variables = {
+      LINE_CHANNEL_ACCESS_TOKEN = var.line_channel_access_token
+      ENVIRONMENT              = "production"
+    }
+  }
+
+  tags = {
+    Name        = "line-notification"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
 }
 
 # 価格チェック用のLambda関数
@@ -346,9 +376,8 @@ resource "aws_lambda_function" "check_prices_lambda" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE    = aws_dynamodb_table.iphone_prices.name
-      LINE_NOTIFY_TOKEN = var.line_notify_token
-      ENVIRONMENT      = "production"
+      DYNAMODB_TABLE = aws_dynamodb_table.kaitori_prices.name
+      ENVIRONMENT    = "production"
     }
   }
 
@@ -356,16 +385,29 @@ resource "aws_lambda_function" "check_prices_lambda" {
     Name        = "check-prices"
     Environment = "production"
     Project     = "iphone_price_tracker"
-    Service     = "price-check"
   }
 }
 
-# 価格チェック用のLambdaパーミッション
+# 価格チェック用のCloudWatchイベントルール
+resource "aws_cloudwatch_event_rule" "check_prices_schedule" {
+  name                = "check-prices-schedule"
+  description         = "Schedule for checking prices"
+  schedule_expression = "rate(1 hour)"
+}
+
+# 価格チェック用のCloudWatchイベントターゲット
+resource "aws_cloudwatch_event_target" "check_prices_target" {
+  rule      = aws_cloudwatch_event_rule.check_prices_schedule.name
+  target_id = "CheckPrices"
+  arn       = aws_lambda_function.check_prices_lambda.arn
+}
+
+# Lambda関数のCloudWatchイベント実行権限
 resource "aws_lambda_permission" "check_prices_lambda_permission" {
   statement_id  = "AllowExecutionFromCloudWatch"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.check_prices_lambda.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.check_prices.arn
+  source_arn    = aws_cloudwatch_event_rule.check_prices_schedule.arn
 }
 
