@@ -1,6 +1,44 @@
 # DynamoDBテーブルのデータ管理
 
 # DynamoDBテーブルの定義
+resource "aws_dynamodb_table" "kaitori_prices" {
+  name           = "kaitori_prices"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+
+  attribute {
+    name = "price"
+    type = "N"
+  }
+
+  global_secondary_index {
+    name            = "PriceIndex"
+    hash_key        = "id"
+    range_key       = "price"
+    projection_type = "ALL"
+  }
+
+  lifecycle {
+    ignore_changes = [
+      read_capacity,
+      write_capacity,
+      billing_mode
+    ]
+  }
+
+  tags = {
+    Name        = "kaitori_prices"
+    Environment = "production"
+    Project     = "iphone_price_tracker"
+  }
+}
+
+# DynamoDBテーブルの定義
 resource "aws_dynamodb_table" "official_prices" {
   name           = "official_prices"
   billing_mode   = "PAY_PER_REQUEST"
@@ -125,74 +163,6 @@ resource "aws_dynamodb_table" "price_history" {
 
   tags = {
     Name        = "price_history"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
-}
-
-resource "aws_dynamodb_table" "price_predictions" {
-  name           = "price_predictions"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "series"
-  range_key      = "timestamp"
-
-  attribute {
-    name = "series"
-    type = "S"
-  }
-
-  attribute {
-    name = "timestamp"
-    type = "S"
-  }
-
-  lifecycle {
-    ignore_changes = [
-      read_capacity,
-      write_capacity,
-      billing_mode
-    ]
-  }
-
-  tags = {
-    Name        = "price_predictions"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
-}
-
-resource "aws_dynamodb_table" "kaitori_prices" {
-  name           = "kaitori_prices"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "id"
-
-  attribute {
-    name = "id"
-    type = "S"
-  }
-
-  attribute {
-    name = "price"
-    type = "N"
-  }
-
-  global_secondary_index {
-    name            = "PriceIndex"
-    hash_key        = "id"
-    range_key       = "price"
-    projection_type = "ALL"
-  }
-
-  lifecycle {
-    ignore_changes = [
-      read_capacity,
-      write_capacity,
-      billing_mode
-    ]
-  }
-
-  tags = {
-    Name        = "kaitori_prices"
     Environment = "production"
     Project     = "iphone_price_tracker"
   }
