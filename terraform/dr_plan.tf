@@ -38,8 +38,10 @@ resource "aws_iam_role_policy" "dr_policy" {
           "dynamodb:DescribeTable"
         ]
         Resource = [
-          aws_dynamodb_table.price_comparison.arn,
-          aws_dynamodb_table.price_comparison_backup.arn
+          aws_dynamodb_table.kaitori_prices.arn,
+          aws_dynamodb_table.official_prices.arn,
+          aws_dynamodb_table.price_history.arn,
+          aws_dynamodb_table.price_predictions.arn
         ]
       },
       {
@@ -67,10 +69,10 @@ resource "aws_lambda_function" "dr_handler" {
 
   environment {
     variables = {
-      PRIMARY_TABLE = aws_dynamodb_table.price_comparison.name
-      BACKUP_TABLE  = aws_dynamodb_table.price_comparison_backup.name
-      PRIMARY_API   = aws_api_gateway_rest_api.price_comparison.id
-      BACKUP_API    = aws_api_gateway_rest_api.price_comparison_backup.id
+      KAITORI_TABLE = aws_dynamodb_table.kaitori_prices.name
+      OFFICIAL_TABLE = aws_dynamodb_table.official_prices.name
+      HISTORY_TABLE = aws_dynamodb_table.price_history.name
+      PREDICTIONS_TABLE = aws_dynamodb_table.price_predictions.name
     }
   }
 
