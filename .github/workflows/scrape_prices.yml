@@ -54,12 +54,12 @@ jobs:
         id: scrape
         continue-on-error: true  # エラーが発生しても続行
         run: |
-          python src/scripts/scrape_prices.py
+          python scripts/price_scraping/scrape_prices.py
 
       - name: Send error notification
         if: steps.scrape.outcome == 'failure'
         run: |
-          python src/scripts/send_error_notification.py "${{ steps.scrape.outcome }}" "${{ steps.scrape.outputs.error_message }}"
+          python scripts/price_scraping/send_error_notification.py "${{ steps.scrape.outcome }}" "${{ steps.scrape.outputs.error_message }}"
 
       - name: Run tests
         if: ${{ github.event_name == 'workflow_dispatch' }}
