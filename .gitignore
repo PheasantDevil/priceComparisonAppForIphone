@@ -301,6 +301,14 @@ terraform/lambda/*/
 !terraform/lambda/*/*.py
 !terraform/lambda/*/requirements.txt
 
+# Lambda function dependencies
+terraform/lambdas/*/bin/
+terraform/lambdas/*/*.dist-info/
+terraform/lambdas/*/certifi/
+terraform/lambdas/*/charset_normalizer/
+terraform/lambdas/*/idna/
+terraform/lambdas/*/requests/
+terraform/lambdas/*/urllib3/
 
 # Terraform
 *.tfstate
