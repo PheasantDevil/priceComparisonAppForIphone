@@ -162,14 +162,32 @@ class PriceScraper:
         """DynamoDBにデータを保存"""
         try:
             # kaitori_pricesテーブルへの保存（上書き）
-            self.kaitori_table.put_item(Item=data)
+            kaitori_item = {
+                "id": data["id"],
+                "series": data["series"],
+                "capacity": data["capacity"],
+                "colors": data["colors"],
+                "kaitori_price_min": data["kaitori_price_min"],
+                "kaitori_price_max": data["kaitori_price_max"],
+                "updated_at": datetime.now().isoformat()
+            }
+            self.kaitori_table.put_item(Item=kaitori_item)
+            logger.info(f"kaitori_pricesテーブルに保存: {json.dumps(kaitori_item, ensure_ascii=False)}")
             
             # price_historyテーブルへの保存（履歴追加）
-            history_data = {
-                **data,
-                'timestamp': datetime.now().isoformat()
+            current_timestamp = int(datetime.now().timestamp())
+            history_item = {
+                "model": data["id"],
+                "timestamp": current_timestamp,
+                "series": data["series"],
+                "capacity": data["capacity"],
+                "colors": data["colors"],
+                "kaitori_price_min": data["kaitori_price_min"],
+                "kaitori_price_max": data["kaitori_price_max"],
+                "expiration_time": int((datetime.now() + timedelta(days=14)).timestamp())
             }
-            self.history_table.put_item(Item=history_data)
+            self.history_table.put_item(Item=history_item)
+            logger.info(f"price_historyテーブルに保存: {json.dumps(history_item, ensure_ascii=False)}")
             
         except Exception as e:
             logger.error(f"DynamoDB保存エラー: {e}")
@@ -178,7 +196,7 @@ class PriceScraper:
     def delete_old_data(self) -> None:
         """2週間以上前のデータを削除"""
         try:
-            two_weeks_ago = (datetime.now() - timedelta(days=14)).isoformat()
+            two_weeks_ago = int((datetime.now() - timedelta(days=14)).timestamp())
             
             # 2週間以上前のデータを検索
             response = self.history_table.scan(
@@ -191,10 +209,11 @@ class PriceScraper:
                 for item in response.get('Items', []):
                     batch.delete_item(
                         Key={
-                            'id': item['id'],
+                            'model': item['model'],
                             'timestamp': item['timestamp']
                         }
                     )
+                    logger.info(f"古いデータを削除: {json.dumps(item, ensure_ascii=False)}")
                     
         except Exception as e:
             logger.error(f"古いデータの削除に失敗: {e}")
