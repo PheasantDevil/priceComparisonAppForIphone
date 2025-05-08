@@ -226,13 +226,19 @@ class PriceScraper:
             
             # 2週間以上前のデータを検索
             response = self.history_table.scan(
-                FilterExpression='timestamp < :two_weeks_ago',
-                ExpressionAttributeValues={':two_weeks_ago': two_weeks_ago}
+                FilterExpression='#ts < :two_weeks_ago',
+                ExpressionAttributeValues={':two_weeks_ago': two_weeks_ago},
+                ExpressionAttributeNames={'#ts': 'timestamp'}  # 予約語の回避
             )
+            
+            items = response.get('Items', [])
+            if not items:
+                logger.info("2週間以上経過しているデータは存在しないため、削除処理をスキップしました")
+                return
             
             # 古いデータを削除
             with self.history_table.batch_writer() as batch:
-                for item in response.get('Items', []):
+                for item in items:
                     batch.delete_item(
                         Key={
                             'model': item['model'],
@@ -240,9 +246,11 @@ class PriceScraper:
                         }
                     )
                     logger.info(f"古いデータを削除: {json.dumps(item, ensure_ascii=False)}")
+            
+            logger.info(f"合計{len(items)}件の古いデータを削除しました")
                     
         except Exception as e:
-            error_msg = f"古いデータの削除に失敗: {e}"
+            error_msg = f"古いデータの削除処理中にエラーが発生: {e}"
             logger.error(error_msg)
             self._send_error_notification('dynamodb', error_msg)
             # 削除処理の失敗は他の処理に影響を与えない
