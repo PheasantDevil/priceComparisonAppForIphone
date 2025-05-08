@@ -10,6 +10,7 @@ env:
   AWS_REGION: ap-northeast-1
   PYTHONPATH: ${{ github.workspace }}
   PYTHONUNBUFFERED: 1  # Pythonの出力バッファリングを無効化
+  TEST_ENV: true  # テスト環境フラグ
 
 jobs:
   scrape:
@@ -63,9 +64,13 @@ jobs:
 
       - name: Run tests
         if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          AWS_REGION: ap-northeast-1
+          TEST_ENV: true
+          PYTHONPATH: ${{ github.workspace }}
         run: |
-          pip install pytest pytest-cov
-          pytest tests/ --cov=src --cov-report=xml
+          pip install pytest pytest-cov pytest-asyncio
+          pytest tests/ --cov=src --cov-report=xml -v --tb=short
 
       - name: Upload coverage report
         if: ${{ github.event_name == 'workflow_dispatch' }}
