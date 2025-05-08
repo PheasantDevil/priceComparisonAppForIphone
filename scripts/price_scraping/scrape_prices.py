@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -42,8 +43,25 @@ class PriceScraper:
             with open(config_path, 'r') as f:
                 return yaml.safe_load(f)
         except Exception as e:
-            logger.error(f"設定ファイルの読み込みに失敗: {e}")
+            error_msg = f"設定ファイルの読み込みに失敗: {e}"
+            logger.error(error_msg)
+            self._send_error_notification('config', error_msg)
             raise
+
+    def _send_error_notification(self, error_type: str, error_message: str) -> None:
+        """エラー通知の送信"""
+        try:
+            script_path = Path(__file__).parent / 'send_error_notification.py'
+            subprocess.run([
+                sys.executable,
+                str(script_path),
+                error_type,
+                error_message
+            ], check=True)
+        except subprocess.CalledProcessError as e:
+            logger.error(f"エラー通知の送信に失敗: {e}")
+        except Exception as e:
+            logger.error(f"エラー通知処理中に予期せぬエラー: {e}")
 
     def _price_text_to_int(self, price_text: str) -> int:
         """価格テキストを整数に変換"""
@@ -68,7 +86,9 @@ class PriceScraper:
                 # 価格情報を含む要素を取得
                 items = await page.query_selector_all(".tr")
                 if not items:
-                    logger.warning(f"価格要素が見つかりません (URL: {url})")
+                    error_msg = f"価格要素が見つかりません (URL: {url})"
+                    logger.warning(error_msg)
+                    self._send_error_notification('scraping', error_msg)
                     return {}
 
                 product_details = {
@@ -131,7 +151,9 @@ class PriceScraper:
                                 product_details["kaitori_price_max"] = price_value
 
                     except Exception as e:
-                        logger.error(f"要素の処理中にエラー (URL: {url}): {e}")
+                        error_msg = f"要素の処理中にエラー (URL: {url}): {e}"
+                        logger.error(error_msg)
+                        self._send_error_notification('scraping', error_msg)
                         continue
 
                 # 結果を整形
@@ -146,7 +168,9 @@ class PriceScraper:
                 return result
 
             except Exception as e:
-                logger.error(f"スクレイピングエラー (URL: {url}): {e}")
+                error_msg = f"スクレイピングエラー (URL: {url}): {e}"
+                logger.error(error_msg)
+                self._send_error_notification('scraping', error_msg)
                 raise
             finally:
                 await browser.close()
@@ -190,7 +214,9 @@ class PriceScraper:
             logger.info(f"price_historyテーブルに保存: {json.dumps(history_item, ensure_ascii=False)}")
             
         except Exception as e:
-            logger.error(f"DynamoDB保存エラー: {e}")
+            error_msg = f"DynamoDB保存エラー: {e}"
+            logger.error(error_msg)
+            self._send_error_notification('dynamodb', error_msg)
             raise
 
     def delete_old_data(self) -> None:
@@ -216,7 +242,9 @@ class PriceScraper:
                     logger.info(f"古いデータを削除: {json.dumps(item, ensure_ascii=False)}")
                     
         except Exception as e:
-            logger.error(f"古いデータの削除に失敗: {e}")
+            error_msg = f"古いデータの削除に失敗: {e}"
+            logger.error(error_msg)
+            self._send_error_notification('dynamodb', error_msg)
             # 削除処理の失敗は他の処理に影響を与えない
             pass
 
@@ -238,7 +266,9 @@ async def main():
         scraper.delete_old_data()
         
     except Exception as e:
-        logger.error(f"予期せぬエラー: {e}")
+        error_msg = f"予期せぬエラー: {e}"
+        logger.error(error_msg)
+        scraper._send_error_notification('unexpected', error_msg)
         sys.exit(1)
 
 if __name__ == "__main__":
