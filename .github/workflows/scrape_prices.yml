@@ -93,7 +93,7 @@ jobs:
           
           # テストの実行
           pip install pytest pytest-cov pytest-asyncio
-          pytest tests/ --cov=src --cov-report=xml -v --tb=short --capture=no
+          python -m pytest tests/ --cov=src --cov-report=xml -v --tb=short
 
       - name: Upload coverage report
         if: ${{ github.event_name == 'workflow_dispatch' }}
