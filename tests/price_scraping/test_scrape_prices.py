@@ -6,6 +6,7 @@
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -45,10 +46,9 @@ TEST_HTML = """
 def mock_config():
     """設定ファイルのモック"""
     with patch('scripts.price_scraping.scrape_prices.Path') as mock_path:
-        mock_path.return_value.parent.parent.parent = MagicMock()
-        mock_path.return_value.parent.parent.parent.__truediv__.return_value = MagicMock()
-        mock_path.return_value.parent.parent.parent.__truediv__.return_value.__truediv__.return_value = MagicMock()
-        mock_path.return_value.parent.parent.parent.__truediv__.return_value.__truediv__.return_value.open.return_value.__enter__.return_value.read.return_value = json.dumps(TEST_CONFIG)
+        # 実際のファイルパスを使用
+        config_path = Path(__file__).parent.parent.parent / 'config' / 'config.testing.yaml'
+        mock_path.return_value = config_path
         yield mock_path
 
 @pytest.fixture
