@@ -38,8 +38,9 @@ resource "aws_iam_role_policy" "dr_policy" {
           "dynamodb:DescribeTable"
         ]
         Resource = [
-          aws_dynamodb_table.price_comparison.arn,
-          aws_dynamodb_table.price_comparison_backup.arn
+          aws_dynamodb_table.kaitori_prices.arn,
+          aws_dynamodb_table.official_prices.arn,
+          aws_dynamodb_table.price_history.arn
         ]
       },
       {
@@ -67,10 +68,9 @@ resource "aws_lambda_function" "dr_handler" {
 
   environment {
     variables = {
-      PRIMARY_TABLE = aws_dynamodb_table.price_comparison.name
-      BACKUP_TABLE  = aws_dynamodb_table.price_comparison_backup.name
-      PRIMARY_API   = aws_api_gateway_rest_api.price_comparison.id
-      BACKUP_API    = aws_api_gateway_rest_api.price_comparison_backup.id
+      KAITORI_TABLE = aws_dynamodb_table.kaitori_prices.name
+      OFFICIAL_TABLE = aws_dynamodb_table.official_prices.name
+      HISTORY_TABLE = aws_dynamodb_table.price_history.name
     }
   }
 
@@ -94,6 +94,31 @@ resource "aws_cloudwatch_event_target" "dr_test" {
   arn       = aws_lambda_function.dr_handler.arn
 }
 
+# SNSトピックの作成
+resource "aws_sns_topic" "dr_alerts" {
+  name = "price-comparison-dr-alerts"
+  display_name = "Price Comparison DR Alerts"
+}
+
+# SNSトピックのポリシー
+resource "aws_sns_topic_policy" "dr_alerts" {
+  arn = aws_sns_topic.dr_alerts.arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudwatch.amazonaws.com"
+        }
+        Action = "SNS:Publish"
+        Resource = aws_sns_topic.dr_alerts.arn
+      }
+    ]
+  })
+}
+
 # ディザスタリカバリの検証
 resource "aws_cloudwatch_metric_alarm" "dr_verification" {
   alarm_name          = "dr-verification"
@@ -105,7 +130,7 @@ resource "aws_cloudwatch_metric_alarm" "dr_verification" {
   statistic          = "Sum"
   threshold          = 0
   alarm_description  = "DR verification Lambda function errors"
-  alarm_actions      = [aws_sns_topic.alerts.arn]
+  alarm_actions      = [aws_sns_topic.dr_alerts.arn]
 
   dimensions = {
     FunctionName = aws_lambda_function.dr_handler.function_name

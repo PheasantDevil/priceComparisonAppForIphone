@@ -14,6 +14,9 @@ sys.path.insert(0, project_root)
 
 # 環境変数の設定
 os.environ["PYTHONPATH"] = project_root
+os.environ["FLASK_ENV"] = "testing"
+os.environ["SECRET_KEY"] = "test-secret-key-16ch"
+os.environ["LOG_LEVEL"] = "DEBUG"
 
 # テスト用の設定
 def pytest_configure(config):
@@ -26,7 +29,7 @@ def mock_env_vars(monkeypatch):
     """環境変数をモックするフィクスチャ"""
     test_vars = {
         "FLASK_ENV": "testing",
-        "SECRET_KEY": "test-secret-key-16ch",  # 16文字以上に変更
+        "SECRET_KEY": "test-secret-key-16ch",
         "LOG_LEVEL": "DEBUG"
     }
     for key, value in test_vars.items():
@@ -79,11 +82,39 @@ def mock_response():
     return response
 
 @pytest.fixture
-def test_config_file(mock_config):
+def test_config_file(tmp_path):
     """Create a temporary YAML configuration file."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
-        yaml.dump(mock_config, f)
-        return Path(f.name)
+    config_content = """
+app:
+  debug: true
+  log_level: DEBUG
+  secret_key: test-secret-key-16ch
+
+scraper:
+  kaitori_rudea_urls:
+    - "https://kaitori-rudeya.com/category/detail/183"  # iPhone 16
+    - "https://kaitori-rudeya.com/category/detail/185"  # iPhone 16 Pro
+    - "https://kaitori-rudeya.com/category/detail/186"  # iPhone 16 Pro Max
+    - "https://kaitori-rudeya.com/category/detail/205"  # iPhone 16 e
+  apple_store_url: "https://www.apple.com/jp/shop/buy-iphone"
+  request_timeout: 30
+  retry_count: 3
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+"""
+    config_file = tmp_path / "config.testing.yaml"
+    config_file.write_text(config_content)
+    
+    # ConfigManagerが参照するディレクトリにファイルをコピー
+    dest_dir = Path(__file__).parent.parent / "config"
+    dest_dir.mkdir(exist_ok=True)
+    dest_file = dest_dir / "config.testing.yaml"
+    shutil.copy(str(config_file), str(dest_file))
+    
+    yield dest_file
+    
+    # テスト後にファイルを削除
+    if dest_file.exists():
+        dest_file.unlink()
 
 @pytest.fixture(autouse=True)
 def setup_test_env():

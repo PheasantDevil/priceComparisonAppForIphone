@@ -301,6 +301,14 @@ terraform/lambda/*/
 !terraform/lambda/*/*.py
 !terraform/lambda/*/requirements.txt
 
+# Lambda function dependencies
+terraform/lambdas/*/bin/
+terraform/lambdas/*/*.dist-info/
+terraform/lambdas/*/certifi/
+terraform/lambdas/*/charset_normalizer/
+terraform/lambdas/*/idna/
+terraform/lambdas/*/requests/
+terraform/lambdas/*/urllib3/
 
 # Terraform
 *.tfstate
@@ -336,3 +344,32 @@ package-lock.json
 *.backup
 dynamodb_local/
 cache/
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraformrc
+terraform.rc
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# AWS Lambda deployment packages
+*.zip

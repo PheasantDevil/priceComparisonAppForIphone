@@ -174,22 +174,6 @@ resource "aws_lambda_permission" "api_gateway_price_history" {
   source_arn    = "${aws_api_gateway_rest_api.price_comparison.execution_arn}/*/*"
 }
 
-resource "aws_apigatewayv2_route" "predict_prices" {
-  api_id    = aws_apigatewayv2_api.main.id
-  route_key = "GET /predict-prices"
-  target    = "integrations/${aws_apigatewayv2_integration.predict_prices.id}"
-}
-
-resource "aws_apigatewayv2_integration" "predict_prices" {
-  api_id           = aws_apigatewayv2_api.main.id
-  integration_type = "AWS_PROXY"
-
-  connection_type    = "INTERNET"
-  description        = "Predict prices integration"
-  integration_method = "POST"
-  integration_uri    = aws_lambda_function.predict_prices_lambda.invoke_arn
-}
-
 resource "aws_apigatewayv2_route" "compare_prices" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "GET /compare-prices"

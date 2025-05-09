@@ -62,7 +62,7 @@ resource "aws_cloudwatch_metric_alarm" "api_gateway_errors" {
 
 # DynamoDBの容量アラーム
 resource "aws_cloudwatch_metric_alarm" "dynamodb_capacity" {
-  alarm_name          = "price_comparison_dynamodb_capacity"
+  alarm_name          = "kaitori_prices_dynamodb_capacity"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = "1"
   metric_name         = "ConsumedReadCapacityUnits"
@@ -74,7 +74,7 @@ resource "aws_cloudwatch_metric_alarm" "dynamodb_capacity" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    TableName = aws_dynamodb_table.price_comparison.name
+    TableName = aws_dynamodb_table.kaitori_prices.name
   }
 
   alarm_actions = [aws_sns_topic.alerts.arn]
@@ -156,8 +156,8 @@ resource "aws_cloudwatch_dashboard" "main" {
 
         properties = {
           metrics = [
-            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", aws_dynamodb_table.price_comparison.name],
-            ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", aws_dynamodb_table.price_comparison.name]
+            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", aws_dynamodb_table.kaitori_prices.name],
+            ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", aws_dynamodb_table.kaitori_prices.name]
           ]
           period = 300
           stat   = "Sum"
@@ -251,15 +251,15 @@ resource "aws_cloudwatch_metric_alarm" "custom_error_rate" {
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = "1"
   metric_name         = "ErrorRate"
-  namespace           = "Custom/PriceComparison"
+  namespace           = "PriceComparison"
   period              = "300"
   statistic           = "Average"
-  threshold           = "0.1" # 10%のエラーレート
-  alarm_description   = "カスタムエラーレートが閾値を超えました"
+  threshold           = "0.1" # 10%
+  alarm_description   = "エラー率が10%を超えています"
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    Service = "PriceComparison"
+    ApiName = aws_api_gateway_rest_api.price_comparison.name
   }
 
   alarm_actions = [aws_sns_topic.alerts.arn]
@@ -295,8 +295,8 @@ resource "aws_cloudwatch_dashboard" "performance" {
         height = 6
         properties = {
           metrics = [
-            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", aws_dynamodb_table.iphone_prices.name],
-            ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", aws_dynamodb_table.iphone_prices.name]
+            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", aws_dynamodb_table.kaitori_prices.name],
+            ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", aws_dynamodb_table.kaitori_prices.name]
           ]
           period = 300
           stat   = "Sum"

@@ -33,8 +33,9 @@ resource "aws_backup_selection" "dynamodb" {
   iam_role_arn = aws_iam_role.backup.arn
 
   resources = [
-    aws_dynamodb_table.price_comparison_backup_v2.arn,
-    aws_dynamodb_table.price_comparison.arn
+    aws_dynamodb_table.kaitori_prices.arn,
+    aws_dynamodb_table.official_prices.arn,
+    aws_dynamodb_table.price_history.arn
   ]
 
   selection_tag {
@@ -80,8 +81,9 @@ resource "aws_iam_role_policy" "backup" {
           "dynamodb:RestoreTableFromBackup"
         ]
         Resource = [
-          aws_dynamodb_table.iphone_prices.arn,
-          aws_dynamodb_table.official_prices.arn
+          aws_dynamodb_table.kaitori_prices.arn,
+          aws_dynamodb_table.official_prices.arn,
+          aws_dynamodb_table.price_history.arn
         ]
       },
       {
