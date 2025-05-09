@@ -30,11 +30,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class PriceScraper:
-    def __init__(self):
-        self.config = self._load_config()
-        self.dynamodb = boto3.resource('dynamodb')
-        self.kaitori_table = self.dynamodb.Table('kaitori_prices')
-        self.history_table = self.dynamodb.Table('price_history')
+    def __init__(self, config: Dict):
+        self.config = config
+        self.playwright = None
+        self.browser = None
+        self.context = None
+        self.kaitori_table = boto3.resource('dynamodb').Table('kaitori_prices')
+        self.history_table = boto3.resource('dynamodb').Table('price_history')
+        self.model_patterns = {
+            "iPhone 16 Pro Max": r"iPhone\s*16\s*Pro\s*Max",
+            "iPhone 16 Pro": r"iPhone\s*16\s*Pro(?!\s*Max)",
+            "iPhone 16 Plus": r"iPhone\s*16\s*Plus",
+            "iPhone 16 e": r"iPhone\s*16\s*[eE]",
+            "iPhone 16": r"iPhone\s*16(?!\s*(?:Pro|Plus|[eE]))"
+        }
         
         # 各モデルの有効な容量を定義
         self.valid_capacities = {
@@ -45,32 +54,21 @@ class PriceScraper:
             "iPhone 16 e": ["128GB", "256GB", "512GB"]
         }
 
-    def _load_config(self) -> dict:
-        """設定ファイルの読み込み"""
-        try:
-            config_path = Path(__file__).parent.parent.parent / 'config' / 'config.production.yaml'
-            with open(config_path, 'r') as f:
-                return yaml.safe_load(f)
-        except Exception as e:
-            error_msg = f"設定ファイルの読み込みに失敗: {e}"
-            logger.error(error_msg)
-            self._send_error_notification('config', error_msg)
-            raise
+    async def __aenter__(self):
+        """非同期コンテキストマネージャーのエントリーポイント"""
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.chromium.launch()
+        self.context = await self.browser.new_context()
+        return self
 
-    def _send_error_notification(self, error_type: str, error_message: str) -> None:
-        """エラー通知の送信"""
-        try:
-            script_path = Path(__file__).parent / 'send_error_notification.py'
-            subprocess.run([
-                sys.executable,
-                str(script_path),
-                error_type,
-                error_message
-            ], check=True)
-        except subprocess.CalledProcessError as e:
-            logger.error(f"エラー通知の送信に失敗: {e}")
-        except Exception as e:
-            logger.error(f"エラー通知処理中に予期せぬエラー: {e}")
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """非同期コンテキストマネージャーの終了処理"""
+        if self.context:
+            await self.context.close()
+        if self.browser:
+            await self.browser.close()
+        if self.playwright:
+            await self.playwright.stop()
 
     def _price_text_to_int(self, price_text: str) -> int:
         """価格テキストを整数に変換"""
@@ -80,163 +78,154 @@ class PriceScraper:
             return 0
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=10),
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=2, max=30),
         reraise=True
     )
     async def scrape_url(self, url: str) -> List[Dict]:
         """指定されたURLから価格データをスクレイピング"""
-        async with async_playwright() as p:
-            browser = await p.chromium.launch()
-            page = await browser.new_page()
+        try:
+            # ページの読み込み
+            page = await self.context.new_page()
             try:
-                await page.goto(url, wait_until='networkidle')
+                await page.goto(url, wait_until='networkidle', timeout=60000)
                 
-                # 価格情報を含む要素を取得
-                items = await page.query_selector_all(".tr")
-                if not items:
-                    error_msg = f"価格要素が見つかりません (URL: {url})"
-                    logger.error(error_msg)
-                    self._send_error_notification('scraping', error_msg)
-                    raise ValueError(error_msg)
-
+                # デバッグ情報の出力
+                logger.debug(f"ページのタイトル: {await page.title()}")
+                logger.debug(f"URL: {page.url}")
+                
+                # 価格要素の取得（セレクターを修正）
+                price_elements = await page.query_selector_all('.tr')
+                if not price_elements:
+                    logger.warning(f"価格要素が見つかりません: {url}")
+                    # ページ構造のデバッグ
+                    content = await page.content()
+                    logger.debug(f"ページ構造: {content[:500]}...")  # 最初の500文字のみ表示
+                    return []
+                
+                logger.info(f"価格要素が{len(price_elements)}個見つかりました")
+                
                 results = []
-                current_series = None
-                current_capacity = None
-                product_details = {
-                    "colors": {},
-                    "kaitori_price_min": None,
-                    "kaitori_price_max": None,
-                }
-
-                for item in items:
+                for element in price_elements:
                     try:
-                        # モデル名を取得
-                        model_element = await item.query_selector(".ttl h2")
-                        model_name = await model_element.inner_text() if model_element else ""
-                        model_name = model_name.strip()
-
-                        # モデル名からシリーズを判定
-                        if "Pro Max" in model_name:
-                            series = "iPhone 16 Pro Max"
-                        elif "Pro" in model_name:
-                            series = "iPhone 16 Pro"
-                        elif "Plus" in model_name:
-                            series = "iPhone 16 Plus"
-                        elif "16 e" in model_name or "16e" in model_name:
-                            series = "iPhone 16 e"
-                        elif "16" in model_name:
-                            series = "iPhone 16"
-                        else:
-                            logger.warning(f"未知のモデル名: {model_name}")
+                        # モデル名の取得（セレクターを修正）
+                        model_name = await element.query_selector('.ttl h2')
+                        if not model_name:
                             continue
-
-                        # 容量を抽出
-                        capacity_match = re.search(r"(\d+)(GB|TB)", model_name)
+                        model_text = await model_name.text_content()
+                        if not model_text:
+                            continue
+                        
+                        logger.debug(f"モデル名: {model_text}")
+                        
+                        # モデルシリーズの識別
+                        series = self._identify_model_series(model_text.strip())
+                        if not series:
+                            logger.warning(f"未知のモデル名: {model_text}")
+                            continue
+                        
+                        # 容量の取得（正規表現で抽出）
+                        capacity_match = re.search(r'(\d+)\s*[GT]B', model_text)
                         if not capacity_match:
-                            logger.warning(f"容量が見つかりません: {model_name}")
+                            logger.warning(f"容量が見つかりません: {model_text}")
                             continue
-                        capacity = capacity_match.group(0)  # "128GB" or "1TB"
-
-                        # 容量の組み合わせを検証
-                        if not self._is_valid_capacity(series, capacity):
+                        capacity = f"{capacity_match.group(1)}GB"
+                        
+                        logger.debug(f"容量: {capacity}")
+                        
+                        # 価格の取得（セレクターを修正）
+                        price_element = await element.query_selector('.td.td2 .td2wrap')
+                        if not price_element:
                             continue
-
-                        # 新しいシリーズまたは容量の場合、前のデータを保存
-                        if (current_series and current_series != series) or \
-                           (current_capacity and current_capacity != capacity):
-                            if product_details["colors"]:
-                                result = {
-                                    "id": f"{current_series}_{current_capacity}",
-                                    "series": current_series,
-                                    "capacity": current_capacity,
-                                    **product_details
-                                }
-                                results.append(result)
-                                product_details = {
-                                    "colors": {},
-                                    "kaitori_price_min": None,
-                                    "kaitori_price_max": None,
-                                }
-
-                        current_series = series
-                        current_capacity = capacity
-
-                        # 価格を取得
-                        price_element = await item.query_selector(".td.td2 .td2wrap")
-                        price_text = await price_element.inner_text() if price_element else ""
-                        price_text = price_text.strip()
-
-                        if not price_text or "円" not in price_text:
-                            logger.warning(f"価格が見つかりません: {model_name}")
+                        price_text = await price_element.text_content()
+                        if not price_text:
                             continue
-
-                        # カラーを抽出
-                        color_match = re.search(r"(黒|白|桃|緑|青|金|灰)", model_name)
+                        
+                        # 価格の正規化
+                        price = self._normalize_price(price_text.strip())
+                        if not price:
+                            logger.warning(f"無効な価格: {price_text}")
+                            continue
+                        
+                        logger.debug(f"価格: {price}")
+                        
+                        # 色の取得（正規表現で抽出）
+                        color_match = re.search(r'(黒|白|桃|緑|青|金|灰)', model_text)
                         color = color_match.group(1) if color_match else "不明"
-
-                        # 価格を数値に変換
-                        price_value = self._price_text_to_int(price_text)
-                        if price_value == 0:
-                            logger.warning(f"無効な価格: {price_text} ({model_name})")
-                            continue
-
-                        # 色ごとの価格を保存
-                        product_details["colors"][color] = {
-                            "price_text": price_text,
-                            "price_value": price_value,
+                        
+                        # 結果の追加
+                        result = {
+                            "id": f"{series}_{capacity}",
+                            "series": series,
+                            "capacity": capacity,
+                            "colors": [color.strip()],
+                            "kaitori_price_min": price,
+                            "kaitori_price_max": price
                         }
-
-                        # 最小・最大価格を更新
-                        current_min = product_details["kaitori_price_min"]
-                        current_max = product_details["kaitori_price_max"]
-
-                        if current_min is None or price_value < current_min:
-                            product_details["kaitori_price_min"] = price_value
-                        if current_max is None or price_value > current_max:
-                            product_details["kaitori_price_max"] = price_value
-
+                        
+                        logger.debug(f"結果: {json.dumps(result, ensure_ascii=False)}")
+                        results.append(result)
+                        
                     except Exception as e:
-                        error_msg = f"要素の処理中にエラー (URL: {url}): {e}"
-                        logger.error(error_msg)
-                        self._send_error_notification('scraping', error_msg)
+                        logger.error(f"要素の処理中にエラーが発生: {e}")
                         continue
-
-                # 最後のデータを保存
-                if product_details["colors"]:
-                    result = {
-                        "id": f"{current_series}_{current_capacity}",
-                        "series": current_series,
-                        "capacity": current_capacity,
-                        **product_details
-                    }
-                    results.append(result)
-
-                if not results:
-                    error_msg = f"有効な価格データが見つかりません (URL: {url})"
-                    logger.error(error_msg)
-                    self._send_error_notification('scraping', error_msg)
-                    raise ValueError(error_msg)
-
-                logger.info(f"スクレイピング成功 (URL: {url}): {json.dumps(results, ensure_ascii=False)}")
+                
+                if results:
+                    logger.info(f"{len(results)}件の価格データを取得しました: {url}")
+                
                 return results
-
-            except Exception as e:
-                error_msg = f"スクレイピングエラー (URL: {url}): {e}"
-                logger.error(error_msg)
-                self._send_error_notification('scraping', error_msg)
-                raise
+                
             finally:
-                await browser.close()
+                await page.close()
+                
+        except Exception as e:
+            logger.error(f"スクレイピングエラー (URL: {url}): {e}")
+            return []
+
+    def _normalize_capacity(self, capacity: str) -> Optional[str]:
+        """容量を正規化"""
+        try:
+            # 数値の抽出
+            match = re.search(r'(\d+)\s*[Gg][Bb]', capacity)
+            if not match:
+                return None
+            return f"{match.group(1)}GB"
+        except Exception:
+            return None
+
+    def _normalize_price(self, price: str) -> Optional[int]:
+        """価格を正規化"""
+        try:
+            # 数値の抽出
+            match = re.search(r'(\d+(?:,\d+)*)', price)
+            if not match:
+                return None
+            # カンマを除去して整数に変換
+            return int(match.group(1).replace(',', ''))
+        except Exception:
+            return None
 
     async def scrape_all_prices(self) -> List[Dict]:
         """全てのURLから価格データを並行してスクレイピング"""
-        tasks = []
-        for url in self.config['scraper']['kaitori_rudea_urls']:
-            tasks.append(self.scrape_url(url))
+        if not self.context:
+            raise RuntimeError("ブラウザコンテキストが初期化されていません")
+
+        # 並列処理の設定
+        semaphore = asyncio.Semaphore(3)  # 同時実行数を制限
+        
+        async def scrape_with_semaphore(url: str) -> List[Dict]:
+            async with semaphore:
+                try:
+                    return await self.scrape_url(url)
+                except Exception as e:
+                    logger.error(f"スクレイピング失敗 (URL: {url}): {e}")
+                    return []
+
+        # タスクの作成と実行
+        tasks = [scrape_with_semaphore(url) for url in self.config['scraper']['kaitori_rudea_urls']]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        # 結果を平坦化
+        # 結果の処理
         flattened_results = []
         for result in results:
             if isinstance(result, Exception):
@@ -247,43 +236,51 @@ class PriceScraper:
             else:
                 flattened_results.append(result)
         
+        # 結果の検証
+        if not flattened_results:
+            logger.warning("有効な価格データが見つかりませんでした")
+        else:
+            logger.info(f"合計{len(flattened_results)}件の価格データを取得しました")
+        
         return flattened_results
 
     def save_to_dynamodb(self, data: Dict) -> None:
         """DynamoDBにデータを保存"""
         try:
-            # kaitori_pricesテーブルへの保存（上書き）
-            kaitori_item = {
-                "id": data["id"],
-                "series": data["series"],
-                "capacity": data["capacity"],
-                "colors": data["colors"],
-                "kaitori_price_min": data["kaitori_price_min"],
-                "kaitori_price_max": data["kaitori_price_max"],
-                "updated_at": datetime.now().isoformat()
-            }
-            self.kaitori_table.put_item(Item=kaitori_item)
-            logger.info(f"kaitori_pricesテーブルに保存: {json.dumps(kaitori_item, ensure_ascii=False)}")
+            # バッチ書き込みの準備
+            with self.kaitori_table.batch_writer() as batch:
+                # kaitori_pricesテーブルへの保存（上書き）
+                kaitori_item = {
+                    "id": data["id"],
+                    "series": data["series"],
+                    "capacity": data["capacity"],
+                    "colors": data["colors"],
+                    "kaitori_price_min": data["kaitori_price_min"],
+                    "kaitori_price_max": data["kaitori_price_max"],
+                    "updated_at": datetime.now().isoformat()
+                }
+                batch.put_item(Item=kaitori_item)
+                logger.info(f"kaitori_pricesテーブルに保存: {json.dumps(kaitori_item, ensure_ascii=False)}")
             
             # price_historyテーブルへの保存（履歴追加）
-            current_timestamp = int(datetime.now().timestamp())
-            history_item = {
-                "model": data["id"],
-                "timestamp": current_timestamp,
-                "series": data["series"],
-                "capacity": data["capacity"],
-                "colors": data["colors"],
-                "kaitori_price_min": data["kaitori_price_min"],
-                "kaitori_price_max": data["kaitori_price_max"],
-                "expiration_time": int((datetime.now() + timedelta(days=14)).timestamp())
-            }
-            self.history_table.put_item(Item=history_item)
-            logger.info(f"price_historyテーブルに保存: {json.dumps(history_item, ensure_ascii=False)}")
+            with self.history_table.batch_writer() as batch:
+                current_timestamp = int(datetime.now().timestamp())
+                history_item = {
+                    "model": data["id"],
+                    "timestamp": current_timestamp,
+                    "series": data["series"],
+                    "capacity": data["capacity"],
+                    "colors": data["colors"],
+                    "kaitori_price_min": data["kaitori_price_min"],
+                    "kaitori_price_max": data["kaitori_price_max"],
+                    "expiration_time": int((datetime.now() + timedelta(days=14)).timestamp())
+                }
+                batch.put_item(Item=history_item)
+                logger.info(f"price_historyテーブルに保存: {json.dumps(history_item, ensure_ascii=False)}")
             
         except Exception as e:
             error_msg = f"DynamoDB保存エラー: {e}"
             logger.error(error_msg)
-            self._send_error_notification('dynamodb', error_msg)
             raise
 
     def delete_old_data(self) -> None:
@@ -319,7 +316,6 @@ class PriceScraper:
         except Exception as e:
             error_msg = f"古いデータの削除処理中にエラーが発生: {e}"
             logger.error(error_msg)
-            self._send_error_notification('dynamodb', error_msg)
             # 削除処理の失敗は他の処理に影響を与えない
             pass
 
@@ -331,27 +327,73 @@ class PriceScraper:
             logger.warning(f"無効な容量の組み合わせ: {series} {capacity} (有効な容量: {valid_capacities})")
         return is_valid
 
-async def main():
+    def _identify_model_series(self, model_name: str) -> Optional[str]:
+        """モデル名からシリーズを特定"""
+        model_name = model_name.strip()
+        for series, pattern in self.model_patterns.items():
+            if re.search(pattern, model_name, re.IGNORECASE):
+                return series
+        return None
+
+def load_config() -> dict:
+    """設定ファイルの読み込み"""
     try:
-        scraper = PriceScraper()
+        # 環境変数から設定ファイルのパスを取得
+        config_path = os.getenv('CONFIG_FILE', 'config/config.production.yaml')
+        config_path = Path(config_path)
         
-        # 価格データのスクレイピング
-        results = await scraper.scrape_all_prices()
+        if not config_path.exists():
+            error_msg = f"設定ファイルが見つかりません: {config_path}"
+            logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
         
-        # 成功した結果のみを処理
-        for result in results:
-            if isinstance(result, Exception):
-                logger.error(f"スクレイピング失敗: {result}")
-                continue
-            scraper.save_to_dynamodb(result)
-        
-        # 古いデータの削除
-        scraper.delete_old_data()
-        
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+            if not config:
+                error_msg = "設定ファイルが空です"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            # 必須の設定項目を確認
+            if 'scraper' not in config:
+                error_msg = "設定ファイルに'scraper'セクションがありません"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            if 'kaitori_rudea_urls' not in config['scraper']:
+                error_msg = "設定ファイルに'kaitori_rudea_urls'が設定されていません"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            logger.info(f"設定ファイルを読み込みました: {config_path}")
+            return config
     except Exception as e:
-        error_msg = f"予期せぬエラー: {e}"
+        error_msg = f"設定ファイルの読み込みに失敗: {e}"
         logger.error(error_msg)
-        scraper._send_error_notification('unexpected', error_msg)
+        raise
+
+async def main():
+    """メイン処理"""
+    try:
+        # 設定ファイルの読み込み
+        config_file = os.environ.get('CONFIG_FILE', 'config/config.production.yaml')
+        with open(config_file, 'r') as f:
+            config = yaml.safe_load(f)
+        logger.info(f"設定ファイルを読み込みました: {config_file}")
+
+        # スクレイピングの実行
+        async with PriceScraper(config) as scraper:
+            results = await scraper.scrape_all_prices()
+            
+            # 結果の保存
+            for result in results:
+                scraper.save_to_dynamodb(result)
+
+            # 古いデータの削除
+            scraper.delete_old_data()
+
+    except Exception as e:
+        logger.error(f"予期せぬエラーが発生しました: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
