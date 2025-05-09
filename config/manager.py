@@ -93,7 +93,7 @@ class ConfigManager:
     def load_environment(self) -> None:
         """環境変数を読み込む"""
         load_dotenv()
-        self.env: str = os.getenv('FLASK_ENV', 'development')
+        self.env: str = os.getenv('APP_ENV', 'production')
         
     def load_config_file(self, config_dir=None) -> None:
         """設定ファイルを読み込む"""

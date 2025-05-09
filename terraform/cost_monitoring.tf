@@ -98,7 +98,7 @@ resource "aws_cloudwatch_metric_alarm" "dynamodb_capacity_units" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    TableName = aws_dynamodb_table.price_comparison.name
+    TableName = aws_dynamodb_table.kaitori_prices.name
   }
 
   alarm_actions = [aws_sns_topic.alerts.arn]

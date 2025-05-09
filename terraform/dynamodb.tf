@@ -1,53 +1,26 @@
 # DynamoDBテーブルのデータ管理
-resource "aws_dynamodb_table_item" "iphone_prices_data" {
-  count = var.create_sample_data ? 1 : 0
-
-  table_name = aws_dynamodb_table.iphone_prices.name
-  hash_key   = "series"
-  range_key  = "capacity"
-
-  item = jsonencode({
-    series = {
-      S = "iPhone 16"
-    }
-    capacity = {
-      S = "128GB"
-    }
-    price = {
-      N = "999"
-    }
-    timestamp = {
-      S = timestamp()
-    }
-  })
-}
 
 # DynamoDBテーブルの定義
-resource "aws_dynamodb_table" "iphone_prices" {
-  name           = "iphone_prices"
+resource "aws_dynamodb_table" "kaitori_prices" {
+  name           = "kaitori_prices"
   billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "series"
-  range_key      = "capacity"
+  hash_key       = "id"
 
   attribute {
-    name = "series"
+    name = "id"
     type = "S"
   }
 
   attribute {
-    name = "capacity"
-    type = "S"
+    name = "price"
+    type = "N"
   }
 
   global_secondary_index {
-    name            = "CapacityIndex"
-    hash_key        = "series"
-    range_key       = "capacity"
+    name            = "PriceIndex"
+    hash_key        = "id"
+    range_key       = "price"
     projection_type = "ALL"
-  }
-
-  point_in_time_recovery {
-    enabled = true
   }
 
   lifecycle {
@@ -56,16 +29,16 @@ resource "aws_dynamodb_table" "iphone_prices" {
       write_capacity,
       billing_mode
     ]
-    # prevent_destroy = true  # 一時的に無効化
   }
 
   tags = {
-    Name        = "iphone_prices"
+    Name        = "kaitori_prices"
     Environment = "production"
     Project     = "iphone_price_tracker"
   }
 }
 
+# DynamoDBテーブルの定義
 resource "aws_dynamodb_table" "official_prices" {
   name           = "official_prices"
   billing_mode   = "PAY_PER_REQUEST"
@@ -99,41 +72,10 @@ resource "aws_dynamodb_table" "official_prices" {
       write_capacity,
       billing_mode
     ]
-    # prevent_destroy = true  # 一時的に無効化
   }
 
   tags = {
     Name        = "official_prices"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
-}
-
-# 価格情報を格納するメインテーブル
-resource "aws_dynamodb_table" "price_comparison" {
-  name           = "price-comparison"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "id"
-  stream_enabled = true
-  stream_view_type = "NEW_AND_OLD_IMAGES"
-
-  attribute {
-    name = "id"
-    type = "S"
-  }
-
-  server_side_encryption {
-    enabled = true
-    kms_key_arn = aws_kms_key.data_encryption.arn
-  }
-
-  replica {
-    region_name = "ap-southeast-1"
-    kms_key_arn = aws_kms_key.data_encryption_replica.arn
-  }
-
-  tags = {
-    Name        = "price-comparison"
     Environment = "production"
     Project     = "iphone_price_tracker"
   }
@@ -217,91 +159,10 @@ resource "aws_dynamodb_table" "price_history" {
       write_capacity,
       billing_mode
     ]
-    # prevent_destroy = true  # 一時的に無効化
   }
 
   tags = {
     Name        = "price_history"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
-}
-
-resource "aws_dynamodb_table" "price_predictions" {
-  name           = "price_predictions"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "series"
-  range_key      = "timestamp"
-
-  attribute {
-    name = "series"
-    type = "S"
-  }
-
-  attribute {
-    name = "timestamp"
-    type = "S"
-  }
-
-  lifecycle {
-    ignore_changes = [
-      read_capacity,
-      write_capacity,
-      billing_mode
-    ]
-    # prevent_destroy = true  # 一時的に無効化
-  }
-
-  tags = {
-    Name        = "price_predictions"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
-}
-
-resource "aws_dynamodb_table" "kaitori_prices" {
-  name           = "kaitori_prices"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "series"
-  range_key      = "capacity"
-
-  attribute {
-    name = "series"
-    type = "S"
-  }
-
-  attribute {
-    name = "capacity"
-    type = "S"
-  }
-
-  attribute {
-    name = "color"
-    type = "S"
-  }
-
-  global_secondary_index {
-    name               = "ColorIndex"
-    hash_key           = "color"
-    range_key          = "series"
-    projection_type    = "ALL"
-  }
-
-  point_in_time_recovery {
-    enabled = true
-  }
-
-  lifecycle {
-    prevent_destroy = false
-    ignore_changes = [
-      read_capacity,
-      write_capacity,
-      billing_mode
-    ]
-  }
-
-  tags = {
-    Name        = "kaitori_prices"
     Environment = "production"
     Project     = "iphone_price_tracker"
   }
