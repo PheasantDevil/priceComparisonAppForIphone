@@ -69,7 +69,7 @@ jobs:
           TEST_ENV: true
           PYTHONPATH: ${{ github.workspace }}
           PYTHONUNBUFFERED: 1
-          CONFIG_FILE: config/config.testing.yaml  # テスト用設定ファイルを指定
+          CONFIG_FILE: config/config.testing.yaml
         run: |
           # テスト用設定ファイルの作成
           mkdir -p config
@@ -93,7 +93,13 @@ jobs:
           
           # テストの実行
           pip install pytest pytest-cov pytest-asyncio
-          python -m pytest tests/ --cov=src --cov-report=xml -v --tb=short
+          python -m pytest tests/ --cov=src --cov-report=xml -v --tb=short --capture=no 2>&1 | tee test_output.log
+          
+          # テスト結果の確認
+          if [ $? -ne 0 ]; then
+            echo "Tests failed. Check test_output.log for details."
+            exit 1
+          fi
 
       - name: Upload coverage report
         if: ${{ github.event_name == 'workflow_dispatch' }}

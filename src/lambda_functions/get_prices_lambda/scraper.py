@@ -28,7 +28,7 @@ from tenacity import (after_log, before_sleep_log, retry,
 
 # 定数定義
 MAX_WORKERS = 5  # 同時に実行する最大スレッド数
-TIMEOUT = 30     # 各タスクのタイムアウト（秒）
+TIMEOUT = 60     # 各タスクのタイムアウト（秒）を60秒に延長
 CACHE_DURATION = 3600  # キャッシュの有効期間（秒）
 
 # ロギング設定
@@ -196,9 +196,9 @@ class ConfigError(ScraperError):
 
 # リトライ設定
 RETRY_CONFIG = {
-    'max_attempts': 3,
-    'wait_min': 4,
-    'wait_max': 10,
+    'max_attempts': 5,  # リトライ回数を5回に増加
+    'wait_min': 2,      # 最小待機時間を2秒に短縮
+    'wait_max': 30,     # 最大待機時間を30秒に延長
     'wait_multiplier': 1
 }
 
@@ -241,28 +241,47 @@ def load_config():
     """
     設定ファイルを読み込む
     """
-    config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', 'config.production.yaml')
     try:
+        # 環境変数から設定ファイルのパスを取得
+        config_path = os.getenv('CONFIG_FILE', os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', 'config.production.yaml'))
+        
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
-            if not config or 'scraper' not in config:
-                raise ConfigError("Invalid configuration: missing 'scraper' section")
+            if not config:
+                raise ConfigError("Configuration file is empty")
+            
+            # 必須の設定項目を確認
+            required_sections = ['scraper']
+            for section in required_sections:
+                if section not in config:
+                    raise ConfigError(f"Missing required section: {section}")
+            
+            # scraperセクションの必須項目を確認
+            required_scraper_settings = ['kaitori_rudea_urls', 'request_timeout', 'retry_count']
+            for setting in required_scraper_settings:
+                if setting not in config['scraper']:
+                    raise ConfigError(f"Missing required scraper setting: {setting}")
+            
+            logger.info(f"Successfully loaded configuration from {config_path}")
             return config
     except FileNotFoundError:
-        logger.error(f"Config file not found: {config_path}")
-        raise ConfigError(f"Configuration file not found: {config_path}")
+        error_msg = f"Config file not found: {config_path}"
+        logger.error(error_msg)
+        raise ConfigError(error_msg)
     except yaml.YAMLError as e:
-        logger.error(f"Error parsing config file: {str(e)}")
-        raise ConfigError(f"Invalid YAML format: {str(e)}")
+        error_msg = f"Error parsing config file: {str(e)}"
+        logger.error(error_msg)
+        raise ConfigError(error_msg)
     except Exception as e:
-        logger.error(f"Error loading config: {str(e)}")
-        raise ConfigError(f"Failed to load configuration: {str(e)}")
+        error_msg = f"Error loading config: {str(e)}"
+        logger.error(error_msg)
+        raise ConfigError(error_msg)
 
 class PriceData(BaseModel):
     """価格データモデル"""
     model: str
     price: float
-    source: HttpUrl
+    source: str  # Changed from HttpUrl to str to handle source type strings
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     url: Optional[str] = None
     condition: Optional[str] = None
@@ -313,11 +332,12 @@ class PriceData(BaseModel):
     @field_validator('source')
     @classmethod
     def validate_source(cls, v: str) -> str:
-        """ソースURLの検証"""
+        """ソースの検証"""
         if not v or not isinstance(v, str):
             raise ValueError("Source must be a non-empty string")
-        if not v.startswith(('http://', 'https://')):
-            raise ValueError("Source must be a valid URL")
+        valid_sources = ['kaitori', 'official']
+        if v not in valid_sources:
+            raise ValueError(f"Source must be one of: {', '.join(valid_sources)}")
         return v
 
     @field_validator('timestamp')
@@ -630,35 +650,42 @@ class Scraper:
 
     def scrape_url(self, url: str, source: str = 'unknown') -> List[Dict]:
         """指定されたURLからデータをスクレイピング"""
-        try:
-            cached_data = self.cache_manager.get_cached_data(url)
-            if cached_data:
-                self.performance_tracker.record_cache_hit(url)
-                return cached_data
+        retry_count = 0
+        while retry_count < RETRY_CONFIG['max_attempts']:
+            try:
+                cached_data = self.cache_manager.get_cached_data(url)
+                if cached_data:
+                    self.performance_tracker.record_cache_hit(url)
+                    return cached_data
 
-            self.performance_tracker.record_cache_miss(url)
-            
-            with self._measure_request(url):
-                response = self.session.get(url, timeout=self.config.get('timeout', 30))
-                response.raise_for_status()
-                data = self._parse_response(response.text, source)
-                self.cache_manager.save_to_cache(url, data)
-                return data
-        except requests.exceptions.RequestException as e:
-            error = HTTPError(f"Request failed: {str(e)}", getattr(e.response, 'status_code', None), url)
-            self.error_handler.handle_error(error)
-            raise error
-        except Exception as e:
-            if not isinstance(e, ScraperError):
-                error = ScraperError(f"Scraping failed: {str(e)}", context={
-                    'url': url,
-                    'source': source,
-                    'error_type': str(type(e).__name__)
-                })
-                self.error_handler.handle_error(error)
-                raise error
-            self.error_handler.handle_error(e)
-            raise e
+                self.performance_tracker.record_cache_miss(url)
+                
+                with self._measure_request(url):
+                    response = self.session.get(url, timeout=TIMEOUT)
+                    response.raise_for_status()
+                    data = self._parse_response(response.text, source)
+                    self.cache_manager.save_to_cache(url, data)
+                    return data
+            except requests.exceptions.RequestException as e:
+                retry_count += 1
+                if retry_count >= RETRY_CONFIG['max_attempts']:
+                    error = HTTPError(f"Request failed after {retry_count} retries: {str(e)}", getattr(e.response, 'status_code', None), url)
+                    self.error_handler.handle_error(error)
+                    raise error
+                wait_time = min(RETRY_CONFIG['wait_max'], RETRY_CONFIG['wait_min'] * (2 ** (retry_count - 1)))
+                logger.warning(f"Request failed, retrying in {wait_time} seconds... (Attempt {retry_count}/{RETRY_CONFIG['max_attempts']})")
+                time.sleep(wait_time)
+            except Exception as e:
+                if not isinstance(e, ScraperError):
+                    error = ScraperError(f"Scraping failed: {str(e)}", context={
+                        'url': url,
+                        'source': source,
+                        'error_type': str(type(e).__name__)
+                    })
+                    self.error_handler.handle_error(error)
+                    raise error
+                self.error_handler.handle_error(e)
+                raise e
 
     def scrape_urls(self, urls: List[str], source: str) -> List[List[Dict[str, Any]]]:
         """
