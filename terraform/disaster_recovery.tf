@@ -52,10 +52,10 @@
 
 # DynamoDBのバックアップ設定
 resource "aws_dynamodb_table" "price_comparison_backup" {
-  name           = "price-comparison-backup"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "model"
-  stream_enabled = true
+  name             = "price-comparison-backup"
+  billing_mode     = "PAY_PER_REQUEST"
+  hash_key         = "model"
+  stream_enabled   = true
   stream_view_type = "NEW_AND_OLD_IMAGES"
 
   attribute {
@@ -64,7 +64,7 @@ resource "aws_dynamodb_table" "price_comparison_backup" {
   }
 
   server_side_encryption {
-    enabled = true
+    enabled     = true
     kms_key_arn = aws_kms_key.data_encryption.arn
   }
 
@@ -78,10 +78,10 @@ resource "aws_dynamodb_table" "price_comparison_backup" {
 
 # 新しいバックアップテーブルの設定
 resource "aws_dynamodb_table" "price_comparison_backup_v2" {
-  name           = "price-comparison-backup-v2"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "model"
-  stream_enabled = true
+  name             = "price-comparison-backup-v2"
+  billing_mode     = "PAY_PER_REQUEST"
+  hash_key         = "model"
+  stream_enabled   = true
   stream_view_type = "NEW_AND_OLD_IMAGES"
 
   attribute {
@@ -90,7 +90,7 @@ resource "aws_dynamodb_table" "price_comparison_backup_v2" {
   }
 
   server_side_encryption {
-    enabled = true
+    enabled     = true
     kms_key_arn = aws_kms_key.data_encryption.arn
   }
 

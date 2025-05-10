@@ -14,6 +14,7 @@ import re
 import subprocess
 import sys
 from datetime import datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -29,6 +30,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Decimalを処理するJSONエンコーダを追加
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return int(obj) if obj % 1 == 0 else float(obj)
+        return super(DecimalEncoder, self).default(obj)
+
 class PriceScraper:
     def __init__(self, config: Dict):
         self.config = config
@@ -37,6 +45,7 @@ class PriceScraper:
         self.context = None
         self.kaitori_table = boto3.resource('dynamodb').Table('kaitori_prices')
         self.history_table = boto3.resource('dynamodb').Table('price_history')
+        self.official_table = boto3.resource('dynamodb').Table('official_prices')
         self.model_patterns = {
             "iPhone 16 Pro Max": r"iPhone\s*16\s*Pro\s*Max",
             "iPhone 16 Pro": r"iPhone\s*16\s*Pro(?!\s*Max)",
@@ -334,6 +343,51 @@ class PriceScraper:
             if re.search(pattern, model_name, re.IGNORECASE):
                 return series
         return None
+
+    def get_official_prices(self, series: str) -> Dict[str, str]:
+        """公式価格をDynamoDBから取得"""
+        try:
+            # Handle both "iPhone 16e" and "iPhone 16 e" formats
+            lookup_series = series.replace(' e', 'e') if ' e' in series else series
+            logger.info(f"Looking up official prices for {lookup_series} (original request: {series})")
+            
+            # 各容量の価格を取得
+            formatted_prices = {}
+            capacities = ['128GB', '256GB', '512GB', '1TB']
+            
+            for capacity in capacities:
+                try:
+                    response = self.official_table.get_item(
+                        Key={
+                            'series': lookup_series,
+                            'capacity': capacity
+                        }
+                    )
+                    
+                    if 'Item' in response:
+                        # 各色の価格から最小値を取得
+                        colors = response['Item'].get('colors', {})
+                        if colors:
+                            min_price = min(Decimal(str(price)) for price in colors.values())
+                            formatted_prices[capacity] = str(min_price)
+                            logger.info(f"Found price for {lookup_series} {capacity}: {min_price}")
+                        else:
+                            logger.warning(f"No color prices found for {lookup_series} {capacity}")
+                    else:
+                        logger.warning(f"No data found for {lookup_series} {capacity}")
+                except Exception as e:
+                    logger.error(f"Error getting price for {capacity}: {e}")
+                    continue
+            
+            if not formatted_prices:
+                logger.warning(f"No official prices found for {lookup_series}")
+            else:
+                logger.info(f"Found official prices for {lookup_series}: {formatted_prices}")
+            return formatted_prices
+                
+        except Exception as e:
+            logger.error(f"Error getting official prices: {e}")
+            return {}
 
 def load_config() -> dict:
     """設定ファイルの読み込み"""

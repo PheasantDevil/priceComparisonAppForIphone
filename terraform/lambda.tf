@@ -4,7 +4,7 @@ locals {
     "lambdas/get_prices_lambda/lambda_function.py",
     "lambdas/save_price_history_lambda/save_price_history.py",
     "lambdas/get_price_history_lambda/get_price_history.py",
-    "src/apple_scraper_for_rudea.py",
+    "app.py",
     "config/config.production.yaml"
   ]
   layer_build_dir = "${path.module}/layer"
@@ -14,13 +14,13 @@ locals {
 # Lambda Layer用のPythonパッケージをインストール
 resource "null_resource" "install_lambda_layer_packages" {
   triggers = {
-    requirements = filemd5("${path.module}/requirements.txt")
+    requirements = filemd5("${path.module}/../requirements-base.txt")
   }
 
   provisioner "local-exec" {
     command = <<EOF
 mkdir -p ${local.layer_build_dir}/python
-pip install --no-cache-dir --platform manylinux2014_x86_64 --target=${local.layer_build_dir}/python --implementation cp --python-version 3.9 --only-binary=:all: --upgrade -r ${path.module}/requirements.txt
+pip install --no-cache-dir --platform manylinux2014_x86_64 --target=${local.layer_build_dir}/python --implementation cp --python-version 3.9 --only-binary=:all: --upgrade -r ${path.module}/../requirements-base.txt
 cd ${local.layer_build_dir} && zip -r ${local.layer_zip_path} .
 EOF
   }
@@ -57,12 +57,12 @@ data "archive_file" "lambda_get_prices" {
 
 # Get Prices Lambda Function
 resource "aws_lambda_function" "get_prices" {
-  filename         = "./get_prices_lambda.zip"
+  filename         = "${path.module}/lambda_function.zip"
   function_name    = "get_prices"
   role             = aws_iam_role.lambda_execution_role.arn
   handler          = "lambda_function.lambda_handler"
   runtime          = "python3.9"
-  source_code_hash = filebase64sha256("./get_prices_lambda.zip")
+  source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
   timeout          = 30
   memory_size      = 128
 
@@ -82,15 +82,16 @@ resource "aws_lambda_function" "get_prices" {
 
 # Lambda関数のメモリとタイムアウトの最適化
 resource "aws_lambda_function" "price_comparison" {
-  filename      = "lambda_function.zip"
-  function_name = "price-comparison-function"
-  description   = "Lambda function for price comparison"
-  role          = aws_iam_role.lambda_execution_role.arn
-  handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.9"
-  timeout       = 30
-  memory_size   = 128
-  publish       = true  # バージョンを公開
+  filename         = "${path.module}/lambda_function.zip"
+  function_name    = "price-comparison-function"
+  description      = "Lambda function for price comparison"
+  role             = aws_iam_role.lambda_execution_role.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.9"
+  timeout          = 30
+  memory_size      = 128
+  publish          = true # バージョンを公開
+  source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
 
   environment {
     variables = {
@@ -112,7 +113,7 @@ resource "aws_lambda_alias" "get_prices" {
   name             = "production"
   description      = "Production alias for get_prices Lambda function"
   function_name    = aws_lambda_function.price_comparison.function_name
-  function_version = aws_lambda_function.price_comparison.version  # 公開されたバージョンを使用
+  function_version = aws_lambda_function.price_comparison.version # 公開されたバージョンを使用
 }
 
 # Lambda関数のバージョン
@@ -159,7 +160,7 @@ resource "aws_appautoscaling_policy" "lambda_scaling_policy" {
   service_namespace  = aws_appautoscaling_target.lambda_target.service_namespace
 
   target_tracking_scaling_policy_configuration {
-    target_value       = 0.7  # 70%の使用率を目標に
+    target_value       = 0.7 # 70%の使用率を目標に
     scale_in_cooldown  = 300
     scale_out_cooldown = 300
 
@@ -171,13 +172,14 @@ resource "aws_appautoscaling_policy" "lambda_scaling_policy" {
 
 # デプロイメント検証用のLambda関数
 resource "aws_lambda_function" "deployment_verification" {
-  filename      = "deployment_verification.zip"
-  function_name = "deployment-verification"
-  role          = aws_iam_role.deployment_verification.arn
-  handler       = "verify_deployment.lambda_handler"
-  runtime       = "python3.9"
-  timeout       = 300
-  memory_size   = 128
+  filename         = "${path.module}/lambda_function.zip"
+  function_name    = "deployment-verification"
+  role             = aws_iam_role.deployment_verification.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.9"
+  timeout          = 300
+  memory_size      = 128
+  source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
 
   environment {
     variables = {
@@ -197,13 +199,14 @@ resource "aws_lambda_function" "deployment_verification" {
 
 # スモークテスト用のLambda関数
 resource "aws_lambda_function" "smoke_test" {
-  filename      = "smoke_test.zip"
-  function_name = "smoke-test"
-  role          = aws_iam_role.smoke_test.arn
-  handler       = "smoke_test.lambda_handler"
-  runtime       = "python3.9"
-  timeout       = 300
-  memory_size   = 128
+  filename         = "${path.module}/lambda_function.zip"
+  function_name    = "smoke-test"
+  role             = aws_iam_role.smoke_test.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.9"
+  timeout          = 300
+  memory_size      = 128
+  source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
 
   environment {
     variables = {
@@ -347,7 +350,7 @@ resource "aws_lambda_function" "line_notification_lambda" {
     variables = {
       LINE_CHANNEL_ACCESS_TOKEN = var.line_channel_access_token
       LINE_NOTIFY_TOKEN         = var.line_notify_token
-      ENVIRONMENT              = "production"
+      ENVIRONMENT               = "production"
     }
   }
 
@@ -370,7 +373,7 @@ resource "aws_lambda_function" "compare_prices_lambda" {
 
   environment {
     variables = {
-      KAITORI_TABLE = aws_dynamodb_table.kaitori_prices.name
+      KAITORI_TABLE  = aws_dynamodb_table.kaitori_prices.name
       OFFICIAL_TABLE = aws_dynamodb_table.official_prices.name
       ENVIRONMENT    = "production"
     }
