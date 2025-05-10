@@ -12,7 +12,17 @@ logger.setLevel(logging.INFO)
 
 # DynamoDBクライアントの初期化
 dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table(os.environ['DYNAMODB_TABLE'])
+kaitori_table = dynamodb.Table(os.environ['KAITORI_TABLE'])
+official_table = dynamodb.Table(os.environ['OFFICIAL_TABLE'])
+
+# シリーズごとの有効な容量を定義
+VALID_CAPACITIES = {
+    "iPhone 16": ["128GB", "256GB", "512GB"],
+    "iPhone 16 Plus": ["128GB", "256GB", "512GB"],
+    "iPhone 16 Pro": ["128GB", "256GB", "512GB", "1TB"],
+    "iPhone 16 Pro Max": ["256GB", "512GB", "1TB"],
+    "iPhone 16 e": ["128GB", "256GB", "512GB"]
+}
 
 def lambda_handler(event, context):
     """
@@ -23,10 +33,9 @@ def lambda_handler(event, context):
         
         # クエリパラメータからシリーズを取得
         series = event.get('queryStringParameters', {}).get('series', 'iPhone 16')
-        capacity = event.get('queryStringParameters', {}).get('capacity', '128GB')
         
         # 価格情報を取得
-        prices = get_prices(series, capacity)
+        prices = get_prices(series)
         
         return {
             'statusCode': 200,
@@ -50,48 +59,50 @@ def lambda_handler(event, context):
             'body': json.dumps({'error': str(e)})
         }
 
-def get_prices(series, capacity):
+def get_prices(series):
     """
-    指定されたシリーズと容量の価格情報を取得
+    指定されたシリーズの全容量の価格情報を取得
     """
     try:
-        response = table.scan(
-            FilterExpression='#s = :series AND #c = :capacity',
-            ExpressionAttributeNames={
-                '#s': 'series',
-                '#c': 'capacity'
-            },
-            ExpressionAttributeValues={
-                ':series': series,
-                ':capacity': capacity
-            }
+        # 公式価格の取得
+        official_response = official_table.scan(
+            FilterExpression='#s = :series',
+            ExpressionAttributeNames={'#s': 'series'},
+            ExpressionAttributeValues={':series': series}
         )
         
-        if not response['Items']:
-            return {
-                'series': series,
-                'capacity': capacity,
-                'prices': [],
-                'message': 'No prices found for this series and capacity'
-            }
+        # 買取価格の取得
+        kaitori_response = kaitori_table.scan(
+            FilterExpression='#s = :series',
+            ExpressionAttributeNames={'#s': 'series'},
+            ExpressionAttributeValues={':series': series}
+        )
         
-        # レスポンスを整形
-        items = []
-        for item in response['Items']:
-            formatted_item = {
-                'series': item['series'],
-                'capacity': item['capacity'],
-                'price': item['price'],
-                'store': item['store'],
-                'updated_at': item.get('updated_at', '')
-            }
-            items.append(formatted_item)
+        # データの整形と差分計算
+        prices = {}
+        for capacity in VALID_CAPACITIES.get(series, []):
+            official_price = next(
+                (item['price'] for item in official_response['Items'] 
+                 if item['capacity'] == capacity), 
+                None
+            )
+            kaitori_price = next(
+                (item['price'] for item in kaitori_response['Items'] 
+                 if item['capacity'] == capacity), 
+                None
+            )
+            
+            if official_price and kaitori_price:
+                prices[capacity] = {
+                    'official_price': official_price,
+                    'kaitori_price': kaitori_price,
+                    'price_diff': kaitori_price - official_price,
+                    'rakuten_diff': kaitori_price - (official_price * 0.9)
+                }
         
         return {
             'series': series,
-            'capacity': capacity,
-            'prices': items,
-            'message': 'Successfully retrieved prices'
+            'prices': prices
         }
         
     except ClientError as e:
