@@ -12,8 +12,9 @@ import logging
 import os
 import sys
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 
+import yaml
 from linebot import LineBotApi
 from linebot.exceptions import LineBotApiError
 from linebot.models import TextSendMessage
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 def create_error_message(error_type: str, error_message: str) -> str:
     """エラーメッセージの作成"""
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    request_id = os.environ.get('AWS_REQUEST_ID', 'unknown')
     
     # エラータイプに応じたメッセージを生成
     if error_type == 'scraping':
@@ -40,6 +42,7 @@ def create_error_message(error_type: str, error_message: str) -> str:
     return f"""
 🚨 {title} 🚨
 時刻: {timestamp}
+Request ID: {request_id}
 
 エラー内容:
 {error_message}
@@ -50,14 +53,20 @@ def create_error_message(error_type: str, error_message: str) -> str:
 def send_notification(message: str) -> None:
     """LINE通知の送信"""
     try:
+        # 環境変数からLINEチャネルアクセストークンを取得
+        channel_access_token = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN')
+        if not channel_access_token:
+            logger.error("LINE_CHANNEL_ACCESS_TOKEN環境変数が設定されていません")
+            raise ValueError("LINE_CHANNEL_ACCESS_TOKENが必要です")
+
         # LINE Bot APIの初期化
-        line_bot_api = LineBotApi(os.environ['LINE_CHANNEL_ACCESS_TOKEN'])
+        line_bot_api = LineBotApi(channel_access_token)
         
         # メッセージの送信
         text_message = TextSendMessage(text=message)
         line_bot_api.broadcast(text_message)
         
-        logger.info("LINE通知を送信しました")
+        logger.info(f"LINE通知を送信しました (Request ID: {os.environ.get('AWS_REQUEST_ID', 'unknown')})")
         
     except LineBotApiError as e:
         logger.error(f"LINE APIエラー: {str(e)}")

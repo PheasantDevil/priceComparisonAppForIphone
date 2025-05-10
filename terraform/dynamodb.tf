@@ -2,9 +2,9 @@
 
 # DynamoDBテーブルの定義
 resource "aws_dynamodb_table" "kaitori_prices" {
-  name           = "kaitori_prices"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "id"
+  name         = "kaitori_prices"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
 
   attribute {
     name = "id"
@@ -40,10 +40,10 @@ resource "aws_dynamodb_table" "kaitori_prices" {
 
 # DynamoDBテーブルの定義
 resource "aws_dynamodb_table" "official_prices" {
-  name           = "official_prices"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "series"
-  range_key      = "capacity"
+  name         = "official_prices"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "series"
+  range_key    = "capacity"
 
   attribute {
     name = "series"
@@ -115,7 +115,7 @@ resource "aws_dynamodb_table_item" "official_prices_data" {
     colors = {
       M = {
         for color, price in each.value.colors : color => {
-          S = tostring(price)  # 数値を文字列として保存
+          S = tostring(price) # 数値を文字列として保存
         }
       }
     }
@@ -126,10 +126,10 @@ resource "aws_dynamodb_table_item" "official_prices_data" {
 }
 
 resource "aws_dynamodb_table" "price_history" {
-  name           = "price_history"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "model"
-  range_key      = "timestamp"
+  name         = "price_history"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "model"
+  range_key    = "timestamp"
 
   attribute {
     name = "model"
