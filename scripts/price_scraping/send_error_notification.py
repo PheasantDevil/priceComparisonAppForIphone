@@ -26,15 +26,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def load_config(config_path: str) -> Dict[str, Any]:
-    """設定ファイルの読み込み"""
-    try:
-        with open(config_path, 'r') as f:
-            return yaml.safe_load(f)
-    except Exception as e:
-        logger.error(f"設定ファイルの読み込みに失敗: {str(e)}")
-        raise
-
 def create_error_message(error_type: str, error_message: str) -> str:
     """エラーメッセージの作成"""
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
