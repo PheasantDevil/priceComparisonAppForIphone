@@ -90,7 +90,7 @@ resource "aws_lambda_function" "price_comparison" {
   runtime          = "python3.9"
   timeout          = 30
   memory_size      = 128
-  publish          = true  # バージョンを公開
+  publish          = true # バージョンを公開
   source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
 
   environment {
@@ -113,7 +113,7 @@ resource "aws_lambda_alias" "get_prices" {
   name             = "production"
   description      = "Production alias for get_prices Lambda function"
   function_name    = aws_lambda_function.price_comparison.function_name
-  function_version = aws_lambda_function.price_comparison.version  # 公開されたバージョンを使用
+  function_version = aws_lambda_function.price_comparison.version # 公開されたバージョンを使用
 }
 
 # Lambda関数のバージョン
@@ -160,7 +160,7 @@ resource "aws_appautoscaling_policy" "lambda_scaling_policy" {
   service_namespace  = aws_appautoscaling_target.lambda_target.service_namespace
 
   target_tracking_scaling_policy_configuration {
-    target_value       = 0.7  # 70%の使用率を目標に
+    target_value       = 0.7 # 70%の使用率を目標に
     scale_in_cooldown  = 300
     scale_out_cooldown = 300
 
@@ -350,7 +350,7 @@ resource "aws_lambda_function" "line_notification_lambda" {
     variables = {
       LINE_CHANNEL_ACCESS_TOKEN = var.line_channel_access_token
       LINE_NOTIFY_TOKEN         = var.line_notify_token
-      ENVIRONMENT              = "production"
+      ENVIRONMENT               = "production"
     }
   }
 
@@ -373,7 +373,7 @@ resource "aws_lambda_function" "compare_prices_lambda" {
 
   environment {
     variables = {
-      KAITORI_TABLE = aws_dynamodb_table.kaitori_prices.name
+      KAITORI_TABLE  = aws_dynamodb_table.kaitori_prices.name
       OFFICIAL_TABLE = aws_dynamodb_table.official_prices.name
       ENVIRONMENT    = "production"
     }

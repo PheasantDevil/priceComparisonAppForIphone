@@ -75,7 +75,7 @@ resource "aws_config_delivery_channel" "main" {
 # 設定ファイル用のS3バケット
 resource "aws_s3_bucket" "config_bucket" {
   bucket        = "price-comparison-config-production"
-  force_destroy = true  # 一時的に有効化
+  force_destroy = true # 一時的に有効化
 
   tags = {
     Name        = "price-comparison-config"
@@ -443,11 +443,11 @@ resource "aws_kms_alias" "data_encryption" {
 # CloudTrailの設定
 resource "aws_cloudtrail" "security_audit" {
   name                          = "security-audit-trail"
-  s3_bucket_name               = aws_s3_bucket.cloudtrail.id
+  s3_bucket_name                = aws_s3_bucket.cloudtrail.id
   include_global_service_events = true
-  is_multi_region_trail        = true
-  enable_logging               = true
-  kms_key_id                   = aws_kms_key.data_encryption.arn
+  is_multi_region_trail         = true
+  enable_logging                = true
+  kms_key_id                    = aws_kms_key.data_encryption.arn
 
   tags = {
     Name        = "security-audit-trail"
@@ -525,20 +525,20 @@ provider "aws" {
 }
 
 resource "aws_kms_key" "data_encryption_replica" {
-  provider = aws.ap-southeast-1
-  description = "KMS key for encrypting DynamoDB data in ap-southeast-1"
+  provider            = aws.ap-southeast-1
+  description         = "KMS key for encrypting DynamoDB data in ap-southeast-1"
   enable_key_rotation = true
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid = "Enable IAM User Permissions"
+        Sid    = "Enable IAM User Permissions"
         Effect = "Allow"
         Principal = {
           AWS = "arn:aws:iam::273354647319:root"
         }
-        Action = "kms:*"
+        Action   = "kms:*"
         Resource = "*"
       }
     ]
@@ -552,7 +552,7 @@ resource "aws_kms_key" "data_encryption_replica" {
 }
 
 resource "aws_kms_alias" "data_encryption_replica" {
-  provider = aws.ap-southeast-1
+  provider      = aws.ap-southeast-1
   name          = "alias/data-encryption-key-replica"
   target_key_id = aws_kms_key.data_encryption_replica.key_id
 } 
