@@ -68,9 +68,9 @@ resource "aws_lambda_function" "dr_handler" {
 
   environment {
     variables = {
-      KAITORI_TABLE = aws_dynamodb_table.kaitori_prices.name
+      KAITORI_TABLE  = aws_dynamodb_table.kaitori_prices.name
       OFFICIAL_TABLE = aws_dynamodb_table.official_prices.name
-      HISTORY_TABLE = aws_dynamodb_table.price_history.name
+      HISTORY_TABLE  = aws_dynamodb_table.price_history.name
     }
   }
 
@@ -96,7 +96,7 @@ resource "aws_cloudwatch_event_target" "dr_test" {
 
 # SNSトピックの作成
 resource "aws_sns_topic" "dr_alerts" {
-  name = "price-comparison-dr-alerts"
+  name         = "price-comparison-dr-alerts"
   display_name = "Price Comparison DR Alerts"
 }
 
@@ -112,7 +112,7 @@ resource "aws_sns_topic_policy" "dr_alerts" {
         Principal = {
           Service = "cloudwatch.amazonaws.com"
         }
-        Action = "SNS:Publish"
+        Action   = "SNS:Publish"
         Resource = aws_sns_topic.dr_alerts.arn
       }
     ]
@@ -126,11 +126,11 @@ resource "aws_cloudwatch_metric_alarm" "dr_verification" {
   evaluation_periods  = 1
   metric_name         = "Errors"
   namespace           = "AWS/Lambda"
-  period             = 300  # 5分に変更
-  statistic          = "Sum"
-  threshold          = 0
-  alarm_description  = "DR verification Lambda function errors"
-  alarm_actions      = [aws_sns_topic.dr_alerts.arn]
+  period              = 300 # 5分に変更
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "DR verification Lambda function errors"
+  alarm_actions       = [aws_sns_topic.dr_alerts.arn]
 
   dimensions = {
     FunctionName = aws_lambda_function.dr_handler.function_name
