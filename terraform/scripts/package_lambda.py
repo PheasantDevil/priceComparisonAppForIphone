@@ -135,9 +135,10 @@ def main():
     try:
         # スクリプトのディレクトリを取得
         script_dir = os.path.dirname(os.path.abspath(__file__))
+        root_dir = os.path.dirname(os.path.dirname(script_dir))
         
-        # requirements.txtのパスを設定
-        requirements_path = os.path.join(script_dir, "requirements.txt")
+        # requirements-base.txtのパスを設定
+        requirements_path = os.path.join(root_dir, "requirements-base.txt")
         if not os.path.exists(requirements_path):
             raise FileNotFoundError(f"Requirements file not found: {requirements_path}")
         
