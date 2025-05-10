@@ -19,9 +19,10 @@ resource "null_resource" "install_lambda_layer_packages" {
 
   provisioner "local-exec" {
     command = <<EOF
+rm -rf ${local.layer_build_dir}
 mkdir -p ${local.layer_build_dir}/python
 pip install --no-cache-dir --platform manylinux2014_x86_64 --target=${local.layer_build_dir}/python --implementation cp --python-version 3.9 --only-binary=:all: --upgrade -r ${path.module}/../requirements-base.txt
-cd ${local.layer_build_dir} && zip -r ${local.layer_zip_path} .
+cd ${local.layer_build_dir} && zip -r ../layer.zip .
 EOF
   }
 
