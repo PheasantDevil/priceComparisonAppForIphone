@@ -65,3 +65,21 @@ variable "create_sample_data" {
   type        = bool
   default     = false
 }
+
+variable "skip_organization_policy" {
+  description = "Whether to skip organization policy checks"
+  type        = bool
+  default     = false
+}
+
+variable "evaluation_periods" {
+  description = "Number of evaluation periods for CloudWatch alarms"
+  type        = number
+  default     = 2
+}
+
+variable "period" {
+  description = "Period in seconds for CloudWatch metrics"
+  type        = number
+  default     = 300
+}
