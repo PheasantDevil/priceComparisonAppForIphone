@@ -71,7 +71,10 @@ def deploy_lambda_function(function_name, zip_file):
     """Lambda関数をデプロイ"""
     try:
         logger.info(f"Deploying Lambda function {function_name}...")
-        lambda_client = boto3.client('lambda')
+        
+        # AWSリージョンの設定
+        region = os.environ.get('AWS_REGION', 'ap-northeast-1')
+        lambda_client = boto3.client('lambda', region_name=region)
         
         with open(zip_file, 'rb') as f:
             zip_content = f.read()
@@ -91,6 +94,7 @@ def package_and_deploy_lambda(script_name, requirements_file):
     """Lambda関数をパッケージ化してデプロイ"""
     # スクリプトのディレクトリを取得
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    terraform_dir = os.path.dirname(script_dir)
     
     # 一時ディレクトリの作成
     temp_dir = os.path.join(script_dir, f"temp_{script_name}")
@@ -109,11 +113,14 @@ def package_and_deploy_lambda(script_name, requirements_file):
         install_dependencies(requirements_file, temp_dir)
 
         # ZIPファイルを作成
-        output_file = os.path.join(script_dir, f"{script_name}.zip")
+        output_file = os.path.join(terraform_dir, f"{script_name}.zip")
         zip_path = create_zip_file(temp_dir, output_file)
 
         if not os.path.exists(zip_path):
             raise FileNotFoundError(f"ZIP file not created: {zip_path}")
+
+        logger.info(f"ZIP file created at: {zip_path}")
+        logger.info(f"ZIP file size: {os.path.getsize(zip_path)} bytes")
 
         # Lambda関数をデプロイ
         deploy_lambda_function(script_name, zip_path)
