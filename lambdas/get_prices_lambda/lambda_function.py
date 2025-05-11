@@ -26,9 +26,15 @@ VALID_CAPACITIES = {
 
 def safe_int(val):
     """Convert any numeric type to integer safely"""
+    if val is None:
+        return 0
     if isinstance(val, (int, float, Decimal)):
         return int(val)
-    return int(str(val))
+    try:
+        return int(str(val))
+    except (ValueError, TypeError):
+        logger.warning(f"Could not convert value to int: {val}")
+        return 0
 
 def lambda_handler(event, context):
     """
