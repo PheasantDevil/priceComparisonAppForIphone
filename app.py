@@ -117,16 +117,12 @@ def create_app():
                 return jsonify({'error': 'シリーズが指定されていません'}), 400
 
             # API Gatewayへのリクエスト
--            response = requests.get(f'{API_ENDPOINT}?series={series}')
--            response.raise_for_status()
--
--            return jsonify(response.json())
-+            upstream = requests.get(f"{API_ENDPOINT}?series={series}", timeout=5)
-+            return (
-+                jsonify(upstream.json()),
-+                upstream.status_code,
-+                {"Content-Type": upstream.headers.get("Content-Type", "application/json")},
-+            )
+            upstream = requests.get(f"{API_ENDPOINT}?series={series}", timeout=5)
+            return (
+                jsonify(upstream.json()),
+                upstream.status_code,
+                {"Content-Type": upstream.headers.get("Content-Type", "application/json")},
+            )
         except requests.exceptions.RequestException as e:
             return jsonify({'error': str(e)}), 500
     return app
@@ -274,6 +270,8 @@ def get_prices():
                 series = "iPhone 16 Pro Max"
             elif "Pro" in model:
                 series = "iPhone 16 Pro"
+            elif "16e" in model:
+                series = "iPhone 16e"
             elif "16" in model:
                 series = "iPhone 16"
             else:
@@ -288,21 +286,19 @@ def get_prices():
                 official_colors = official_prices.get(series, {}).get(capacity, {})
                 app.logger.debug(f"Found official colors for {series} {capacity}: {official_colors}")
                 
+                # レスポンス形式を統一
                 price_data[series][capacity] = {
-                    'colors': {'不明': {'price_text': f"{price:,}円", 'price_value': price}},
-                    'kaitori_price_min': price,
-                    'kaitori_price_max': price,
-                    'official_prices': official_colors
+                    'kaitori_price': price,
+                    'official_price': official_colors.get('price', 0),
+                    'price_diff': price - official_colors.get('price', 0),
+                    'rakuten_diff': 0  # 必要に応じて計算
                 }
             else:
                 # 最小・最大価格を更新
-                current_min = price_data[series][capacity]['kaitori_price_min']
-                current_max = price_data[series][capacity]['kaitori_price_max']
-                
-                if price < current_min:
-                    price_data[series][capacity]['kaitori_price_min'] = price
-                if price > current_max:
-                    price_data[series][capacity]['kaitori_price_max'] = price
+                current_price = price_data[series][capacity]['kaitori_price']
+                if price > current_price:
+                    price_data[series][capacity]['kaitori_price'] = price
+                    price_data[series][capacity]['price_diff'] = price - price_data[series][capacity]['official_price']
 
         app.logger.debug(f"Final price data: {json.dumps(price_data, indent=2)}")
         return jsonify(price_data), 200
