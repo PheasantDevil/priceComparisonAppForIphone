@@ -69,7 +69,8 @@ resource "aws_lambda_function" "get_prices" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE = aws_dynamodb_table.kaitori_prices.name
+      KAITORI_TABLE  = aws_dynamodb_table.kaitori_prices.name
+      OFFICIAL_TABLE = aws_dynamodb_table.official_prices.name
       ENVIRONMENT    = "production"
     }
   }
@@ -91,12 +92,13 @@ resource "aws_lambda_function" "price_comparison" {
   runtime          = "python3.9"
   timeout          = 30
   memory_size      = 128
-  publish          = true # バージョンを公開
+  publish          = true
   source_code_hash = data.archive_file.lambda_get_prices.output_base64sha256
 
   environment {
     variables = {
-      DYNAMODB_TABLE = aws_dynamodb_table.kaitori_prices.name
+      KAITORI_TABLE  = aws_dynamodb_table.kaitori_prices.name
+      OFFICIAL_TABLE = aws_dynamodb_table.official_prices.name
       ENVIRONMENT    = "production"
     }
   }
