@@ -117,16 +117,12 @@ def create_app():
                 return jsonify({'error': 'シリーズが指定されていません'}), 400
 
             # API Gatewayへのリクエスト
--            response = requests.get(f'{API_ENDPOINT}?series={series}')
--            response.raise_for_status()
--
--            return jsonify(response.json())
-+            upstream = requests.get(f"{API_ENDPOINT}?series={series}", timeout=5)
-+            return (
-+                jsonify(upstream.json()),
-+                upstream.status_code,
-+                {"Content-Type": upstream.headers.get("Content-Type", "application/json")},
-+            )
+            upstream = requests.get(f"{API_ENDPOINT}?series={series}", timeout=5)
+            return (
+                jsonify(upstream.json()),
+                upstream.status_code,
+                {"Content-Type": upstream.headers.get("Content-Type", "application/json")},
+            )
         except requests.exceptions.RequestException as e:
             return jsonify({'error': str(e)}), 500
     return app
@@ -146,6 +142,7 @@ def get_kaitori_prices():
     """買取価格データをスクレイピングで取得"""
     all_product_details = {
         "iPhone 16": {},
+        "iPhone 16 Plus": {},
         "iPhone 16 Pro": {},
         "iPhone 16 Pro Max": {},
         "iPhone 16e": {},
@@ -156,71 +153,98 @@ def get_kaitori_prices():
         page = browser.new_page()
 
         for url in config.scraper.KAITORI_RUDEA_URLS:
-            page.goto(url)
-            page.wait_for_load_state("networkidle")
+            try:
+                page.goto(url)
+                page.wait_for_load_state("networkidle")
+                app.logger.info(f"Scraping URL: {url}")
 
-            items = page.query_selector_all(".tr")
+                items = page.query_selector_all(".tr")
+                app.logger.info(f"Found {len(items)} items on page")
 
-            for item in items:
-                try:
-                    model_element = item.query_selector(".ttl h2")
-                    model_name = model_element.inner_text().strip() if model_element else ""
+                for item in items:
+                    try:
+                        model_element = item.query_selector(".ttl h2")
+                        model_name = model_element.inner_text().strip() if model_element else ""
+                        app.logger.debug(f"Processing model: {model_name}")
 
-                    # モデル名からシリーズを判定
-                    if "Pro Max" in model_name:
-                        series = "iPhone 16 Pro Max"
-                    elif "Pro" in model_name:
-                        series = "iPhone 16 Pro"
-                    elif "16" in model_name:
-                        series = "iPhone 16"
-                    elif "16" in model_name:
-                        series = "iPhone 16 e"
-                    else:
-                        continue
+                        # モデル名からシリーズを判定
+                        if "Pro Max" in model_name:
+                            series = "iPhone 16 Pro Max"
+                        elif "Pro" in model_name:
+                            series = "iPhone 16 Pro"
+                        elif "Plus" in model_name:
+                            series = "iPhone 16 Plus"
+                        elif "16e" in model_name or "16 e" in model_name:
+                            series = "iPhone 16e"
+                        elif "16" in model_name:
+                            series = "iPhone 16"
+                        else:
+                            app.logger.debug(f"Skipping unknown model: {model_name}")
+                            continue
 
-                    # 容量を抽出（例: "128GB" または "1TB"）
-                    capacity_match = re.search(r"(\d+)(GB|TB)", model_name)
-                    if not capacity_match:
-                        continue
-                    capacity = capacity_match.group(0)  # "128GB" or "1TB"
+                        # 容量を抽出（例: "128GB" または "1TB"）
+                        capacity_match = re.search(r"(\d+)(GB|TB)", model_name)
+                        if not capacity_match:
+                            app.logger.debug(f"No capacity found in model: {model_name}")
+                            continue
+                        
+                        # 容量の正規化
+                        capacity_value = int(capacity_match.group(1))
+                        capacity_unit = capacity_match.group(2)
+                        if capacity_unit == "TB":
+                            capacity = f"{capacity_value}TB"
+                        else:
+                            capacity = f"{capacity_value}GB"
 
-                    price_element = item.query_selector(".td.td2 .td2wrap")
-                    price_text = price_element.inner_text().strip() if price_element else ""
+                        price_element = item.query_selector(".td.td2 .td2wrap")
+                        price_text = price_element.inner_text().strip() if price_element else ""
 
-                    if model_name and price_text and "円" in price_text:
-                        # カラーを抽出
-                        color_match = re.search(r"(黒|白|桃|緑|青|金|灰)", model_name)
-                        color = color_match.group(1) if color_match else "不明"
+                        if model_name and price_text and "円" in price_text:
+                            # カラーを抽出
+                            color_match = re.search(r"(黒|白|桃|緑|青|金|灰)", model_name)
+                            color = color_match.group(1) if color_match else "不明"
 
-                        # 容量ごとのデータを初期化・更新
-                        if capacity not in all_product_details[series]:
-                            all_product_details[series][capacity] = {
-                                "colors": {},
-                                "kaitori_price_min": None,
-                                "kaitori_price_max": None,
+                            # 容量ごとのデータを初期化・更新
+                            if capacity not in all_product_details[series]:
+                                all_product_details[series][capacity] = {
+                                    "colors": {},
+                                    "kaitori_price_min": None,
+                                    "kaitori_price_max": None,
+                                }
+
+                            # 色ごとの価格を保存
+                            price_value = price_text_to_int(price_text)
+                            all_product_details[series][capacity]["colors"][color] = {
+                                "price_text": price_text,
+                                "price_value": price_value,
                             }
 
-                        # 色ごとの価格を保存
-                        price_value = price_text_to_int(price_text)
-                        all_product_details[series][capacity]["colors"][color] = {
-                            "price_text": price_text,
-                            "price_value": price_value,
-                        }
+                            # 最小・最大価格を更新
+                            current_min = all_product_details[series][capacity]["kaitori_price_min"]
+                            current_max = all_product_details[series][capacity]["kaitori_price_max"]
 
-                        # 最小・最大価格を更新
-                        current_min = all_product_details[series][capacity]["kaitori_price_min"]
-                        current_max = all_product_details[series][capacity]["kaitori_price_max"]
+                            if current_min is None or price_value < current_min:
+                                all_product_details[series][capacity]["kaitori_price_min"] = price_value
+                            if current_max is None or price_value > current_max:
+                                all_product_details[series][capacity]["kaitori_price_max"] = price_value
 
-                        if current_min is None or price_value < current_min:
-                            all_product_details[series][capacity]["kaitori_price_min"] = price_value
-                        if current_max is None or price_value > current_max:
-                            all_product_details[series][capacity]["kaitori_price_max"] = price_value
+                            app.logger.debug(f"Added price data for {series} {capacity} {color}: {price_value}円")
 
-                except Exception as e:
-                    app.logger.error(f"データ取得エラー: {str(e)}")
-                    continue
+                    except Exception as e:
+                        app.logger.error(f"Error processing item: {str(e)}")
+                        continue
+
+            except Exception as e:
+                app.logger.error(f"Error processing URL {url}: {str(e)}")
+                continue
 
         browser.close()
+
+    # 結果のログ出力
+    for series, capacities in all_product_details.items():
+        app.logger.info(f"Scraped data for {series}:")
+        for capacity, data in capacities.items():
+            app.logger.info(f"  {capacity}: min={data['kaitori_price_min']}, max={data['kaitori_price_max']}")
 
     return all_product_details
 
@@ -274,6 +298,8 @@ def get_prices():
                 series = "iPhone 16 Pro Max"
             elif "Pro" in model:
                 series = "iPhone 16 Pro"
+            elif "16e" in model:
+                series = "iPhone 16e"
             elif "16" in model:
                 series = "iPhone 16"
             else:
@@ -288,21 +314,19 @@ def get_prices():
                 official_colors = official_prices.get(series, {}).get(capacity, {})
                 app.logger.debug(f"Found official colors for {series} {capacity}: {official_colors}")
                 
+                # レスポンス形式を統一
                 price_data[series][capacity] = {
-                    'colors': {'不明': {'price_text': f"{price:,}円", 'price_value': price}},
-                    'kaitori_price_min': price,
-                    'kaitori_price_max': price,
-                    'official_prices': official_colors
+                    'kaitori_price': price,
+                    'official_price': official_colors.get('price', 0),
+                    'price_diff': price - official_colors.get('price', 0),
+                    'rakuten_diff': 0  # 必要に応じて計算
                 }
             else:
                 # 最小・最大価格を更新
-                current_min = price_data[series][capacity]['kaitori_price_min']
-                current_max = price_data[series][capacity]['kaitori_price_max']
-                
-                if price < current_min:
-                    price_data[series][capacity]['kaitori_price_min'] = price
-                if price > current_max:
-                    price_data[series][capacity]['kaitori_price_max'] = price
+                current_price = price_data[series][capacity]['kaitori_price']
+                if price > current_price:
+                    price_data[series][capacity]['kaitori_price'] = price
+                    price_data[series][capacity]['price_diff'] = price - price_data[series][capacity]['official_price']
 
         app.logger.debug(f"Final price data: {json.dumps(price_data, indent=2)}")
         return jsonify(price_data), 200

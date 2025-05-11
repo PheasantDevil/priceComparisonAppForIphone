@@ -50,113 +50,6 @@ resource "aws_cloudwatch_metric_alarm" "security_findings" {
   alarm_actions = [aws_sns_topic.alerts.arn]
 }
 
-# コンプライアンスチェックの設定
-resource "aws_config_configuration_recorder" "main" {
-  name     = "price-comparison-recorder"
-  role_arn = aws_iam_role.config_role.arn
-
-  recording_group {
-    all_supported = true
-  }
-}
-
-resource "aws_config_delivery_channel" "main" {
-  name           = "price-comparison-delivery"
-  s3_bucket_name = aws_s3_bucket.config_bucket.id
-  s3_key_prefix  = "config"
-
-  snapshot_delivery_properties {
-    delivery_frequency = "Six_Hours"
-  }
-
-  depends_on = [aws_config_configuration_recorder.main]
-}
-
-# 設定ファイル用のS3バケット
-resource "aws_s3_bucket" "config_bucket" {
-  bucket        = "price-comparison-config-production"
-  force_destroy = true # 一時的に有効化
-
-  tags = {
-    Name        = "price-comparison-config"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
-}
-
-resource "aws_s3_bucket_versioning" "config_bucket" {
-  bucket = aws_s3_bucket.config_bucket.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "config_bucket" {
-  bucket = aws_s3_bucket.config_bucket.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
-# ConfigのIAMロール
-resource "aws_iam_role" "config_role" {
-  name = "price-comparison-config-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "config.amazonaws.com"
-        }
-      }
-    ]
-  })
-
-  tags = {
-    Name        = "price-comparison-config-role"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
-}
-
-resource "aws_iam_role_policy" "config_policy" {
-  name = "config-policy"
-  role = aws_iam_role.config_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:PutObject",
-          "s3:GetBucketAcl"
-        ]
-        Resource = [
-          aws_s3_bucket.config_bucket.arn,
-          "${aws_s3_bucket.config_bucket.arn}/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "config:Put*",
-          "config:Get*",
-          "config:List*",
-          "config:Describe*"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
 # WAF Web ACLの設定
 resource "aws_wafv2_web_acl" "api_gateway" {
   name        = "api-gateway-waf"
@@ -341,55 +234,7 @@ resource "aws_wafv2_web_acl_association" "api_gateway" {
   ]
 }
 
-# セキュリティグループの設定
-resource "aws_security_group" "lambda" {
-  name        = "lambda-security-group"
-  description = "Security group for Lambda functions"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    description     = "Allow HTTPS traffic from API Gateway"
-    from_port       = 443
-    to_port         = 443
-    protocol        = "tcp"
-    security_groups = [aws_security_group.api_gateway.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name        = "lambda-security-group"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
-}
-
-resource "aws_security_group" "api_gateway" {
-  name        = "api-gateway-security-group"
-  description = "Security group for API Gateway"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    description = "Allow HTTPS traffic from internet"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name        = "api-gateway-security-group"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
-}
-
-# KMSキー
+# KMSキーの設定
 resource "aws_kms_key" "data_encryption" {
   description             = "KMS key for data encryption"
   deletion_window_in_days = 7
@@ -406,23 +251,6 @@ resource "aws_kms_key" "data_encryption" {
         }
         Action   = "kms:*"
         Resource = "*"
-      },
-      {
-        Sid    = "Allow CloudTrail to encrypt logs"
-        Effect = "Allow"
-        Principal = {
-          Service = "cloudtrail.amazonaws.com"
-        }
-        Action = [
-          "kms:GenerateDataKey*",
-          "kms:Decrypt"
-        ]
-        Resource = "*"
-        Condition = {
-          StringLike = {
-            "kms:EncryptionContext:aws:cloudtrail:arn" = "arn:aws:cloudtrail:*:${data.aws_caller_identity.current.account_id}:trail/*"
-          }
-        }
       }
     ]
   })
@@ -438,85 +266,6 @@ resource "aws_kms_key" "data_encryption" {
 resource "aws_kms_alias" "data_encryption" {
   name          = "alias/data-encryption-key"
   target_key_id = aws_kms_key.data_encryption.key_id
-}
-
-# CloudTrailの設定
-resource "aws_cloudtrail" "security_audit" {
-  name                          = "security-audit-trail"
-  s3_bucket_name                = aws_s3_bucket.cloudtrail.id
-  include_global_service_events = true
-  is_multi_region_trail         = true
-  enable_logging                = true
-  kms_key_id                    = aws_kms_key.data_encryption.arn
-
-  tags = {
-    Name        = "security-audit-trail"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-  }
-}
-
-# CloudTrail用のS3バケット
-resource "aws_s3_bucket" "cloudtrail" {
-  bucket        = "security-audit-trail-${data.aws_caller_identity.current.account_id}"
-  force_destroy = true
-
-  tags = {
-    Name        = "security-audit-trail"
-    Environment = "production"
-    Project     = "iphone_price_tracker"
-    Purpose     = "SecurityAudit"
-  }
-}
-
-resource "aws_s3_bucket_versioning" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
-resource "aws_s3_bucket_policy" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AWSCloudTrailAclCheck"
-        Effect = "Allow"
-        Principal = {
-          Service = "cloudtrail.amazonaws.com"
-        }
-        Action   = "s3:GetBucketAcl"
-        Resource = aws_s3_bucket.cloudtrail.arn
-      },
-      {
-        Sid    = "AWSCloudTrailWrite"
-        Effect = "Allow"
-        Principal = {
-          Service = "cloudtrail.amazonaws.com"
-        }
-        Action   = "s3:PutObject"
-        Resource = "${aws_s3_bucket.cloudtrail.arn}/*"
-        Condition = {
-          StringEquals = {
-            "s3:x-amz-acl" = "bucket-owner-full-control"
-          }
-        }
-      }
-    ]
-  })
 }
 
 provider "aws" {

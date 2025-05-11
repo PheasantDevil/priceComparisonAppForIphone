@@ -4,23 +4,28 @@
 resource "aws_dynamodb_table" "kaitori_prices" {
   name         = "kaitori_prices"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "id"
+  hash_key     = "series"
+  range_key    = "capacity"
 
   attribute {
-    name = "id"
+    name = "series"
     type = "S"
   }
 
   attribute {
-    name = "price"
-    type = "N"
+    name = "capacity"
+    type = "S"
   }
 
   global_secondary_index {
-    name            = "PriceIndex"
-    hash_key        = "id"
-    range_key       = "price"
+    name            = "CapacityIndex"
+    hash_key        = "series"
+    range_key       = "capacity"
     projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
   }
 
   lifecycle {
