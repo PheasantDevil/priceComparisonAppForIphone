@@ -42,4 +42,4 @@ jobs:
       - name: Apply Terraform configuration
         run: |
           cd terraform
-          terraform apply -auto-approve -input=false  # `input=false`を追加して自動承認
+          terraform apply -auto-approve
