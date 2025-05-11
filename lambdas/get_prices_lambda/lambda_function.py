@@ -25,7 +25,8 @@ VALID_CAPACITIES = {
 }
 
 def safe_int(val):
-    if isinstance(val, (int, float)):
+    """Convert any numeric type to integer safely"""
+    if isinstance(val, (int, float, Decimal)):
         return int(val)
     return int(str(val))
 
@@ -91,14 +92,12 @@ def get_prices(series):
         official_response = official_table.get_item(
             Key={'series': series}
         )
-        logger.info(f"Official response: {json.dumps(official_response)}")
         
         logger.info(f"Getting kaitori prices for series: {series}")
         # 買取価格の取得
         kaitori_response = kaitori_table.get_item(
             Key={'series': series}
         )
-        logger.info(f"Kaitori response: {json.dumps(kaitori_response)}")
         
         # データの整形と差分計算
         prices = {}
@@ -110,9 +109,6 @@ def get_prices(series):
             # すべての値をintに変換
             official_prices = {k: safe_int(v) for k, v in official_prices.items()}
             kaitori_prices = {k: safe_int(v) for k, v in kaitori_prices.items()}
-            
-            logger.info(f"Official prices: {json.dumps(official_prices)}")
-            logger.info(f"Kaitori prices: {json.dumps(kaitori_prices)}")
             
             for capacity in VALID_CAPACITIES.get(series, []):
                 if capacity in official_prices and capacity in kaitori_prices:
@@ -126,10 +122,15 @@ def get_prices(series):
                         'rakuten_diff': kaitori_price - int(official_price * 0.9)
                     }
         else:
-            logger.error(f"Data not found for series: {series}")
-            logger.error(f"Official response: {json.dumps(official_response)}")
-            logger.error(f"Kaitori response: {json.dumps(kaitori_response)}")
-            raise Exception(f"Data not found for series: {series}")
+            logger.warning(f"Data not found for series: {series}")
+            # データが存在しない場合は空の価格情報を返す
+            for capacity in VALID_CAPACITIES.get(series, []):
+                prices[capacity] = {
+                    'official_price': 0,
+                    'kaitori_price': 0,
+                    'price_diff': 0,
+                    'rakuten_diff': 0
+                }
         
         return {
             'series': series,
