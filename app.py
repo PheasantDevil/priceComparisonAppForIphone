@@ -14,6 +14,11 @@ from services.dynamodb_service import get_prices_by_series
 
 
 def create_app():
+    """
+    Creates and configures the Flask application with integrated AWS services, web scraping, and API proxy routes.
+    
+    Initializes the Flask app with settings from the configuration, sets up logging, and configures AWS DynamoDB and Lambda clients. Defines routes for serving the favicon, rendering the index page, setting alert thresholds, checking prices with alert notifications, and proxying price data requests to an external API Gateway endpoint. Returns the fully configured Flask app instance.
+    """
     app = Flask(__name__, static_folder='static')
 
     # アプリケーション設定の適用
@@ -41,6 +46,13 @@ def create_app():
 
     @app.route("/favicon.ico")
     def favicon():
+        """
+        Serves the favicon.ico file from the static directory.
+        
+        Returns:
+            The favicon.ico file with the appropriate MIME type, or an empty response with
+            HTTP 204 status if an error occurs.
+        """
         try:
             return send_from_directory(
                 os.path.join(app.root_path, "static"),
@@ -80,6 +92,11 @@ def create_app():
 
     @app.route('/check-prices', methods=['GET'])
     def check_prices():
+        """
+        Checks price data against an alert threshold and triggers notifications if prices fall below it.
+        
+        Retrieves all price records and the configured alert threshold from the DynamoDB table. For each price below the threshold, invokes an AWS Lambda function to send a LINE notification. Returns a completion message or an error response.
+        """
         try:
             # 価格データを取得
             response = table.scan()
@@ -111,6 +128,11 @@ def create_app():
 
     @app.route('/api/prices')
     def proxy_prices():
+        """
+        Proxies a price data request to an external API Gateway based on the provided series.
+        
+        Validates the presence of the 'series' query parameter, forwards the request to the external API, and returns the JSON response. Returns an error message with an appropriate status code if the parameter is missing or if the external request fails.
+        """
         try:
             series = request.args.get('series')
             if not series:
@@ -221,7 +243,14 @@ def get_kaitori_prices():
 
 @app.route("/get_prices")
 def get_prices():
-    """DynamoDBから最新の価格情報を取得"""
+    """
+    Retrieves and aggregates the latest buyback and official price data from DynamoDB.
+    
+    Fetches buyback prices from the 'kaitori_prices' table and official prices from the 'official_prices' table, organizing them by iPhone series and capacity. Returns a structured JSON response containing color-specific prices, minimum and maximum buyback prices, and official prices for comparison.
+    
+    Returns:
+        A JSON response with the aggregated price data and HTTP status 200 on success, or an error message with HTTP status 500 on failure.
+    """
     try:
         # DynamoDBから価格データを取得
         dynamodb = boto3.resource('dynamodb')

@@ -25,14 +25,23 @@ VALID_CAPACITIES = {
 }
 
 def safe_int(val):
-    """Convert any numeric type to integer safely"""
+    """
+    Safely converts a numeric value to an integer.
+    
+    Accepts int, float, Decimal, or string representations of numbers and returns the integer value.
+    """
     if isinstance(val, (int, float, Decimal)):
         return int(val)
     return int(str(val))
 
 def lambda_handler(event, context):
     """
-    Lambda関数のメインハンドラー
+    AWS Lambda handler that retrieves iPhone price information for a specified series.
+    
+    Processes an incoming API Gateway event, validates the requested iPhone series,
+    retrieves official and buyback prices for all valid capacities, and returns the
+    data in JSON format with appropriate CORS headers. Returns HTTP 400 for invalid
+    series and HTTP 500 for internal errors.
     """
     try:
         logger.info("Starting price retrieval process")
@@ -84,7 +93,21 @@ def lambda_handler(event, context):
 
 def get_prices(series):
     """
-    指定されたシリーズの全容量の価格情報を取得
+    Retrieves price information for all valid capacities of the specified iPhone series.
+    
+    Fetches official and buyback (kaitori) prices from DynamoDB tables for the given series.
+    Returns a dictionary mapping each valid capacity to its official price, kaitori price,
+    the difference between them, and the difference between the kaitori price and 90% of the official price.
+    If data is missing for the series, returns zeroed price information for all capacities.
+    
+    Args:
+        series: The iPhone series name to retrieve prices for.
+    
+    Returns:
+        A dictionary with the series name and a mapping of capacities to their price details.
+    
+    Raises:
+        ClientError: If a DynamoDB operation fails.
     """
     try:
         logger.info(f"Getting official prices for series: {series}")
