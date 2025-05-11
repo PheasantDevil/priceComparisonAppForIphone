@@ -33,6 +33,12 @@ logger = logging.getLogger(__name__)
 # Decimalを処理するJSONエンコーダを追加
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
+        """
+        Converts objects supporting modulo and numeric conversion to int or float for JSON encoding.
+        
+        If the object supports modulo operation, it is converted to an int if it represents a whole number,
+        otherwise to a float. Falls back to the default JSON encoding for unsupported types.
+        """
         if isinstance(obj):
             return int(obj) if obj % 1 == 0 else float(obj)
         return super(DecimalEncoder, self).default(obj)
@@ -345,7 +351,19 @@ class PriceScraper:
         return None
 
     def get_official_prices(self, series: str) -> Dict[str, str]:
-        """公式価格をDynamoDBから取得"""
+        """
+        Retrieves official iPhone prices by series and capacity from DynamoDB.
+        
+        For the specified series, queries the official prices table for each standard capacity.
+        Returns a dictionary mapping each capacity to the lowest available price among all colors.
+        If no prices are found or an error occurs, returns an empty dictionary.
+        
+        Args:
+            series: The iPhone series name to look up.
+        
+        Returns:
+            A dictionary where keys are capacities (e.g., '128GB') and values are the lowest price as strings.
+        """
         try:
             # Handle both "iPhone 16e" and "iPhone 16 e" formats
             lookup_series = series.replace(' e', 'e') if ' e' in series else series

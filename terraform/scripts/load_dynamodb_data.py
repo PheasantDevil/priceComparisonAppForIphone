@@ -78,7 +78,11 @@ def write_to_price_history(table, data):
         raise
 
 def write_to_price_predictions(table, data):
-    """価格予測データをDynamoDBに書き込む"""
+    """
+    Inserts price prediction data into the DynamoDB price_predictions table.
+    
+    Each prediction entry includes the series name, timestamp, predicted price, confidence score as a string, and contributing factors. Raises an exception if insertion fails.
+    """
     try:
         for series, series_data in data.items():
             for prediction in series_data['predictions']:
