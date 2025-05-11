@@ -267,7 +267,7 @@ jobs:
       - name: Apply Terraform changes
         working-directory: terraform
         run: |
-          terraform apply -auto-approve tfplan
+          terraform apply -auto-approve
 
       - name: Verify deployment
         working-directory: terraform
