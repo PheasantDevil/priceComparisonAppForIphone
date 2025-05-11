@@ -100,9 +100,13 @@ def get_prices(series):
         )
         
         logger.info(f"Getting kaitori prices for series: {series}")
-        # 買取価格の取得
+        # 買取価格の取得（シリーズ名の不一致を考慮）
+        kaitori_series = series
+        if series == "iPhone 16e":
+            kaitori_series = "iPhone 16 e"
+        
         kaitori_response = kaitori_table.get_item(
-            Key={'series': series}
+            Key={'series': kaitori_series}
         )
         
         # データの整形と差分計算
@@ -111,6 +115,9 @@ def get_prices(series):
             # テーブル構造に合わせてフィールド名を修正
             official_prices = official_response['Item'].get('price', {})
             kaitori_prices = kaitori_response['Item'].get('price', {})
+            
+            # 容量の不一致を修正（1GBを1TBに変換）
+            kaitori_prices = {k.replace('1GB', '1TB'): v for k, v in kaitori_prices.items()}
             
             # すべての値をintに変換
             official_prices = {k: safe_int(v) for k, v in official_prices.items()}
