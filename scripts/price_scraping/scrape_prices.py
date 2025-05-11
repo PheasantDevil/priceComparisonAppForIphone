@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # Decimalを処理するJSONエンコーダを追加
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, Decimal):
+        if isinstance(obj):
             return int(obj) if obj % 1 == 0 else float(obj)
         return super(DecimalEncoder, self).default(obj)
 
@@ -368,7 +368,7 @@ class PriceScraper:
                         # 各色の価格から最小値を取得
                         colors = response['Item'].get('colors', {})
                         if colors:
-                            min_price = min(Decimal(str(price)) for price in colors.values())
+                            min_price = min(int(price) for price in colors.values())
                             formatted_prices[capacity] = str(min_price)
                             logger.info(f"Found price for {lookup_series} {capacity}: {min_price}")
                         else:
