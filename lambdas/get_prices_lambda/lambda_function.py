@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import boto3
 from botocore.exceptions import ClientError
@@ -12,17 +13,20 @@ logger.setLevel(logging.INFO)
 
 # DynamoDBクライアントの初期化
 dynamodb = boto3.resource('dynamodb')
-kaitori_table = dynamodb.Table(os.environ['KAITORI_TABLE'])
-official_table = dynamodb.Table(os.environ['OFFICIAL_TABLE'])
+kaitori_table = dynamodb.Table(os.environ.get('KAITORI_TABLE', 'kaitori_prices'))
+official_table = dynamodb.Table(os.environ.get('OFFICIAL_TABLE', 'official_prices'))
 
 # シリーズごとの有効な容量を定義
 VALID_CAPACITIES = {
     "iPhone 16": ["128GB", "256GB", "512GB"],
-    "iPhone 16 Plus": ["128GB", "256GB", "512GB"],
     "iPhone 16 Pro": ["128GB", "256GB", "512GB", "1TB"],
-    "iPhone 16 Pro Max": ["256GB", "512GB", "1TB"],
-    "iPhone 16 e": ["128GB", "256GB", "512GB"]
+    "iPhone 16 Pro Max": ["256GB", "512GB", "1TB"]
 }
+
+def safe_int(val):
+    if isinstance(val, (int, float)):
+        return int(val)
+    return int(str(val))
 
 def lambda_handler(event, context):
     """
@@ -30,12 +34,29 @@ def lambda_handler(event, context):
     """
     try:
         logger.info("Starting price retrieval process")
+        logger.info(f"Event: {json.dumps(event)}")
         
         # クエリパラメータからシリーズを取得
         series = event.get('queryStringParameters', {}).get('series', 'iPhone 16')
+        logger.info(f"Retrieving prices for series: {series}")
+        
+        # シリーズが有効かチェック
+        if series not in VALID_CAPACITIES:
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                    'Access-Control-Allow-Methods': 'GET,OPTIONS'
+                },
+                'body': json.dumps({
+                    'message': f'Invalid series: {series}. Valid series are: {", ".join(VALID_CAPACITIES.keys())}'
+                })
+            }
         
         # 価格情報を取得
         prices = get_prices(series)
+        logger.info(f"Retrieved prices: {json.dumps(prices)}")
         
         return {
             'statusCode': 200,
@@ -48,7 +69,7 @@ def lambda_handler(event, context):
         }
         
     except Exception as e:
-        logger.error(f"Error in lambda_handler: {str(e)}")
+        logger.error(f"Error in lambda_handler: {str(e)}", exc_info=True)
         return {
             'statusCode': 500,
             'headers': {
@@ -56,7 +77,7 @@ def lambda_handler(event, context):
                 'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
                 'Access-Control-Allow-Methods': 'GET,OPTIONS'
             },
-            'body': json.dumps({'error': str(e)})
+            'body': json.dumps({'message': 'Internal server error', 'error': str(e)})
         }
 
 def get_prices(series):
@@ -64,41 +85,50 @@ def get_prices(series):
     指定されたシリーズの全容量の価格情報を取得
     """
     try:
+        logger.info(f"Getting official prices for series: {series}")
         # 公式価格の取得
-        official_response = official_table.scan(
-            FilterExpression='#s = :series',
-            ExpressionAttributeNames={'#s': 'series'},
-            ExpressionAttributeValues={':series': series}
+        official_response = official_table.get_item(
+            Key={'series': series}
         )
+        logger.info(f"Official response: {json.dumps(official_response)}")
         
+        logger.info(f"Getting kaitori prices for series: {series}")
         # 買取価格の取得
-        kaitori_response = kaitori_table.scan(
-            FilterExpression='#s = :series',
-            ExpressionAttributeNames={'#s': 'series'},
-            ExpressionAttributeValues={':series': series}
+        kaitori_response = kaitori_table.get_item(
+            Key={'series': series}
         )
+        logger.info(f"Kaitori response: {json.dumps(kaitori_response)}")
         
         # データの整形と差分計算
         prices = {}
-        for capacity in VALID_CAPACITIES.get(series, []):
-            official_price = next(
-                (item['price'] for item in official_response['Items'] 
-                 if item['capacity'] == capacity), 
-                None
-            )
-            kaitori_price = next(
-                (item['price'] for item in kaitori_response['Items'] 
-                 if item['capacity'] == capacity), 
-                None
-            )
+        if 'Item' in official_response and 'Item' in kaitori_response:
+            # テーブル構造に合わせてフィールド名を修正
+            official_prices = official_response['Item'].get('price', {})
+            kaitori_prices = kaitori_response['Item'].get('price', {})
             
-            if official_price and kaitori_price:
-                prices[capacity] = {
-                    'official_price': official_price,
-                    'kaitori_price': kaitori_price,
-                    'price_diff': kaitori_price - official_price,
-                    'rakuten_diff': kaitori_price - (official_price * 0.9)
-                }
+            # すべての値をintに変換
+            official_prices = {k: safe_int(v) for k, v in official_prices.items()}
+            kaitori_prices = {k: safe_int(v) for k, v in kaitori_prices.items()}
+            
+            logger.info(f"Official prices: {json.dumps(official_prices)}")
+            logger.info(f"Kaitori prices: {json.dumps(kaitori_prices)}")
+            
+            for capacity in VALID_CAPACITIES.get(series, []):
+                if capacity in official_prices and capacity in kaitori_prices:
+                    official_price = official_prices[capacity]
+                    kaitori_price = kaitori_prices[capacity]
+                    
+                    prices[capacity] = {
+                        'official_price': official_price,
+                        'kaitori_price': kaitori_price,
+                        'price_diff': kaitori_price - official_price,
+                        'rakuten_diff': kaitori_price - int(official_price * 0.9)
+                    }
+        else:
+            logger.error(f"Data not found for series: {series}")
+            logger.error(f"Official response: {json.dumps(official_response)}")
+            logger.error(f"Kaitori response: {json.dumps(kaitori_response)}")
+            raise Exception(f"Data not found for series: {series}")
         
         return {
             'series': series,
@@ -106,5 +136,5 @@ def get_prices(series):
         }
         
     except ClientError as e:
-        logger.error(f"Error getting prices: {str(e)}")
+        logger.error(f"Error getting prices: {str(e)}", exc_info=True)
         raise
