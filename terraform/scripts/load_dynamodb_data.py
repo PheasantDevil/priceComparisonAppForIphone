@@ -86,7 +86,8 @@ def write_to_price_predictions(table, data):
                     'series': series,
                     'timestamp': str(prediction['timestamp']),
                     'predicted_price': int(prediction['predicted_price']),
-                    'confidence': (str(prediction['confidence'])),
+                    # Preserve Number type. DynamoDB needs `Decimal` or an int/float.
+                    'confidence': Decimal(str(prediction['confidence'])),
                     'factors': prediction['factors']
                 }
                 table.put_item(Item=item)
