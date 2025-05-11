@@ -94,55 +94,54 @@ def get_prices(series):
     """
     try:
         logger.info(f"Getting official prices for series: {series}")
-        # 公式価格の取得
-        official_response = official_table.get_item(
-            Key={'series': series}
+        # 公式価格の取得（seriesでquery）
+        official_response = official_table.query(
+            KeyConditionExpression=boto3.dynamodb.conditions.Key('series').eq(series)
         )
-        
+        official_items = official_response.get('Items', [])
+        logger.info(f"Official items: {official_items}")
+
         logger.info(f"Getting kaitori prices for series: {series}")
-        # 買取価格の取得
-        kaitori_response = kaitori_table.get_item(
-            Key={'series': series}
+        # 買取価格の取得（seriesでquery）
+        kaitori_response = kaitori_table.query(
+            KeyConditionExpression=boto3.dynamodb.conditions.Key('series').eq(series)
         )
-        
-        # データの整形と差分計算
+        kaitori_items = kaitori_response.get('Items', [])
+        logger.info(f"Kaitori items: {kaitori_items}")
+
+        # 公式価格をマッピング
+        official_prices = {}
+        if official_items:
+            official_item = official_items[0]  # シリーズごとに1つのアイテム
+            if 'price' in official_item:
+                official_prices = official_item['price']
+
+        # 買取価格をマッピング
+        kaitori_map = {item['capacity']: item for item in kaitori_items}
+
         prices = {}
-        if 'Item' in official_response and 'Item' in kaitori_response:
-            # テーブル構造に合わせてフィールド名を修正
-            official_prices = official_response['Item'].get('price', {})
-            kaitori_prices = kaitori_response['Item'].get('price', {})
-            
-            # すべての値をintに変換
-            official_prices = {k: safe_int(v) for k, v in official_prices.items()}
-            kaitori_prices = {k: safe_int(v) for k, v in kaitori_prices.items()}
-            
-            for capacity in VALID_CAPACITIES.get(series, []):
-                if capacity in official_prices and capacity in kaitori_prices:
-                    official_price = official_prices[capacity]
-                    kaitori_price = kaitori_prices[capacity]
-                    
-                    prices[capacity] = {
-                        'official_price': official_price,
-                        'kaitori_price': kaitori_price,
-                        'price_diff': kaitori_price - official_price,
-                        'rakuten_diff': kaitori_price - int(official_price * 0.9)
-                    }
-        else:
-            logger.warning(f"Data not found for series: {series}")
-            # データが存在しない場合は空の価格情報を返す
-            for capacity in VALID_CAPACITIES.get(series, []):
-                prices[capacity] = {
-                    'official_price': 0,
-                    'kaitori_price': 0,
-                    'price_diff': 0,
-                    'rakuten_diff': 0
-                }
-        
+        for capacity in VALID_CAPACITIES.get(series, []):
+            # 公式価格
+            official_price = safe_int(official_prices.get(capacity, 0))
+
+            # 買取価格
+            kaitori_price = 0
+            kaitori_item = kaitori_map.get(capacity)
+            if kaitori_item:
+                kaitori_price = safe_int(kaitori_item.get('kaitori_price_max', 0))
+
+            prices[capacity] = {
+                'official_price': official_price,
+                'kaitori_price': kaitori_price,
+                'price_diff': kaitori_price - official_price,
+                'rakuten_diff': kaitori_price - int(official_price * 0.9)
+            }
+
         return {
             'series': series,
             'prices': prices
         }
-        
+
     except ClientError as e:
         logger.error(f"Error getting prices: {str(e)}", exc_info=True)
         raise
