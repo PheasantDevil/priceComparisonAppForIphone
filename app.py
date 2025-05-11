@@ -117,13 +117,18 @@ def create_app():
                 return jsonify({'error': 'シリーズが指定されていません'}), 400
 
             # API Gatewayへのリクエスト
-            response = requests.get(f'{API_ENDPOINT}?series={series}')
-            response.raise_for_status()
-            
-            return jsonify(response.json())
+-            response = requests.get(f'{API_ENDPOINT}?series={series}')
+-            response.raise_for_status()
+-
+-            return jsonify(response.json())
++            upstream = requests.get(f"{API_ENDPOINT}?series={series}", timeout=5)
++            return (
++                jsonify(upstream.json()),
++                upstream.status_code,
++                {"Content-Type": upstream.headers.get("Content-Type", "application/json")},
++            )
         except requests.exceptions.RequestException as e:
             return jsonify({'error': str(e)}), 500
-
     return app
 
 # アプリケーションインスタンスの作成
