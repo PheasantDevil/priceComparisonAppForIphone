@@ -5,6 +5,7 @@ import re
 from datetime import datetime
 
 import boto3
+import requests
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from playwright.sync_api import sync_playwright
 
@@ -13,7 +14,7 @@ from services.dynamodb_service import get_prices_by_series
 
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder='static')
 
     # アプリケーション設定の適用
     app.config['DEBUG'] = config.app.DEBUG
@@ -34,6 +35,9 @@ def create_app():
 
     # Lambdaクライアントの設定
     lambda_client = boto3.client('lambda')
+
+    # API Gatewayのエンドポイント
+    API_ENDPOINT = "https://qpt4qfbk57.execute-api.ap-northeast-1.amazonaws.com/production/get_prices"
 
     @app.route("/favicon.ico")
     def favicon():
@@ -105,6 +109,26 @@ def create_app():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
+    @app.route('/api/prices')
+    def proxy_prices():
+        try:
+            series = request.args.get('series')
+            if not series:
+                return jsonify({'error': 'シリーズが指定されていません'}), 400
+
+            # API Gatewayへのリクエスト
+-            response = requests.get(f'{API_ENDPOINT}?series={series}')
+-            response.raise_for_status()
+-
+-            return jsonify(response.json())
++            upstream = requests.get(f"{API_ENDPOINT}?series={series}", timeout=5)
++            return (
++                jsonify(upstream.json()),
++                upstream.status_code,
++                {"Content-Type": upstream.headers.get("Content-Type", "application/json")},
++            )
+        except requests.exceptions.RequestException as e:
+            return jsonify({'error': str(e)}), 500
     return app
 
 # アプリケーションインスタンスの作成
@@ -289,4 +313,4 @@ def get_prices():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8080)))

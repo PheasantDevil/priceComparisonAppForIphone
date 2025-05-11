@@ -50,7 +50,7 @@ mkdir -p $DEPLOY_DIR
 
 echo "必要なファイルをコピー中..."
 # Lambda関数のコードをコピー
-cp lambda/get_prices_lambda/lambda_function.py $DEPLOY_DIR/
+cp lambdas/get_prices_lambda/lambda_function.py $DEPLOY_DIR/lambda_function.py
 cp -r src $DEPLOY_DIR/
 cp -r services $DEPLOY_DIR/
 cp -r config $DEPLOY_DIR/  # 設定ファイルをコピー
@@ -116,12 +116,12 @@ aws iam attach-role-policy \
 
 # Lambda関数の更新
 aws lambda update-function-code \
-    --function-name get_prices_lambda \
+    --function-name get_prices \
     --zip-file fileb://$ARTIFACTS_DIR/function_latest.zip
 
 # Lambda関数の設定更新
 aws lambda update-function-configuration \
-    --function-name get_prices_lambda \
+    --function-name get_prices \
     --handler lambda_function.lambda_handler \
     --role "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/get_prices_lambda_role" \
     --timeout 30 \
@@ -130,8 +130,18 @@ aws lambda update-function-configuration \
 echo "Lambda関数が更新されました"
 
 # DynamoDBテーブルの作成（存在しない場合）
+# 公式価格テーブル
 aws dynamodb create-table \
-    --table-name iphone_prices \
+    --table-name official_prices \
+    --attribute-definitions \
+        AttributeName=series,AttributeType=S \
+    --key-schema \
+        AttributeName=series,KeyType=HASH \
+    --billing-mode PAY_PER_REQUEST || true
+
+# 買取価格テーブル
+aws dynamodb create-table \
+    --table-name kaitori_prices \
     --attribute-definitions \
         AttributeName=series,AttributeType=S \
     --key-schema \
@@ -139,39 +149,75 @@ aws dynamodb create-table \
     --billing-mode PAY_PER_REQUEST || true
 
 # テーブルが作成されるのを待機
-aws dynamodb wait table-exists --table-name iphone_prices
+aws dynamodb wait table-exists --table-name official_prices
+aws dynamodb wait table-exists --table-name kaitori_prices
 
-# サンプルデータの投入
+# サンプルデータの投入（公式価格）
 aws dynamodb put-item \
-    --table-name iphone_prices \
+    --table-name official_prices \
     --item '{
         "series": {"S": "iPhone 16"},
-        "prices": {"M": {
-            "128GB": {"S": "124800"},
-            "256GB": {"S": "139800"},
-            "512GB": {"S": "169800"}
+        "price": {"M": {
+            "128GB": {"N": "124800"},
+            "256GB": {"N": "139800"},
+            "512GB": {"N": "169800"}
         }}
     }'
 
 aws dynamodb put-item \
-    --table-name iphone_prices \
+    --table-name official_prices \
     --item '{
         "series": {"S": "iPhone 16 Pro"},
-        "prices": {"M": {
-            "128GB": {"S": "159800"},
-            "256GB": {"S": "174800"},
-            "512GB": {"S": "204800"},
-            "1TB": {"S": "234800"}
+        "price": {"M": {
+            "128GB": {"N": "159800"},
+            "256GB": {"N": "174800"},
+            "512GB": {"N": "204800"},
+            "1TB": {"N": "234800"}
         }}
     }'
 
 aws dynamodb put-item \
-    --table-name iphone_prices \
+    --table-name official_prices \
     --item '{
         "series": {"S": "iPhone 16 Pro Max"},
-        "prices": {"M": {
-            "256GB": {"S": "189800"},
-            "512GB": {"S": "219800"},
-            "1TB": {"S": "249800"}
+        "price": {"M": {
+            "256GB": {"N": "189800"},
+            "512GB": {"N": "219800"},
+            "1TB": {"N": "249800"}
+        }}
+    }'
+
+# サンプルデータの投入（買取価格）
+aws dynamodb put-item \
+    --table-name kaitori_prices \
+    --item '{
+        "series": {"S": "iPhone 16"},
+        "price": {"M": {
+            "128GB": {"N": "100000"},
+            "256GB": {"N": "115000"},
+            "512GB": {"N": "145000"}
+        }}
+    }'
+
+aws dynamodb put-item \
+    --table-name kaitori_prices \
+    --item '{
+        "series": {"S": "iPhone 16 Pro"},
+        "price": {"M": {
+            "128GB": {"N": "135000"},
+            "256GB": {"N": "150000"},
+            "512GB": {"N": "180000"},
+            "1TB": {"N": "210000"}
+        }}
+    }'
+
+aws dynamodb put-item \
+    --table-name kaitori_prices \
+    --item '{
+        "series": {"S": "iPhone 16 Pro Max"},
+        "price": {"M": {
+            "256GB": {"N": "165000"},
+            "512GB": {"N": "195000"},
+            "1TB": {"N": "225000"}
         }}
     }'
