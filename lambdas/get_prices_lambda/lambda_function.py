@@ -20,7 +20,8 @@ official_table = dynamodb.Table(os.environ.get('OFFICIAL_TABLE', 'official_price
 VALID_CAPACITIES = {
     "iPhone 16": ["128GB", "256GB", "512GB"],
     "iPhone 16 Pro": ["128GB", "256GB", "512GB", "1TB"],
-    "iPhone 16 Pro Max": ["256GB", "512GB", "1TB"]
+    "iPhone 16 Pro Max": ["256GB", "512GB", "1TB"],
+    "iPhone 16e": ["128GB", "256GB", "512GB"]
 }
 
 def safe_int(val):
