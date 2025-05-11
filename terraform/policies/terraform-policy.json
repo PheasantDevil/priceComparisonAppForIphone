@@ -4,7 +4,6 @@
     {
       "Effect": "Allow",
       "Action": [
-        "s3:*",
         "dynamodb:*",
         "lambda:*",
         "apigateway:*",
