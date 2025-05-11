@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>iPhone 16シリーズ 買取価格比較</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/styles.css') }}"
+    />
     <style>
       /* テーブルのスタイル */
       .tables-container {
@@ -102,7 +106,9 @@
   </head>
   <body>
     <div class="container">
-      <h1 class="mb-4">iPhone価格比較</h1>
+      <h1>iPhone価格比較</h1>
+
+      <div id="error-message" class="error-message"></div>
 
       <div id="content">
         <div id="priceTablesContainer" class="tables-container">
@@ -110,6 +116,9 @@
           <div class="series-section">
             <h2>iPhone 16</h2>
             <div class="table-wrapper">
+              <div class="loading">
+                <div class="loading-spinner"></div>
+              </div>
               <table id="iPhone16-prices" class="price-table">
                 <thead>
                   <tr>
@@ -129,6 +138,9 @@
           <div class="series-section">
             <h2>iPhone 16 Pro</h2>
             <div class="table-wrapper">
+              <div class="loading">
+                <div class="loading-spinner"></div>
+              </div>
               <table id="iPhone16Pro-prices" class="price-table">
                 <thead>
                   <tr>
@@ -148,6 +160,9 @@
           <div class="series-section">
             <h2>iPhone 16 Pro Max</h2>
             <div class="table-wrapper">
+              <div class="loading">
+                <div class="loading-spinner"></div>
+              </div>
               <table id="iPhone16ProMax-prices" class="price-table">
                 <thead>
                   <tr>
@@ -167,6 +182,9 @@
           <div class="series-section">
             <h2>iPhone 16e</h2>
             <div class="table-wrapper">
+              <div class="loading">
+                <div class="loading-spinner"></div>
+              </div>
               <table id="iPhone16e-prices" class="price-table">
                 <thead>
                   <tr>
@@ -187,14 +205,27 @@
 
     <script>
       document.addEventListener('DOMContentLoaded', function () {
-        const API_ENDPOINT =
-          'https://l8l7v5xw9d.execute-api.ap-northeast-1.amazonaws.com/prod/get_prices';
-        const series = [
-          'iPhone 16',
-          'iPhone 16 Pro',
-          'iPhone 16 Pro Max',
-          'iPhone 16 e',
-        ];
+        const API_ENDPOINT = '/api/prices';
+        const series = ['iPhone 16', 'iPhone 16 Pro', 'iPhone 16 Pro Max'];
+
+        // エラーメッセージの表示
+        function showError(message) {
+          const errorElement = document.getElementById('error-message');
+          errorElement.textContent = message;
+          errorElement.style.display = 'block';
+        }
+
+        // ローディング状態の管理
+        function setLoading(tableId, isLoading) {
+          const tableWrapper = document.querySelector(
+            `#${tableId}`
+          ).parentElement;
+          const loadingElement = tableWrapper.querySelector('.loading');
+          const tableElement = tableWrapper.querySelector('.price-table');
+
+          loadingElement.style.display = isLoading ? 'flex' : 'none';
+          tableElement.style.display = isLoading ? 'none' : 'table';
+        }
 
         // データ取得と表示の処理
         async function fetchPrices() {
@@ -265,29 +296,25 @@
                   // まとめてDOM更新
                   tableBody.innerHTML = '';
                   tableBody.appendChild(fragment);
+                  setLoading(tableId, false);
                 }
               }
             });
-
-            // データ表示後にテーブルを表示
-            const priceTablesContainer = document.getElementById(
-              'priceTablesContainer'
-            );
-            if (priceTablesContainer) {
-              priceTablesContainer.style.display = 'flex';
-            }
           } catch (error) {
             console.error('Fetch Error:', error);
-            const errorElement = document.getElementById('error-message');
-            if (errorElement) {
-              errorElement.textContent = `データの取得に失敗しました: ${error.message}`;
-              errorElement.style.display = 'block';
-            }
+            showError(`データの取得に失敗しました: ${error.message}`);
+            series.forEach(series => {
+              const tableId = series.replace(/\s+/g, '') + '-prices';
+              setLoading(tableId, false);
+            });
           }
         }
 
         // 初期データ取得
         fetchPrices();
+
+        // 5分ごとにデータを更新
+        setInterval(fetchPrices, 5 * 60 * 1000);
       });
     </script>
   </body>

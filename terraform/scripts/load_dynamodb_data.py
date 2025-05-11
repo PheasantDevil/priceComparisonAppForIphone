@@ -86,7 +86,7 @@ def write_to_price_predictions(table, data):
                     'series': series,
                     'timestamp': str(prediction['timestamp']),
                     'predicted_price': int(prediction['predicted_price']),
-                    'confidence': Decimal(str(prediction['confidence'])),
+                    'confidence': (str(prediction['confidence'])),
                     'factors': prediction['factors']
                 }
                 table.put_item(Item=item)
