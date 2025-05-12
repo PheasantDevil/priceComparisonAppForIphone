@@ -1,10 +1,23 @@
 services:
-  - name: official_prices_app
-    type: web
+  - type: web
+    name: price-comparison-app
     runtime: python
-    plan: free # 無料プランを明示
-    buildCommand: ''
-    startCommand: 'python app.py'
+    buildCommand: |
+      pip install -r requirements.txt
+    startCommand: |
+      python app.py
     envVars:
-      - key: DATABASE_URL
-        value: postgresql://official_prices_db_gop6_user:ngVU5yXdsM8AMyt0Jy2FdC2fOtfL9Rc0@dpg-ct8or1a3esus7384jdbg-a.oregon-postgres.render.com/official_prices_db_gop6
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: ap-northeast-1
+      # - key: LINE_CHANNEL_ACCESS_TOKEN
+      #   sync: false
+      # - key: LINE_CHANNEL_SECRET
+      #   sync: false
+    healthCheckPath: /health
+    autoDeploy: true
