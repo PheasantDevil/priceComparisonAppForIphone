@@ -1,4 +1,4 @@
-boto3==1.38.14
+boto3==1.38.23
 requests==2.31.0
 line-bot-sdk==3.4.0
 playwright==1.42.0
