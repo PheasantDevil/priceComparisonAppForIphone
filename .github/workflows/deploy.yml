@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main  # `main`ブランチへのプッシュをトリガー
+      - ci/bug-fix-Deploy-to-Render
 
 env:
   AWS_REGION: ap-northeast-1
@@ -42,4 +43,19 @@ jobs:
       - name: Apply Terraform configuration
         run: |
           cd terraform
-          terraform apply -auto-approve
+          echo "Starting Terraform apply..."
+          terraform plan -out=tfplan
+          echo "Terraform plan completed. Applying changes..."
+          terraform apply -auto-approve tfplan
+        env:
+          TF_LOG: DEBUG
+          TF_LOG_PATH: terraform.log
+        continue-on-error: true
+
+      - name: Upload Terraform logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-logs
+          path: terraform/terraform.log
+          retention-days: 7
