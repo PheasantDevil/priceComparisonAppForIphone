@@ -18,6 +18,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # システムライブラリのインストール
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libyaml-dev
+
       # Terraformのセットアップ
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
