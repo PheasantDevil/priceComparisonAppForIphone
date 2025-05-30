@@ -31,10 +31,17 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      # pipのアップグレード
-      - name: Upgrade pip
+      # pipのアップグレードと設定
+      - name: Upgrade pip and configure
         run: |
           python -m pip install --upgrade pip
+          pip config set global.require-hashes false
+          pip config set global.no-cache-dir false
+
+      # 依存関係のインストール
+      - name: Install dependencies
+        run: |
+          pip install --no-cache-dir -r requirements.txt
 
       # Terraformのセットアップ
       - name: Set up Terraform
