@@ -43,6 +43,12 @@ jobs:
         run: |
           pip install --no-cache-dir -r requirements.txt
 
+      # Playwrightのブラウザをインストール
+      - name: Install Playwright browsers
+        run: |
+          playwright install chromium
+          playwright install-deps
+
       # Terraformのセットアップ
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
