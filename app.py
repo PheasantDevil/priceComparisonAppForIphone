@@ -29,12 +29,15 @@ def create_app():
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
+    # AWSリージョンの設定
+    aws_region = os.getenv('AWS_REGION', 'ap-northeast-1')
+    
     # DynamoDBの設定
-    dynamodb = boto3.resource('dynamodb')
+    dynamodb = boto3.resource('dynamodb', region_name=aws_region)
     table = dynamodb.Table('price_history')
 
     # Lambdaクライアントの設定
-    lambda_client = boto3.client('lambda')
+    lambda_client = boto3.client('lambda', region_name=aws_region)
 
     # API Gatewayのエンドポイント
     API_ENDPOINT = "https://qpt4qfbk57.execute-api.ap-northeast-1.amazonaws.com/production/get_prices"
@@ -252,8 +255,11 @@ def get_kaitori_prices():
 def get_prices():
     """DynamoDBから最新の価格情報を取得"""
     try:
+        # AWSリージョンの設定
+        aws_region = os.getenv('AWS_REGION', 'ap-northeast-1')
+        
         # DynamoDBから価格データを取得
-        dynamodb = boto3.resource('dynamodb')
+        dynamodb = boto3.resource('dynamodb', region_name=aws_region)
         kaitori_table = dynamodb.Table('kaitori_prices')
         official_table = dynamodb.Table('official_prices')
         
