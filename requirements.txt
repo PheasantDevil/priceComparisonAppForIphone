@@ -3,7 +3,7 @@ boto3==1.38.28
 requests==2.32.3
 line-bot-sdk==3.17.1
 playwright==1.52.0
-pytest==8.3.5
+pytest==8.4.0
 pytest-asyncio==0.26.0
 pytest-cov==6.1.1
 python-dotenv==1.1.0
