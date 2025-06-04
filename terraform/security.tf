@@ -260,12 +260,24 @@ resource "aws_kms_key" "data_encryption" {
     Environment = "production"
     Project     = "iphone_price_tracker"
   }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes = [
+      description,
+      policy
+    ]
+  }
 }
 
 # KMSキーのエイリアス
 resource "aws_kms_alias" "data_encryption" {
   name          = "alias/data-encryption-key"
   target_key_id = aws_kms_key.data_encryption.key_id
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 provider "aws" {
@@ -298,10 +310,22 @@ resource "aws_kms_key" "data_encryption_replica" {
     Environment = "production"
     Project     = "iphone_price_tracker"
   }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes = [
+      description,
+      policy
+    ]
+  }
 }
 
 resource "aws_kms_alias" "data_encryption_replica" {
   provider      = aws.ap-southeast-1
   name          = "alias/data-encryption-key-replica"
   target_key_id = aws_kms_key.data_encryption_replica.key_id
+
+  lifecycle {
+    prevent_destroy = true
+  }
 } 

@@ -24,6 +24,24 @@ resource "aws_kms_key" "backup" {
   description             = "KMS key for DynamoDB backups"
   deletion_window_in_days = 7
   enable_key_rotation     = true
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes = [
+      description,
+      policy
+    ]
+  }
+}
+
+# バックアップ用KMSキーのエイリアス
+resource "aws_kms_alias" "backup" {
+  name          = "alias/backup-key"
+  target_key_id = aws_kms_key.backup.key_id
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # バックアップポリシー
@@ -78,7 +96,8 @@ resource "aws_iam_role_policy" "backup" {
           "dynamodb:ListBackups",
           "dynamodb:CreateBackup",
           "dynamodb:DeleteBackup",
-          "dynamodb:RestoreTableFromBackup"
+          "dynamodb:RestoreTableFromBackup",
+          "dynamodb:ListTagsOfResource"
         ]
         Resource = [
           aws_dynamodb_table.kaitori_prices.arn,
