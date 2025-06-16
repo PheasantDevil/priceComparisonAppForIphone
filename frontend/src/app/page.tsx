@@ -9,7 +9,7 @@ import {
   useToast,
   VStack,
 } from '@chakra-ui/react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LoadingState } from '../components/LoadingState';
 import { ModelSelector } from '../components/ModelSelector';
@@ -71,10 +71,14 @@ export default function Home() {
     setError(null);
     try {
       const newData: Record<string, PricesResponse> = {};
-      for (const series of selectedSeries) {
-        const response = await fetchPrices(series);
-        newData[series] = response;
-      }
+      // 並列でデータを取得
+      const promises = selectedSeries.map(series => fetchPrices(series));
+      const results = await Promise.all(promises);
+
+      selectedSeries.forEach((series, index) => {
+        newData[series] = results[index];
+      });
+
       setData(newData);
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -115,6 +119,31 @@ export default function Home() {
     );
   }, []);
 
+  // メモ化されたコンポーネントのレンダリング
+  const modelSelector = useMemo(
+    () => (
+      <ModelSelector
+        series={SERIES}
+        selectedSeries={selectedSeries}
+        onSeriesToggle={handleSeriesToggle}
+        onRefresh={handleRefresh}
+        loading={loading}
+      />
+    ),
+    [selectedSeries, handleSeriesToggle, handleRefresh, loading]
+  );
+
+  const priceTable = useMemo(
+    () => (
+      <PriceComparisonTable
+        data={data}
+        selectedSeries={selectedSeries}
+        loading={loading}
+      />
+    ),
+    [data, selectedSeries, loading]
+  );
+
   return (
     <ErrorBoundary>
       <Container maxW='container.lg' py={8}>
@@ -131,13 +160,7 @@ export default function Home() {
           </Heading>
 
           <VStack spacing={4} align='stretch' mb={6}>
-            <ModelSelector
-              series={SERIES}
-              selectedSeries={selectedSeries}
-              onSeriesToggle={handleSeriesToggle}
-              onRefresh={handleRefresh}
-              loading={loading}
-            />
+            {modelSelector}
           </VStack>
 
           {loading ? (
@@ -157,11 +180,7 @@ export default function Home() {
               <Text color='red.500'>{error.message}</Text>
             </Box>
           ) : (
-            <PriceComparisonTable
-              data={data}
-              selectedSeries={selectedSeries}
-              loading={loading}
-            />
+            priceTable
           )}
         </Box>
       </Container>

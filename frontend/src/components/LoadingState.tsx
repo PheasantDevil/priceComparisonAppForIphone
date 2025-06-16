@@ -1,34 +1,25 @@
-import { Box, Progress, Text, VStack } from '@chakra-ui/react';
-import { memo } from 'react';
+import { Box, Spinner, Text, VStack } from '@chakra-ui/react';
 
-type LoadingStateProps = {
-  message?: string;
-};
-
-export const LoadingState = memo(function LoadingState({
-  message = 'データを読み込み中...',
-}: LoadingStateProps) {
+export const LoadingState = () => {
   return (
     <Box
-      p={8}
+      p={6}
       borderRadius='lg'
-      bg='blue.50'
+      bg='gray.50'
       borderWidth='1px'
-      borderColor='blue.200'
+      borderColor='gray.200'
       textAlign='center'
     >
       <VStack spacing={4}>
-        <Progress
-          size='xs'
-          isIndeterminate
-          width='100%'
-          colorScheme='blue'
-          borderRadius='full'
+        <Spinner
+          thickness='4px'
+          speed='0.65s'
+          emptyColor='gray.200'
+          color='blue.500'
+          size='xl'
         />
-        <Text color='blue.600' fontWeight='medium'>
-          {message}
-        </Text>
+        <Text color='gray.600'>データを読み込み中...</Text>
       </VStack>
     </Box>
   );
-});
+};

@@ -24,11 +24,15 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error('Uncaught error:', error, errorInfo);
   }
 
+  private handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
   public render() {
     if (this.state.hasError) {
       return (
         <Box
-          p={8}
+          p={6}
           borderRadius='lg'
           bg='red.50'
           borderWidth='1px'
@@ -37,17 +41,18 @@ export class ErrorBoundary extends Component<Props, State> {
         >
           <VStack spacing={4}>
             <Heading size='md' color='red.600'>
-              エラーが発生しました
+              予期せぬエラーが発生しました
             </Heading>
             <Text color='red.500'>
-              {this.state.error?.message || '予期せぬエラーが発生しました'}
+              {this.state.error?.message || '不明なエラーが発生しました'}
             </Text>
             <Button
               colorScheme='red'
               variant='outline'
-              onClick={() => window.location.reload()}
+              onClick={this.handleRetry}
+              size='sm'
             >
-              ページを再読み込み
+              再試行
             </Button>
           </VStack>
         </Box>
