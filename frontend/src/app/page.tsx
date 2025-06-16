@@ -2,25 +2,18 @@
 
 import {
   Box,
-  Button,
-  Checkbox,
   Container,
   Heading,
-  HStack,
-  Spinner,
-  Stack,
-  Table,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tr,
   useColorModeValue,
   useToast,
   VStack,
 } from '@chakra-ui/react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { LoadingState } from '../components/LoadingState';
+import { ModelSelector } from '../components/ModelSelector';
+import { PriceComparisonTable } from '../components/PriceComparisonTable';
 import { clearCache, fetchPrices, PricesResponse } from '../lib/api';
 
 const SERIES = ['iPhone 16', 'iPhone 16 Pro'];
@@ -30,8 +23,7 @@ export default function Home() {
   const [selectedSeries, setSelectedSeries] = useState<string[]>([]);
   const [data, setData] = useState<Record<string, PricesResponse>>({});
   const [loading, setLoading] = useState(false);
-  const [sortBy, setSortBy] = useState<'capacity' | 'price_diff'>('capacity');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [error, setError] = useState<Error | null>(null);
   const toast = useToast();
 
   const bgColor = useColorModeValue('white', 'gray.800');
@@ -49,8 +41,15 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Failed to load saved series:', error);
+      toast({
+        title: '設定の読み込みに失敗しました',
+        description: 'デフォルト設定を使用します',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
     }
-  }, []);
+  }, [toast]);
 
   // 選択状態をローカルストレージに保存
   useEffect(() => {
@@ -67,37 +66,9 @@ export default function Home() {
     }
   }, [selectedSeries, toast]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const newData: Record<string, PricesResponse> = {};
-        for (const series of selectedSeries) {
-          const response = await fetchPrices(series);
-          newData[series] = response;
-        }
-        setData(newData);
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-        toast({
-          title: 'データの取得に失敗しました',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (selectedSeries.length > 0) {
-      fetchData();
-    }
-  }, [selectedSeries, toast]);
-
-  const handleRefresh = async () => {
-    clearCache();
+  const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const newData: Record<string, PricesResponse> = {};
       for (const series of selectedSeries) {
@@ -105,16 +76,13 @@ export default function Home() {
         newData[series] = response;
       }
       setData(newData);
-      toast({
-        title: 'データを更新しました',
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
     } catch (error) {
-      console.error('Failed to refresh data:', error);
+      console.error('Failed to fetch data:', error);
+      setError(
+        error instanceof Error ? error : new Error('データの取得に失敗しました')
+      );
       toast({
-        title: 'データの更新に失敗しました',
+        title: 'データの取得に失敗しました',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -122,159 +90,81 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedSeries, toast]);
 
-  const formatPrice = (price: number) => {
-    return `${price.toLocaleString()}円`;
-  };
+  useEffect(() => {
+    if (selectedSeries.length > 0) {
+      fetchData();
+    }
+  }, [selectedSeries, fetchData]);
 
-  const formatPercentage = (price: number, basePrice: number) => {
-    const percentage = (price / basePrice) * 100;
-    return `${percentage.toFixed(1)}%`;
-  };
+  const handleRefresh = useCallback(async () => {
+    clearCache();
+    await fetchData();
+    toast({
+      title: 'データを更新しました',
+      status: 'success',
+      duration: 2000,
+      isClosable: true,
+    });
+  }, [fetchData, toast]);
 
-  const getPriceDiffColor = (diff: number) => {
-    if (diff > 0) return 'green.500';
-    if (diff < 0) return 'red.500';
-    return 'gray.500';
-  };
-
-  const handleSeriesToggle = (series: string) => {
+  const handleSeriesToggle = useCallback((series: string) => {
     setSelectedSeries(prev =>
       prev.includes(series) ? prev.filter(s => s !== series) : [...prev, series]
     );
-  };
-
-  const getUniqueCapacities = () => {
-    const capacities = new Set<string>();
-    Object.values(data).forEach(modelData => {
-      Object.keys(modelData.prices).forEach(capacity => {
-        capacities.add(capacity);
-      });
-    });
-    return Array.from(capacities).sort();
-  };
-
-  const getModelPrice = (series: string, capacity: string) => {
-    return data[series]?.prices[capacity] || null;
-  };
+  }, []);
 
   return (
-    <Container maxW='container.lg' py={8}>
-      <Box
-        bg={bgColor}
-        p={6}
-        borderRadius='lg'
-        boxShadow='base'
-        borderWidth='1px'
-        borderColor={borderColor}
-      >
-        <Heading mb={6} textAlign='center' size='lg'>
-          iPhone 価格比較
-        </Heading>
+    <ErrorBoundary>
+      <Container maxW='container.lg' py={8}>
+        <Box
+          bg={bgColor}
+          p={6}
+          borderRadius='lg'
+          boxShadow='base'
+          borderWidth='1px'
+          borderColor={borderColor}
+        >
+          <Heading mb={6} textAlign='center' size='lg'>
+            iPhone 価格比較
+          </Heading>
 
-        <VStack spacing={4} align='stretch' mb={6}>
-          <HStack justify='space-between' align='center'>
-            <Text fontWeight='bold'>比較するモデルを選択：</Text>
-            <Button
-              onClick={handleRefresh}
-              isLoading={loading}
-              loadingText='更新中'
-              colorScheme='blue'
-              size='sm'
+          <VStack spacing={4} align='stretch' mb={6}>
+            <ModelSelector
+              series={SERIES}
+              selectedSeries={selectedSeries}
+              onSeriesToggle={handleSeriesToggle}
+              onRefresh={handleRefresh}
+              loading={loading}
+            />
+          </VStack>
+
+          {loading ? (
+            <LoadingState />
+          ) : error ? (
+            <Box
+              p={4}
+              borderRadius='md'
+              bg='red.50'
+              borderWidth='1px'
+              borderColor='red.200'
+              textAlign='center'
             >
-              データを更新
-            </Button>
-          </HStack>
-          <Stack direction={['column', 'row']} spacing={4}>
-            {SERIES.map(series => (
-              <Checkbox
-                key={series}
-                isChecked={selectedSeries.includes(series)}
-                onChange={() => handleSeriesToggle(series)}
-                size='lg'
-              >
-                {series}
-              </Checkbox>
-            ))}
-          </Stack>
-        </VStack>
-
-        {loading ? (
-          <Box textAlign='center' py={8}>
-            <Spinner size='xl' />
-            <Text mt={4}>データを読み込み中...</Text>
-          </Box>
-        ) : selectedSeries.length > 0 ? (
-          <Box overflowX='auto'>
-            <Table variant='simple'>
-              <Thead>
-                <Tr>
-                  <Th>容量</Th>
-                  {selectedSeries.map(series => (
-                    <Th key={series} colSpan={4}>
-                      {series}
-                    </Th>
-                  ))}
-                </Tr>
-                <Tr>
-                  <Th></Th>
-                  {selectedSeries.map(series => (
-                    <>
-                      <Th>公式価格</Th>
-                      <Th>買取価格</Th>
-                      <Th>差額</Th>
-                      <Th>差額率</Th>
-                    </>
-                  ))}
-                </Tr>
-              </Thead>
-              <Tbody>
-                {getUniqueCapacities().map(capacity => (
-                  <Tr key={capacity}>
-                    <Td fontWeight='bold'>{capacity}</Td>
-                    {selectedSeries.map(series => {
-                      const priceInfo = getModelPrice(series, capacity);
-                      if (!priceInfo)
-                        return (
-                          <Td key={series} colSpan={4}>
-                            -
-                          </Td>
-                        );
-
-                      return (
-                        <>
-                          <Td>{formatPrice(priceInfo.official_price)}</Td>
-                          <Td>{formatPrice(priceInfo.kaitori_price)}</Td>
-                          <Td color={getPriceDiffColor(priceInfo.price_diff)}>
-                            {formatPrice(priceInfo.price_diff)}
-                          </Td>
-                          <Td color={getPriceDiffColor(priceInfo.price_diff)}>
-                            {formatPercentage(
-                              priceInfo.price_diff,
-                              priceInfo.official_price
-                            )}
-                          </Td>
-                        </>
-                      );
-                    })}
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-          </Box>
-        ) : (
-          <Box
-            textAlign='center'
-            py={8}
-            color='gray.500'
-            bg='gray.50'
-            borderRadius='md'
-          >
-            比較するモデルを選択してください
-          </Box>
-        )}
-      </Box>
-    </Container>
+              <Heading size='sm' color='red.600' mb={2}>
+                エラーが発生しました
+              </Heading>
+              <Text color='red.500'>{error.message}</Text>
+            </Box>
+          ) : (
+            <PriceComparisonTable
+              data={data}
+              selectedSeries={selectedSeries}
+              loading={loading}
+            />
+          )}
+        </Box>
+      </Container>
+    </ErrorBoundary>
   );
 }
