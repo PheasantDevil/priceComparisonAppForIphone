@@ -2,9 +2,11 @@
 
 import {
   Box,
+  Button,
   Checkbox,
   Container,
   Heading,
+  HStack,
   Spinner,
   Stack,
   Table,
@@ -19,7 +21,7 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
-import { fetchPrices, PricesResponse } from '../lib/api';
+import { clearCache, fetchPrices, PricesResponse } from '../lib/api';
 
 const SERIES = ['iPhone 16', 'iPhone 16 Pro'];
 const STORAGE_KEY = 'selected_iphone_models';
@@ -93,6 +95,35 @@ export default function Home() {
     }
   }, [selectedSeries, toast]);
 
+  const handleRefresh = async () => {
+    clearCache();
+    setLoading(true);
+    try {
+      const newData: Record<string, PricesResponse> = {};
+      for (const series of selectedSeries) {
+        const response = await fetchPrices(series);
+        newData[series] = response;
+      }
+      setData(newData);
+      toast({
+        title: 'データを更新しました',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to refresh data:', error);
+      toast({
+        title: 'データの更新に失敗しました',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatPrice = (price: number) => {
     return `${price.toLocaleString()}円`;
   };
@@ -143,7 +174,18 @@ export default function Home() {
         </Heading>
 
         <VStack spacing={4} align='stretch' mb={6}>
-          <Text fontWeight='bold'>比較するモデルを選択：</Text>
+          <HStack justify='space-between' align='center'>
+            <Text fontWeight='bold'>比較するモデルを選択：</Text>
+            <Button
+              onClick={handleRefresh}
+              isLoading={loading}
+              loadingText='更新中'
+              colorScheme='blue'
+              size='sm'
+            >
+              データを更新
+            </Button>
+          </HStack>
           <Stack direction={['column', 'row']} spacing={4}>
             {SERIES.map(series => (
               <Checkbox
