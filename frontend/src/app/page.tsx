@@ -1,103 +1,238 @@
-import Image from "next/image";
+'use client';
+
+import {
+  Box,
+  Checkbox,
+  Container,
+  Heading,
+  Spinner,
+  Stack,
+  Table,
+  Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
+  Tr,
+  useColorModeValue,
+  useToast,
+  VStack,
+} from '@chakra-ui/react';
+import { useEffect, useState } from 'react';
+import { fetchPrices, PricesResponse } from '../lib/api';
+
+const SERIES = ['iPhone 16', 'iPhone 16 Pro'];
+const STORAGE_KEY = 'selected_iphone_models';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [selectedSeries, setSelectedSeries] = useState<string[]>([]);
+  const [data, setData] = useState<Record<string, PricesResponse>>({});
+  const [loading, setLoading] = useState(false);
+  const [sortBy, setSortBy] = useState<'capacity' | 'price_diff'>('capacity');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const toast = useToast();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+
+  // ローカルストレージから選択状態を読み込む
+  useEffect(() => {
+    try {
+      const savedSeries = localStorage.getItem(STORAGE_KEY);
+      if (savedSeries) {
+        const parsed = JSON.parse(savedSeries);
+        if (Array.isArray(parsed) && parsed.every(s => SERIES.includes(s))) {
+          setSelectedSeries(parsed);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load saved series:', error);
+    }
+  }, []);
+
+  // 選択状態をローカルストレージに保存
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedSeries));
+    } catch (error) {
+      console.error('Failed to save series:', error);
+      toast({
+        title: '選択状態の保存に失敗しました',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  }, [selectedSeries, toast]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const newData: Record<string, PricesResponse> = {};
+        for (const series of selectedSeries) {
+          const response = await fetchPrices(series);
+          newData[series] = response;
+        }
+        setData(newData);
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+        toast({
+          title: 'データの取得に失敗しました',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (selectedSeries.length > 0) {
+      fetchData();
+    }
+  }, [selectedSeries, toast]);
+
+  const formatPrice = (price: number) => {
+    return `${price.toLocaleString()}円`;
+  };
+
+  const formatPercentage = (price: number, basePrice: number) => {
+    const percentage = (price / basePrice) * 100;
+    return `${percentage.toFixed(1)}%`;
+  };
+
+  const getPriceDiffColor = (diff: number) => {
+    if (diff > 0) return 'green.500';
+    if (diff < 0) return 'red.500';
+    return 'gray.500';
+  };
+
+  const handleSeriesToggle = (series: string) => {
+    setSelectedSeries(prev =>
+      prev.includes(series) ? prev.filter(s => s !== series) : [...prev, series]
+    );
+  };
+
+  const getUniqueCapacities = () => {
+    const capacities = new Set<string>();
+    Object.values(data).forEach(modelData => {
+      Object.keys(modelData.prices).forEach(capacity => {
+        capacities.add(capacity);
+      });
+    });
+    return Array.from(capacities).sort();
+  };
+
+  const getModelPrice = (series: string, capacity: string) => {
+    return data[series]?.prices[capacity] || null;
+  };
+
+  return (
+    <Container maxW='container.lg' py={8}>
+      <Box
+        bg={bgColor}
+        p={6}
+        borderRadius='lg'
+        boxShadow='base'
+        borderWidth='1px'
+        borderColor={borderColor}
+      >
+        <Heading mb={6} textAlign='center' size='lg'>
+          iPhone 価格比較
+        </Heading>
+
+        <VStack spacing={4} align='stretch' mb={6}>
+          <Text fontWeight='bold'>比較するモデルを選択：</Text>
+          <Stack direction={['column', 'row']} spacing={4}>
+            {SERIES.map(series => (
+              <Checkbox
+                key={series}
+                isChecked={selectedSeries.includes(series)}
+                onChange={() => handleSeriesToggle(series)}
+                size='lg'
+              >
+                {series}
+              </Checkbox>
+            ))}
+          </Stack>
+        </VStack>
+
+        {loading ? (
+          <Box textAlign='center' py={8}>
+            <Spinner size='xl' />
+            <Text mt={4}>データを読み込み中...</Text>
+          </Box>
+        ) : selectedSeries.length > 0 ? (
+          <Box overflowX='auto'>
+            <Table variant='simple'>
+              <Thead>
+                <Tr>
+                  <Th>容量</Th>
+                  {selectedSeries.map(series => (
+                    <Th key={series} colSpan={4}>
+                      {series}
+                    </Th>
+                  ))}
+                </Tr>
+                <Tr>
+                  <Th></Th>
+                  {selectedSeries.map(series => (
+                    <>
+                      <Th>公式価格</Th>
+                      <Th>買取価格</Th>
+                      <Th>差額</Th>
+                      <Th>差額率</Th>
+                    </>
+                  ))}
+                </Tr>
+              </Thead>
+              <Tbody>
+                {getUniqueCapacities().map(capacity => (
+                  <Tr key={capacity}>
+                    <Td fontWeight='bold'>{capacity}</Td>
+                    {selectedSeries.map(series => {
+                      const priceInfo = getModelPrice(series, capacity);
+                      if (!priceInfo)
+                        return (
+                          <Td key={series} colSpan={4}>
+                            -
+                          </Td>
+                        );
+
+                      return (
+                        <>
+                          <Td>{formatPrice(priceInfo.official_price)}</Td>
+                          <Td>{formatPrice(priceInfo.kaitori_price)}</Td>
+                          <Td color={getPriceDiffColor(priceInfo.price_diff)}>
+                            {formatPrice(priceInfo.price_diff)}
+                          </Td>
+                          <Td color={getPriceDiffColor(priceInfo.price_diff)}>
+                            {formatPercentage(
+                              priceInfo.price_diff,
+                              priceInfo.official_price
+                            )}
+                          </Td>
+                        </>
+                      );
+                    })}
+                  </Tr>
+                ))}
+              </Tbody>
+            </Table>
+          </Box>
+        ) : (
+          <Box
+            textAlign='center'
+            py={8}
+            color='gray.500'
+            bg='gray.50'
+            borderRadius='md'
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+            比較するモデルを選択してください
+          </Box>
+        )}
+      </Box>
+    </Container>
   );
 }
