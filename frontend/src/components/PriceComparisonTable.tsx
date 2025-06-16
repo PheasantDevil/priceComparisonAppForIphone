@@ -63,7 +63,12 @@ export const PriceComparisonTable = memo(function PriceComparisonTable({
 
   if (loading) {
     return (
-      <Box textAlign='center' py={8}>
+      <Box
+        textAlign='center'
+        py={8}
+        role='status'
+        aria-label='データを読み込み中'
+      >
         <Spinner size='xl' />
         <Text mt={4}>データを読み込み中...</Text>
       </Box>
@@ -78,6 +83,8 @@ export const PriceComparisonTable = memo(function PriceComparisonTable({
         color='gray.500'
         bg='gray.50'
         borderRadius='md'
+        role='status'
+        aria-label='モデルが選択されていません'
       >
         比較するモデルを選択してください
       </Box>
@@ -100,56 +107,123 @@ export const PriceComparisonTable = memo(function PriceComparisonTable({
           borderRadius: '4px',
         },
       }}
+      role='region'
+      aria-label='価格比較テーブル'
     >
-      <Table variant='simple' size={['sm', 'md']}>
+      <Table
+        variant='simple'
+        size={['sm', 'md']}
+        role='grid'
+        aria-label='iPhone価格比較'
+      >
         <Thead position='sticky' top={0} bg={headerBg}>
           <Tr>
-            <Th>容量</Th>
+            <Th scope='col' role='columnheader'>
+              容量
+            </Th>
             {selectedSeries.map(series => (
-              <Th key={series} colSpan={4}>
+              <Th
+                key={series}
+                colSpan={4}
+                scope='colgroup'
+                role='columnheader'
+                aria-label={`${series}の価格情報`}
+              >
                 {series}
               </Th>
             ))}
           </Tr>
           <Tr>
-            <Th></Th>
+            <Th scope='col' role='columnheader'></Th>
             {selectedSeries.map(series => (
               <>
-                <Th>公式価格</Th>
-                <Th>買取価格</Th>
-                <Th>差額</Th>
-                <Th>差額率</Th>
+                <Th
+                  scope='col'
+                  role='columnheader'
+                  aria-label={`${series}の公式価格`}
+                >
+                  公式価格
+                </Th>
+                <Th
+                  scope='col'
+                  role='columnheader'
+                  aria-label={`${series}の買取価格`}
+                >
+                  買取価格
+                </Th>
+                <Th
+                  scope='col'
+                  role='columnheader'
+                  aria-label={`${series}の差額`}
+                >
+                  差額
+                </Th>
+                <Th
+                  scope='col'
+                  role='columnheader'
+                  aria-label={`${series}の差額率`}
+                >
+                  差額率
+                </Th>
               </>
             ))}
           </Tr>
         </Thead>
         <Tbody>
           {getUniqueCapacities(data).map(capacity => (
-            <Tr key={capacity}>
-              <Td fontWeight='bold' whiteSpace='nowrap'>
+            <Tr key={capacity} role='row'>
+              <Td
+                fontWeight='bold'
+                whiteSpace='nowrap'
+                role='cell'
+                aria-label={`容量: ${capacity}`}
+              >
                 {capacity}
               </Td>
               {selectedSeries.map(series => {
                 const priceInfo = getModelPrice(data, series, capacity);
                 if (!priceInfo)
                   return (
-                    <Td key={series} colSpan={4}>
+                    <Td
+                      key={series}
+                      colSpan={4}
+                      role='cell'
+                      aria-label={`${series}の${capacity}の価格情報はありません`}
+                    >
                       -
                     </Td>
                   );
 
                 return (
                   <>
-                    <Td isNumeric whiteSpace='nowrap'>
+                    <Td
+                      isNumeric
+                      whiteSpace='nowrap'
+                      role='cell'
+                      aria-label={`${series}の${capacity}の公式価格: ${formatPrice(
+                        priceInfo.official_price
+                      )}`}
+                    >
                       {formatPrice(priceInfo.official_price)}
                     </Td>
-                    <Td isNumeric whiteSpace='nowrap'>
+                    <Td
+                      isNumeric
+                      whiteSpace='nowrap'
+                      role='cell'
+                      aria-label={`${series}の${capacity}の買取価格: ${formatPrice(
+                        priceInfo.kaitori_price
+                      )}`}
+                    >
                       {formatPrice(priceInfo.kaitori_price)}
                     </Td>
                     <Td
                       isNumeric
                       color={getPriceDiffColor(priceInfo.price_diff)}
                       whiteSpace='nowrap'
+                      role='cell'
+                      aria-label={`${series}の${capacity}の差額: ${formatPrice(
+                        priceInfo.price_diff
+                      )}`}
                     >
                       {formatPrice(priceInfo.price_diff)}
                     </Td>
@@ -157,6 +231,11 @@ export const PriceComparisonTable = memo(function PriceComparisonTable({
                       isNumeric
                       color={getPriceDiffColor(priceInfo.price_diff)}
                       whiteSpace='nowrap'
+                      role='cell'
+                      aria-label={`${series}の${capacity}の差額率: ${formatPercentage(
+                        priceInfo.price_diff,
+                        priceInfo.official_price
+                      )}`}
                     >
                       {formatPercentage(
                         priceInfo.price_diff,
