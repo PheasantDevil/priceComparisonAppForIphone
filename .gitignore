@@ -373,3 +373,8 @@ yarn-error.log*
 
 # AWS Lambda deployment packages
 *.zip
+
+# Google Cloud credentials
+key.json
+*.json.key
+credentials/
