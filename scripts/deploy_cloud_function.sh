@@ -20,7 +20,8 @@ gcloud functions deploy $FUNCTION_NAME \
   --set-env-vars BUCKET_NAME=$BUCKET_NAME \
   --allow-unauthenticated \
   --runtime python311 \
-  --use-dockerfile
+  --min-instances 1 \
+  --max-instances 1
 
 # Cloud Schedulerの設定
 gcloud scheduler jobs create http scrape-prices-scheduler \
