@@ -225,7 +225,11 @@ def scrape_prices():
         
         # スクレイピング対象のURLリスト
         urls = [
-            "https://www.rudea.jp/kaitori/iphone/",
+            "https://kaitori-rudeya.com/category/detail/183", # iPhone 16
+            "https://kaitori-rudeya.com/category/detail/184", # iPhone 16 Plus
+            "https://kaitori-rudeya.com/category/detail/185", # iPhone 16 Pro
+            "https://kaitori-rudeya.com/category/detail/186", # iPhone 16 Pro Max
+            "https://kaitori-rudeya.com/category/detail/205", # iPhone 16 e
             # 他のURLを追加
         ]
         
