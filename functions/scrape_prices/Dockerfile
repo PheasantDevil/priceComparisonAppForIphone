@@ -38,6 +38,7 @@ COPY . .
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
+ENV PORT=8080
 
 # Run the function
 CMD ["python", "main.py"] 

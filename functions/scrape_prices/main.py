@@ -5,6 +5,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
+from flask import Flask, request
 from google.cloud import storage
 from playwright.sync_api import sync_playwright
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -15,6 +16,8 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+app = Flask(__name__)
 
 class PriceScraper:
     def __init__(self):
@@ -51,7 +54,7 @@ class PriceScraper:
         """指定されたURLから価格データをスクレイピング"""
         try:
             with sync_playwright() as p:
-                # Cloud Functions環境用の設定
+                # Cloud Run環境用の設定
                 browser = p.chromium.launch(
                     args=[
                         '--no-sandbox',
@@ -213,8 +216,9 @@ class PriceScraper:
             logger.error(error_msg)
             raise
 
-def scrape_prices(request):
-    """Cloud Function to scrape iPhone prices."""
+@app.route('/', methods=['POST'])
+def scrape_prices():
+    """Cloud Run endpoint to scrape iPhone prices."""
     try:
         # スクレイパーの初期化
         scraper = PriceScraper()
@@ -240,4 +244,8 @@ def scrape_prices(request):
         
     except Exception as e:
         logger.error(f"Error during price scraping: {str(e)}")
-        return {"status": "error", "message": str(e)} 
+        return {"status": "error", "message": str(e)}
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port) 
