@@ -39,8 +39,18 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright
 # Playwrightブラウザのインストール
 RUN playwright install chromium
 
+# GCP認証情報のディレクトリを作成
+RUN mkdir -p /app/config/gcp
+
 # プロジェクトのファイルをコピー
 COPY . .
+
+# GCP認証情報の環境変数を設定
+ENV GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp/key.json
+
+# セキュリティ強化: 非rootユーザーを作成して切り替え
+RUN useradd -m appuser && chown -R appuser:appuser /app
+USER appuser
 
 # アプリケーションを起動
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers=3", "--timeout=60"]
