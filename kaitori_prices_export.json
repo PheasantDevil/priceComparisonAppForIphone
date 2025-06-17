@@ -1,0 +1,148 @@
+[
+  {
+    "kaitori_price_max": 115000,
+    "capacity": "512GB",
+    "series": "iPhone 16"
+  },
+  {
+    "kaitori_price_max": 95000,
+    "capacity": "256GB",
+    "series": "iPhone 16"
+  },
+  {
+    "series": "iPhone 16 Plus",
+    "source": "kaitori-rudea",
+    "colors": {
+      "Black": 75000,
+      "White": 75000,
+      "Green": 75000,
+      "Blue": 75000
+    },
+    "kaitori_price_max": 75000,
+    "kaitori_price_min": 75000,
+    "capacity": "256GB"
+  },
+  {
+    "series": "iPhone 16 e",
+    "source": "kaitori-rudea",
+    "colors": {
+      "Black": 60000,
+      "White": 60000
+    },
+    "kaitori_price_max": 60000,
+    "kaitori_price_min": 60000,
+    "capacity": "256GB"
+  },
+  {
+    "kaitori_price_max": 145000,
+    "capacity": "512GB",
+    "series": "iPhone 16 Pro"
+  },
+  {
+    "series": "iPhone 16 Plus",
+    "source": "kaitori-rudea",
+    "colors": {
+      "Black": 70000,
+      "White": 70000,
+      "Green": 70000,
+      "Blue": 70000
+    },
+    "kaitori_price_max": 70000,
+    "kaitori_price_min": 70000,
+    "capacity": "128GB"
+  },
+  {
+    "kaitori_price_max": 165000,
+    "capacity": "1TB",
+    "series": "iPhone 16 Pro"
+  },
+  {
+    "series": "iPhone 16 Pro Max",
+    "source": "kaitori-rudea",
+    "colors": {
+      "Natural Titanium": 95000,
+      "Black Titanium": 95000,
+      "White Titanium": 95000,
+      "Blue Titanium": 95000
+    },
+    "kaitori_price_max": 95000,
+    "kaitori_price_min": 95000,
+    "capacity": "256GB"
+  },
+  {
+    "series": "iPhone 16 e",
+    "source": "kaitori-rudea",
+    "colors": {
+      "Black": 55000,
+      "White": 55000
+    },
+    "kaitori_price_max": 55000,
+    "kaitori_price_min": 55000,
+    "capacity": "128GB"
+  },
+  {
+    "kaitori_price_max": 115000,
+    "capacity": "128GB",
+    "series": "iPhone 16 Pro"
+  },
+  {
+    "series": "iPhone 16 Pro Max",
+    "source": "kaitori-rudea",
+    "colors": {
+      "Natural Titanium": 105000,
+      "Black Titanium": 105000,
+      "White Titanium": 105000,
+      "Blue Titanium": 105000
+    },
+    "kaitori_price_max": 105000,
+    "kaitori_price_min": 105000,
+    "capacity": "512GB"
+  },
+  {
+    "series": "iPhone 16 Plus",
+    "source": "kaitori-rudea",
+    "colors": {
+      "Black": 85000,
+      "White": 85000,
+      "Green": 85000,
+      "Blue": 85000
+    },
+    "kaitori_price_max": 85000,
+    "kaitori_price_min": 85000,
+    "capacity": "512GB"
+  },
+  {
+    "kaitori_price_max": 125000,
+    "capacity": "256GB",
+    "series": "iPhone 16 Pro"
+  },
+  {
+    "kaitori_price_max": 85000,
+    "capacity": "128GB",
+    "series": "iPhone 16"
+  },
+  {
+    "series": "iPhone 16 e",
+    "source": "kaitori-rudea",
+    "colors": {
+      "Black": 70000,
+      "White": 70000
+    },
+    "kaitori_price_max": 70000,
+    "kaitori_price_min": 70000,
+    "capacity": "512GB"
+  },
+  {
+    "series": "iPhone 16 Pro Max",
+    "source": "kaitori-rudea",
+    "colors": {
+      "Natural Titanium": 115000,
+      "Black Titanium": 115000,
+      "White Titanium": 115000,
+      "Blue Titanium": 115000
+    },
+    "kaitori_price_max": 115000,
+    "kaitori_price_min": 115000,
+    "capacity": "1TB"
+  }
+]
