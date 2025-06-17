@@ -1,14 +1,3 @@
-import {
-  Box,
-  Button,
-  Checkbox,
-  HStack,
-  Icon,
-  Stack,
-  Text,
-  useColorModeValue,
-  useToast,
-} from '@chakra-ui/react';
 import { memo, useCallback } from 'react';
 import { FiRefreshCw } from 'react-icons/fi';
 
@@ -27,92 +16,79 @@ export const ModelSelector = memo(function ModelSelector({
   onRefresh,
   loading,
 }: ModelSelectorProps) {
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const hoverBg = useColorModeValue('gray.50', 'gray.700');
-  const toast = useToast();
-
   const handleKeyPress = useCallback(
     (event: React.KeyboardEvent, series: string) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         onSeriesToggle(series);
-        toast({
-          title: selectedSeries.includes(series)
+        alert(
+          selectedSeries.includes(series)
             ? `${series}の選択を解除しました`
-            : `${series}を選択しました`,
-          status: 'info',
-          duration: 2000,
-          isClosable: true,
-        });
+            : `${series}を選択しました`
+        );
       }
     },
-    [onSeriesToggle, selectedSeries, toast]
+    [onSeriesToggle, selectedSeries]
   );
 
   return (
-    <Box
-      p={4}
-      borderRadius='lg'
-      borderWidth='1px'
-      borderColor={borderColor}
-      _hover={{ bg: hoverBg }}
-      transition='background-color 0.2s'
+    <div
+      className='p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200'
       role='region'
       aria-label='モデル選択'
     >
-      <HStack
-        justify='space-between'
-        align='center'
-        mb={4}
-        flexWrap='wrap'
-        gap={2}
-      >
-        <Text
-          fontWeight='bold'
-          fontSize={['sm', 'md']}
+      <div className='flex justify-between items-center mb-4 flex-wrap gap-2'>
+        <label
+          className='font-bold text-sm md:text-base'
           id='model-selector-label'
         >
           比較するモデルを選択：
-        </Text>
-        <Button
+        </label>
+        <button
           onClick={onRefresh}
-          isLoading={loading}
-          loadingText='更新中'
-          colorScheme='blue'
-          size={['sm', 'md']}
-          leftIcon={<Icon as={FiRefreshCw} />}
+          disabled={loading}
+          className='inline-flex items-center px-4 py-2 text-sm md:text-base font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed'
           aria-label='データを更新'
           aria-busy={loading}
         >
-          データを更新
-        </Button>
-      </HStack>
-      <Stack
-        direction={['column', 'row']}
-        spacing={4}
-        flexWrap='wrap'
-        align='flex-start'
+          {loading ? (
+            <>
+              <div className='animate-spin -ml-1 mr-2 h-4 w-4 text-white'>
+                <FiRefreshCw className='h-4 w-4' />
+              </div>
+              更新中
+            </>
+          ) : (
+            <>
+              <FiRefreshCw className='mr-2' />
+              データを更新
+            </>
+          )}
+        </button>
+      </div>
+      <div
+        className='flex flex-col md:flex-row gap-4 flex-wrap'
         role='group'
         aria-labelledby='model-selector-label'
       >
         {series.map(model => (
-          <Checkbox
+          <label
             key={model}
-            isChecked={selectedSeries.includes(model)}
-            onChange={() => onSeriesToggle(model)}
-            size={['md', 'lg']}
-            aria-label={`${model}を選択`}
-            onKeyPress={e => handleKeyPress(e, model)}
-            tabIndex={0}
-            _focus={{
-              boxShadow: 'outline',
-              outline: 'none',
-            }}
+            className='inline-flex items-center space-x-2 cursor-pointer'
           >
-            {model}
-          </Checkbox>
+            <input
+              type='checkbox'
+              checked={selectedSeries.includes(model)}
+              onChange={() => onSeriesToggle(model)}
+              onKeyPress={e => handleKeyPress(e, model)}
+              className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+              aria-label={`${model}を選択`}
+              tabIndex={0}
+            />
+            <span className='text-sm md:text-base'>{model}</span>
+          </label>
         ))}
-      </Stack>
-    </Box>
+      </div>
+    </div>
   );
 });

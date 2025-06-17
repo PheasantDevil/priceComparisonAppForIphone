@@ -17,8 +17,9 @@ db = firestore.Client()
 VALID_CAPACITIES = {
     "iPhone 16": ["128GB", "256GB", "512GB"],
     "iPhone 16 Pro": ["128GB", "256GB", "512GB", "1TB"],
+    "iPhone 16 Plus": ["128GB", "256GB", "512GB"],
     "iPhone 16 Pro Max": ["256GB", "512GB", "1TB"],
-    "iPhone 16e": ["128GB", "256GB", "512GB"]
+    "iPhone 16 e": ["128GB", "256GB", "512GB"]
 }
 
 def safe_int(val):
@@ -98,8 +99,13 @@ def fetch_prices(series):
     try:
         logger.info(f"Getting official prices for series: {series}")
         # 公式価格の取得
-        official_doc = db.collection('official_prices').document(series).get()
-        official_data = official_doc.to_dict() if official_doc.exists else {}
+        official_prices = {}
+        for doc in db.collection('official_prices').stream():
+            data = doc.to_dict()
+            if 'price' in data:
+                official_prices[doc.id] = data['price']
+            else:
+                official_prices[doc.id] = data
 
         logger.info(f"Getting kaitori prices for series: {series}")
         # 買取価格の取得
@@ -107,7 +113,12 @@ def fetch_prices(series):
         kaitori_items = [doc.to_dict() for doc in kaitori_docs]
 
         # 公式価格をマッピング
-        official_prices = official_data.get('price', {})
+        official_doc = db.collection('official_prices').document(series).get()
+        official_data = official_doc.to_dict() if official_doc.exists else {}
+        if 'price' in official_data:
+            official_prices = official_data['price']
+        else:
+            official_prices = official_data
 
         # 買取価格をマッピング
         kaitori_map = {item['capacity']: item for item in kaitori_items}
@@ -115,7 +126,15 @@ def fetch_prices(series):
         prices = {}
         for capacity in VALID_CAPACITIES.get(series, []):
             # 公式価格
-            official_price = safe_int(official_prices.get(capacity, 0))
+            official_price_info = official_prices.get(capacity, {})
+            if isinstance(official_price_info, dict) and 'colors' in official_price_info:
+                color_prices = official_price_info['colors']
+                if color_prices:
+                    official_price = safe_int(next(iter(color_prices.values())))
+                else:
+                    official_price = 0
+            else:
+                official_price = safe_int(official_price_info)
 
             # 買取価格
             kaitori_price = 0

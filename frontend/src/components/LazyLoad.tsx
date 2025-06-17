@@ -1,4 +1,3 @@
-import { Box, Spinner } from '@chakra-ui/react';
 import { ComponentType, Suspense, lazy } from 'react';
 
 type LazyLoadProps = {
@@ -13,9 +12,9 @@ export function LazyLoad({ component, fallback }: LazyLoadProps) {
     <Suspense
       fallback={
         fallback || (
-          <Box textAlign='center' py={8}>
-            <Spinner size='xl' />
-          </Box>
+          <div className='text-center py-8'>
+            <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto'></div>
+          </div>
         )
       }
     >

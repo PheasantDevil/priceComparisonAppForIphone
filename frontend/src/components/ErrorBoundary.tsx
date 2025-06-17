@@ -1,4 +1,3 @@
-import { Box, Button, Heading, Text, VStack } from '@chakra-ui/react';
 import { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
@@ -31,31 +30,22 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <Box
-          p={6}
-          borderRadius='lg'
-          bg='red.50'
-          borderWidth='1px'
-          borderColor='red.200'
-          textAlign='center'
-        >
-          <VStack spacing={4}>
-            <Heading size='md' color='red.600'>
+        <div className='p-6 rounded-lg bg-red-50 border border-red-200 text-center'>
+          <div className='flex flex-col items-center space-y-4'>
+            <h2 className='text-lg font-semibold text-red-600'>
               予期せぬエラーが発生しました
-            </Heading>
-            <Text color='red.500'>
+            </h2>
+            <p className='text-red-500'>
               {this.state.error?.message || '不明なエラーが発生しました'}
-            </Text>
-            <Button
-              colorScheme='red'
-              variant='outline'
+            </p>
+            <button
+              className='px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-600 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'
               onClick={this.handleRetry}
-              size='sm'
             >
               再試行
-            </Button>
-          </VStack>
-        </Box>
+            </button>
+          </div>
+        </div>
       );
     }
 

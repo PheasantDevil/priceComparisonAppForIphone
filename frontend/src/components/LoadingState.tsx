@@ -1,25 +1,10 @@
-import { Box, Spinner, Text, VStack } from '@chakra-ui/react';
-
 export const LoadingState = () => {
   return (
-    <Box
-      p={6}
-      borderRadius='lg'
-      bg='gray.50'
-      borderWidth='1px'
-      borderColor='gray.200'
-      textAlign='center'
-    >
-      <VStack spacing={4}>
-        <Spinner
-          thickness='4px'
-          speed='0.65s'
-          emptyColor='gray.200'
-          color='blue.500'
-          size='xl'
-        />
-        <Text color='gray.600'>データを読み込み中...</Text>
-      </VStack>
-    </Box>
+    <div className='p-6 rounded-lg bg-gray-50 border border-gray-200 text-center'>
+      <div className='flex flex-col items-center space-y-4'>
+        <div className='animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-blue-500'></div>
+        <p className='text-gray-600'>データを読み込み中...</p>
+      </div>
+    </div>
   );
 };
