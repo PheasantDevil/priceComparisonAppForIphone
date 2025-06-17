@@ -1,92 +1,61 @@
-name: Deploy to Render
+name: Deploy to GCP
 
 on:
   push:
-    branches:
-      - main  # `main`ブランチへのプッシュをトリガー
-      - ci/bug-fix-Deploy-to-Render
+    branches: [ main ]
+  workflow_dispatch:
 
 env:
-  AWS_REGION: ap-northeast-1
+  PROJECT_ID: price-comparison-app-463007
+  SERVICE_NAME: price-comparison-app
+  REGION: asia-northeast1
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
-      # コードをチェックアウト
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # システムライブラリのインストール
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libyaml-dev python3-dev gcc
-
-      # Pythonのセットアップ
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
           cache: 'pip'
 
-      # pipのアップグレードと設定
-      - name: Upgrade pip and configure
-        run: |
-          python -m pip install --upgrade pip
-          pip config set global.require-hashes false
-          pip config set global.no-cache-dir false
-
-      # 依存関係のインストール
       - name: Install dependencies
         run: |
-          pip install --no-cache-dir -r requirements.txt
-
-      # Playwrightのブラウザをインストール
-      - name: Install Playwright browsers
-        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install playwright
           playwright install chromium
-          playwright install-deps
 
-      # Terraformのセットアップ
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
         with:
-          terraform_version: 1.5.0
+          project_id: ${{ env.PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: GitHubActionsSession
+      - name: Configure Docker
+        run: gcloud auth configure-docker
 
-      # Terraformの初期化
-      - name: Initialize Terraform
+      - name: Build and push container
         run: |
-          cd terraform
-          terraform init
+          docker build -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
+          docker push gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
 
-      # Terraform構成の適用
-      - name: Apply Terraform configuration
-        run: |
-          cd terraform
-          echo "Starting Terraform apply..."
-          terraform plan -out=tfplan
-          echo "Terraform plan completed. Applying changes..."
-          terraform apply -auto-approve tfplan
-        env:
-          TF_LOG: DEBUG
-          TF_LOG_PATH: terraform.log
-        continue-on-error: true
-
-      - name: Upload Terraform logs
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
         with:
-          name: terraform-logs
-          path: terraform/terraform.log
-          retention-days: 7
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          flags: '--allow-unauthenticated'
+          env_vars: |
+            BUCKET_NAME=price-comparison-app-data
+            CLOUD_RUN_ENDPOINT=https://scrape-prices-xxxxx-uc.a.run.app
