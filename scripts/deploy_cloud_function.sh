@@ -7,6 +7,7 @@ REGION="asia-northeast1"
 RUNTIME="python311"
 MEMORY="512MB"
 TIMEOUT="540s"
+BUCKET_NAME="your-bucket-name"
 
 # Cloud Functionのデプロイ
 gcloud functions deploy $FUNCTION_NAME \
@@ -18,6 +19,7 @@ gcloud functions deploy $FUNCTION_NAME \
   --trigger-http \
   --entry-point scrape_prices \
   --source functions/scrape_prices \
+  --set-env-vars BUCKET_NAME=$BUCKET_NAME \
   --allow-unauthenticated
 
 # Cloud Schedulerの設定
@@ -26,4 +28,5 @@ gcloud scheduler jobs create http scrape-prices-scheduler \
   --schedule "0 10,22 * * *" \
   --uri "https://$REGION-$PROJECT_ID.cloudfunctions.net/$FUNCTION_NAME" \
   --http-method POST \
-  --time-zone "Asia/Tokyo" 
+  --time-zone "Asia/Tokyo" \
+  --attempt-deadline 540s 
