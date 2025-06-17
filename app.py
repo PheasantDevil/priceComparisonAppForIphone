@@ -4,9 +4,9 @@ import os
 import re
 from datetime import datetime
 
-import boto3
 import requests
 from flask import Flask, jsonify, render_template, request, send_from_directory
+from google.cloud import storage
 from playwright.sync_api import sync_playwright
 
 from config import config
@@ -15,9 +15,11 @@ from services.dynamodb_service import get_prices_by_series
 
 def create_app():
     """
-    Creates and configures the Flask application with integrated AWS services, web scraping, and API proxy routes.
+    Creates and configures the Flask application with integrated GCP services, web scraping, and API proxy routes.
     
-    Initializes the Flask app with settings from the configuration, sets up logging, and configures AWS DynamoDB and Lambda clients. Defines routes for serving the favicon, rendering the index page, setting alert thresholds, checking prices with alert notifications, and proxying price data requests to an external API Gateway endpoint. Returns the fully configured Flask app instance.
+    Initializes the Flask app with settings from the configuration, sets up logging, and configures GCP Cloud Storage.
+    Defines routes for serving the favicon, rendering the index page, setting alert thresholds, checking prices with alert notifications,
+    and proxying price data requests to an external Cloud Run endpoint.
     """
     app = Flask(__name__, static_folder='static')
 
@@ -34,18 +36,12 @@ def create_app():
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    # AWSリージョンの設定
-    aws_region = os.getenv('AWS_REGION', 'ap-northeast-1')
-    
-    # DynamoDBの設定
-    dynamodb = boto3.resource('dynamodb', region_name=aws_region)
-    table = dynamodb.Table('price_history')
+    # Cloud Storageクライアントの初期化
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(os.getenv('BUCKET_NAME', 'price-comparison-app-data'))
 
-    # Lambdaクライアントの設定
-    lambda_client = boto3.client('lambda', region_name=aws_region)
-
-    # API Gatewayのエンドポイント
-    API_ENDPOINT = "https://qpt4qfbk57.execute-api.ap-northeast-1.amazonaws.com/production/get_prices"
+    # Cloud Runのエンドポイント
+    API_ENDPOINT = "https://scrape-prices-xxxxx-uc.a.run.app"
 
     @app.route("/favicon.ico")
     def favicon():
@@ -79,13 +75,15 @@ def create_app():
             if not threshold:
                 return jsonify({'error': '閾値が指定されていません'}), 400
             
-            # 閾値をDynamoDBに保存
-            table.put_item(
-                Item={
-                    'id': 'alert_threshold',
-                    'threshold': int(threshold),
-                    'timestamp': str(datetime.now())
-                }
+            # 閾値をCloud Storageに保存
+            alert_blob = bucket.blob('config/alert_threshold.json')
+            alert_data = {
+                'threshold': int(threshold),
+                'timestamp': datetime.now().isoformat()
+            }
+            alert_blob.upload_from_string(
+                json.dumps(alert_data),
+                content_type='application/json'
             )
             
             return jsonify({'message': 'アラートを設定しました'}), 200
@@ -98,31 +96,36 @@ def create_app():
         """
         Checks price data against an alert threshold and triggers notifications if prices fall below it.
         
-        Retrieves all price records and the configured alert threshold from the DynamoDB table. For each price below the threshold, invokes an AWS Lambda function to send a LINE notification. Returns a completion message or an error response.
+        Retrieves all price records and the configured alert threshold from Cloud Storage.
+        For each price below the threshold, triggers a Cloud Function to send a LINE notification.
+        Returns a completion message or an error response.
         """
         try:
             # 価格データを取得
-            response = table.scan()
-            items = response.get('Items', [])
+            current_date = datetime.now().strftime('%Y/%m/%d')
+            prices_blob = bucket.blob(f'prices/{current_date}/prices.json')
+            prices_data = json.loads(prices_blob.download_as_string())
             
             # アラート閾値を取得
-            alert_response = table.get_item(Key={'id': 'alert_threshold'})
-            threshold = alert_response.get('Item', {}).get('threshold')
+            alert_blob = bucket.blob('config/alert_threshold.json')
+            alert_data = json.loads(alert_blob.download_as_string())
+            threshold = alert_data.get('threshold')
             
             if not threshold:
                 return jsonify({'message': 'アラート閾値が設定されていません'}), 200
             
             # 価格が閾値を下回っているかチェック
-            for item in items:
-                if item.get('price', float('inf')) < threshold:
-                    # LINE通知を送信
-                    lambda_client.invoke(
-                        FunctionName='line_notification_lambda',
-                        InvocationType='Event',
-                        Payload=json.dumps({
-                            'message': f'価格アラート: {item.get("model")}の価格が{threshold}円を下回りました。現在の価格: {item.get("price")}円'
-                        })
-                    )
+            for series, capacities in prices_data.items():
+                for capacity, data in capacities.items():
+                    if data.get('kaitori_price_min', float('inf')) < threshold:
+                        # LINE通知を送信
+                        notification_url = f"{API_ENDPOINT}/notify"
+                        requests.post(
+                            notification_url,
+                            json={
+                                'message': f'価格アラート: {series} {capacity}の価格が{threshold}円を下回りました。現在の価格: {data.get("kaitori_price_min")}円'
+                            }
+                        )
             
             return jsonify({'message': '価格チェックを完了しました'}), 200
             
@@ -132,17 +135,19 @@ def create_app():
     @app.route('/api/prices')
     def proxy_prices():
         """
-        Proxies a price data request to an external API Gateway based on the provided series.
+        Proxies a price data request to an external Cloud Run endpoint based on the provided series.
         
-        Validates the presence of the 'series' query parameter, forwards the request to the external API, and returns the JSON response. Returns an error message with an appropriate status code if the parameter is missing or if the external request fails.
+        Validates the presence of the 'series' query parameter, forwards the request to the external API,
+        and returns the JSON response. Returns an error message with an appropriate status code if the
+        parameter is missing or if the external request fails.
         """
         try:
             series = request.args.get('series')
             if not series:
                 return jsonify({'error': 'シリーズが指定されていません'}), 400
 
-            # API Gatewayへのリクエスト
-            upstream = requests.get(f"{API_ENDPOINT}?series={series}", timeout=5)
+            # Cloud Runへのリクエスト
+            upstream = requests.get(f"{API_ENDPOINT}/prices?series={series}", timeout=5)
             return (
                 jsonify(upstream.json()),
                 upstream.status_code,
@@ -150,6 +155,66 @@ def create_app():
             )
         except requests.exceptions.RequestException as e:
             return jsonify({'error': str(e)}), 500
+
+    @app.route("/get_prices")
+    def get_prices():
+        """
+        Retrieves and aggregates the latest buyback and official price data from Cloud Storage.
+        
+        Fetches buyback prices and official prices from Cloud Storage, organizing them by iPhone series and capacity.
+        Returns a structured JSON response containing color-specific prices, minimum and maximum buyback prices,
+        and official prices for comparison.
+        
+        Returns:
+            A JSON response with the aggregated price data and HTTP status 200 on success,
+            or an error message with HTTP status 500 on failure.
+        """
+        try:
+            # Cloud Storageクライアントの初期化
+            storage_client = storage.Client()
+            bucket = storage_client.bucket(os.getenv('BUCKET_NAME', 'price-comparison-app-data'))
+            
+            # 現在の日付のパスを生成
+            current_date = datetime.now().strftime('%Y/%m/%d')
+            
+            # 買取価格データを取得
+            kaitori_blob = bucket.blob(f'prices/{current_date}/prices.json')
+            kaitori_data = json.loads(kaitori_blob.download_as_string())
+            app.logger.info(f"Found {len(kaitori_data)} items in prices.json")
+            
+            # 公式価格データを取得
+            official_blob = bucket.blob('config/official_prices.json')
+            official_data = json.loads(official_blob.download_as_string())
+            app.logger.info(f"Found {len(official_data)} items in official_prices.json")
+            app.logger.debug(f"Official prices data: {json.dumps(official_data, indent=2)}")
+            
+            # データを整形
+            price_data = {}
+            for series, capacities in kaitori_data.items():
+                price_data[series] = {}
+                
+                for capacity, data in capacities.items():
+                    # 公式価格を取得
+                    official_colors = official_data.get(series, {}).get(capacity, {})
+                    app.logger.debug(f"Found official colors for {series} {capacity}: {official_colors}")
+                    
+                    # レスポンス形式を統一
+                    price_data[series][capacity] = {
+                        'kaitori_price': data.get('kaitori_price_min', 0),
+                        'official_price': official_colors.get('price', 0),
+                        'price_diff': data.get('kaitori_price_min', 0) - official_colors.get('price', 0),
+                        'rakuten_diff': 0,  # 必要に応じて計算
+                        'colors': data.get('colors', {})
+                    }
+
+            app.logger.debug(f"Final price data: {json.dumps(price_data, indent=2)}")
+            return jsonify(price_data), 200
+
+        except Exception as e:
+            app.logger.error(f"エラー: {str(e)}")
+            app.logger.exception("Detailed error information:")
+            return jsonify({"error": str(e)}), 500
+
     return app
 
 # アプリケーションインスタンスの作成
@@ -272,104 +337,6 @@ def get_kaitori_prices():
             app.logger.info(f"  {capacity}: min={data['kaitori_price_min']}, max={data['kaitori_price_max']}")
 
     return all_product_details
-
-@app.route("/get_prices")
-def get_prices():
-    """
-    Retrieves and aggregates the latest buyback and official price data from DynamoDB.
-    
-    Fetches buyback prices from the 'kaitori_prices' table and official prices from the 'official_prices' table, organizing them by iPhone series and capacity. Returns a structured JSON response containing color-specific prices, minimum and maximum buyback prices, and official prices for comparison.
-    
-    Returns:
-        A JSON response with the aggregated price data and HTTP status 200 on success, or an error message with HTTP status 500 on failure.
-    """
-    try:
-        # AWSリージョンの設定
-        aws_region = os.getenv('AWS_REGION', 'ap-northeast-1')
-        
-        # DynamoDBから価格データを取得
-        dynamodb = boto3.resource('dynamodb', region_name=aws_region)
-        kaitori_table = dynamodb.Table('kaitori_prices')
-        official_table = dynamodb.Table('official_prices')
-        
-        app.logger.info("Fetching data from kaitori_prices table...")
-        # 買取価格データを取得
-        kaitori_response = kaitori_table.scan()
-        kaitori_items = kaitori_response.get('Items', [])
-        app.logger.info(f"Found {len(kaitori_items)} items in kaitori_prices table")
-        
-        app.logger.info("Fetching data from official_prices table...")
-        # 公式価格データを取得
-        official_response = official_table.scan()
-        official_items = official_response.get('Items', [])
-        app.logger.info(f"Found {len(official_items)} items in official_prices table")
-        app.logger.debug(f"Official prices data: {json.dumps(official_items, indent=2)}")
-        
-        # 公式価格をマッピング
-        official_prices = {}
-        for item in official_items:
-            series = item.get('series')
-            capacity = item.get('capacity')
-            colors = item.get('colors', {})
-            
-            if series and capacity:
-                if series not in official_prices:
-                    official_prices[series] = {}
-                official_prices[series][capacity] = colors
-        
-        app.logger.debug(f"Mapped official prices: {json.dumps(official_prices, indent=2)}")
-        
-        # データを整形
-        price_data = {}
-        for item in kaitori_items:
-            model = item.get('model')
-            capacity = item.get('capacity')
-            price = item.get('price')
-            
-            app.logger.debug(f"Processing kaitori item: {json.dumps(item, indent=2)}")
-            
-            # モデル名からシリーズを判定
-            if "Pro Max" in model:
-                series = "iPhone 16 Pro Max"
-            elif "Pro" in model:
-                series = "iPhone 16 Pro"
-            elif "16e" in model:
-                series = "iPhone 16e"
-            elif "16" in model:
-                series = "iPhone 16"
-            else:
-                app.logger.warning(f"Skipping unknown model: {model}")
-                continue
-            
-            if series not in price_data:
-                price_data[series] = {}
-            
-            if capacity not in price_data[series]:
-                # 公式価格を取得
-                official_colors = official_prices.get(series, {}).get(capacity, {})
-                app.logger.debug(f"Found official colors for {series} {capacity}: {official_colors}")
-                
-                # レスポンス形式を統一
-                price_data[series][capacity] = {
-                    'kaitori_price': price,
-                    'official_price': official_colors.get('price', 0),
-                    'price_diff': price - official_colors.get('price', 0),
-                    'rakuten_diff': 0  # 必要に応じて計算
-                }
-            else:
-                # 最小・最大価格を更新
-                current_price = price_data[series][capacity]['kaitori_price']
-                if price > current_price:
-                    price_data[series][capacity]['kaitori_price'] = price
-                    price_data[series][capacity]['price_diff'] = price - price_data[series][capacity]['official_price']
-
-        app.logger.debug(f"Final price data: {json.dumps(price_data, indent=2)}")
-        return jsonify(price_data), 200
-
-    except Exception as e:
-        app.logger.error(f"エラー: {str(e)}")
-        app.logger.exception("Detailed error information:")
-        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
