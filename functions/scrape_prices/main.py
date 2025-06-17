@@ -51,7 +51,16 @@ class PriceScraper:
         """指定されたURLから価格データをスクレイピング"""
         try:
             with sync_playwright() as p:
-                browser = p.chromium.launch()
+                # Cloud Functions環境用の設定
+                browser = p.chromium.launch(
+                    args=[
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-accelerated-2d-canvas',
+                        '--disable-gpu'
+                    ]
+                )
                 page = browser.new_page()
                 
                 try:
