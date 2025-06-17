@@ -19,7 +19,8 @@ gcloud run deploy $SERVICE_NAME \
   --timeout $TIMEOUT \
   --set-env-vars BUCKET_NAME=$BUCKET_NAME \
   --allow-unauthenticated \
-  --port 8080
+  --port 8080 \
+  --clear-base-image
 
 # Cloud Schedulerの設定
 gcloud scheduler jobs create http scrape-prices-scheduler \
