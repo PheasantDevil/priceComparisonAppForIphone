@@ -4,7 +4,6 @@
 PROJECT_ID="price-comparison-app-463007"
 FUNCTION_NAME="scrape-prices"
 REGION="asia-northeast1"
-RUNTIME="python311"
 MEMORY="512MB"
 TIMEOUT="540s"
 BUCKET_NAME="price-comparison-app-data"
@@ -13,14 +12,15 @@ BUCKET_NAME="price-comparison-app-data"
 gcloud functions deploy $FUNCTION_NAME \
   --project $PROJECT_ID \
   --region $REGION \
-  --runtime $RUNTIME \
   --memory $MEMORY \
   --timeout $TIMEOUT \
   --trigger-http \
   --entry-point scrape_prices \
   --source functions/scrape_prices \
   --set-env-vars BUCKET_NAME=$BUCKET_NAME \
-  --allow-unauthenticated
+  --allow-unauthenticated \
+  --runtime python311 \
+  --use-dockerfile
 
 # Cloud Schedulerの設定
 gcloud scheduler jobs create http scrape-prices-scheduler \
