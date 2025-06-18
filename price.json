@@ -1,0 +1,578 @@
+[
+  {
+    "id": "iPhone 16_128GB",
+    "series": "iPhone 16",
+    "capacity": "128GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 109000,
+    "kaitori_price_max": 109000,
+    "updated_at": "2025-06-18T01:00:05.475374"
+  },
+  {
+    "id": "iPhone 16_128GB",
+    "series": "iPhone 16",
+    "capacity": "128GB",
+    "colors": ["白"],
+    "kaitori_price_min": 109000,
+    "kaitori_price_max": 109000,
+    "updated_at": "2025-06-18T01:00:05.563578"
+  },
+  {
+    "id": "iPhone 16_128GB",
+    "series": "iPhone 16",
+    "capacity": "128GB",
+    "colors": ["緑"],
+    "kaitori_price_min": 109000,
+    "kaitori_price_max": 109000,
+    "updated_at": "2025-06-18T01:00:05.606842"
+  },
+  {
+    "id": "iPhone 16_128GB",
+    "series": "iPhone 16",
+    "capacity": "128GB",
+    "colors": ["青"],
+    "kaitori_price_min": 109000,
+    "kaitori_price_max": 109000,
+    "updated_at": "2025-06-18T01:00:05.706085"
+  },
+  {
+    "id": "iPhone 16_128GB",
+    "series": "iPhone 16",
+    "capacity": "128GB",
+    "colors": ["桃"],
+    "kaitori_price_min": 109000,
+    "kaitori_price_max": 109000,
+    "updated_at": "2025-06-18T01:00:05.861147"
+  },
+  {
+    "id": "iPhone 16_256GB",
+    "series": "iPhone 16",
+    "capacity": "256GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 121600,
+    "kaitori_price_max": 121600,
+    "updated_at": "2025-06-18T01:00:05.929086"
+  },
+  {
+    "id": "iPhone 16_256GB",
+    "series": "iPhone 16",
+    "capacity": "256GB",
+    "colors": ["白"],
+    "kaitori_price_min": 121600,
+    "kaitori_price_max": 121600,
+    "updated_at": "2025-06-18T01:00:06.064219"
+  },
+  {
+    "id": "iPhone 16_256GB",
+    "series": "iPhone 16",
+    "capacity": "256GB",
+    "colors": ["緑"],
+    "kaitori_price_min": 121600,
+    "kaitori_price_max": 121600,
+    "updated_at": "2025-06-18T01:00:06.106890"
+  },
+  {
+    "id": "iPhone 16_256GB",
+    "series": "iPhone 16",
+    "capacity": "256GB",
+    "colors": ["青"],
+    "kaitori_price_min": 121600,
+    "kaitori_price_max": 121600,
+    "updated_at": "2025-06-18T01:00:06.195826"
+  },
+  {
+    "id": "iPhone 16_256GB",
+    "series": "iPhone 16",
+    "capacity": "256GB",
+    "colors": ["桃"],
+    "kaitori_price_min": 121600,
+    "kaitori_price_max": 121600,
+    "updated_at": "2025-06-18T01:00:06.282784"
+  },
+  {
+    "id": "iPhone 16_512GB",
+    "series": "iPhone 16",
+    "capacity": "512GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 128600,
+    "kaitori_price_max": 128600,
+    "updated_at": "2025-06-18T01:00:06.382647"
+  },
+  {
+    "id": "iPhone 16_512GB",
+    "series": "iPhone 16",
+    "capacity": "512GB",
+    "colors": ["白"],
+    "kaitori_price_min": 128600,
+    "kaitori_price_max": 128600,
+    "updated_at": "2025-06-18T01:00:06.481484"
+  },
+  {
+    "id": "iPhone 16_512GB",
+    "series": "iPhone 16",
+    "capacity": "512GB",
+    "colors": ["緑"],
+    "kaitori_price_min": 128600,
+    "kaitori_price_max": 128600,
+    "updated_at": "2025-06-18T01:00:06.523665"
+  },
+  {
+    "id": "iPhone 16_512GB",
+    "series": "iPhone 16",
+    "capacity": "512GB",
+    "colors": ["青"],
+    "kaitori_price_min": 128600,
+    "kaitori_price_max": 128600,
+    "updated_at": "2025-06-18T01:00:06.573672"
+  },
+  {
+    "id": "iPhone 16_512GB",
+    "series": "iPhone 16",
+    "capacity": "512GB",
+    "colors": ["桃"],
+    "kaitori_price_min": 128600,
+    "kaitori_price_max": 128600,
+    "updated_at": "2025-06-18T01:00:06.626750"
+  },
+  {
+    "id": "iPhone 16 Plus_128GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "128GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 120100,
+    "kaitori_price_max": 120100,
+    "updated_at": "2025-06-18T01:00:11.232336"
+  },
+  {
+    "id": "iPhone 16 Plus_128GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "128GB",
+    "colors": ["白"],
+    "kaitori_price_min": 120100,
+    "kaitori_price_max": 120100,
+    "updated_at": "2025-06-18T01:00:11.361168"
+  },
+  {
+    "id": "iPhone 16 Plus_128GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "128GB",
+    "colors": ["緑"],
+    "kaitori_price_min": 120100,
+    "kaitori_price_max": 120100,
+    "updated_at": "2025-06-18T01:00:11.403590"
+  },
+  {
+    "id": "iPhone 16 Plus_128GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "128GB",
+    "colors": ["青"],
+    "kaitori_price_min": 120100,
+    "kaitori_price_max": 120100,
+    "updated_at": "2025-06-18T01:00:11.452911"
+  },
+  {
+    "id": "iPhone 16 Plus_128GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "128GB",
+    "colors": ["桃"],
+    "kaitori_price_min": 120100,
+    "kaitori_price_max": 120100,
+    "updated_at": "2025-06-18T01:00:11.673319"
+  },
+  {
+    "id": "iPhone 16 Plus_256GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "256GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 135600,
+    "kaitori_price_max": 135600,
+    "updated_at": "2025-06-18T01:00:11.769790"
+  },
+  {
+    "id": "iPhone 16 Plus_256GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "256GB",
+    "colors": ["白"],
+    "kaitori_price_min": 135600,
+    "kaitori_price_max": 135600,
+    "updated_at": "2025-06-18T01:00:11.814385"
+  },
+  {
+    "id": "iPhone 16 Plus_256GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "256GB",
+    "colors": ["緑"],
+    "kaitori_price_min": 135600,
+    "kaitori_price_max": 135600,
+    "updated_at": "2025-06-18T01:00:11.864268"
+  },
+  {
+    "id": "iPhone 16 Plus_256GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "256GB",
+    "colors": ["青"],
+    "kaitori_price_min": 135600,
+    "kaitori_price_max": 135600,
+    "updated_at": "2025-06-18T01:00:11.931457"
+  },
+  {
+    "id": "iPhone 16 Plus_256GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "256GB",
+    "colors": ["桃"],
+    "kaitori_price_min": 135600,
+    "kaitori_price_max": 135600,
+    "updated_at": "2025-06-18T01:00:12.085114"
+  },
+  {
+    "id": "iPhone 16 Plus_512GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "512GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 145600,
+    "kaitori_price_max": 145600,
+    "updated_at": "2025-06-18T01:00:12.185832"
+  },
+  {
+    "id": "iPhone 16 Plus_512GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "512GB",
+    "colors": ["白"],
+    "kaitori_price_min": 145600,
+    "kaitori_price_max": 145600,
+    "updated_at": "2025-06-18T01:00:12.274928"
+  },
+  {
+    "id": "iPhone 16 Plus_512GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "512GB",
+    "colors": ["緑"],
+    "kaitori_price_min": 145600,
+    "kaitori_price_max": 145600,
+    "updated_at": "2025-06-18T01:00:12.362260"
+  },
+  {
+    "id": "iPhone 16 Plus_512GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "512GB",
+    "colors": ["青"],
+    "kaitori_price_min": 145600,
+    "kaitori_price_max": 145600,
+    "updated_at": "2025-06-18T01:00:12.457157"
+  },
+  {
+    "id": "iPhone 16 Plus_512GB",
+    "series": "iPhone 16 Plus",
+    "capacity": "512GB",
+    "colors": ["桃"],
+    "kaitori_price_min": 145600,
+    "kaitori_price_max": 145600,
+    "updated_at": "2025-06-18T01:00:12.522985"
+  },
+  {
+    "id": "iPhone 16 Pro_128GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "128GB",
+    "colors": ["金"],
+    "kaitori_price_min": 145200,
+    "kaitori_price_max": 145200,
+    "updated_at": "2025-06-18T01:00:16.882415"
+  },
+  {
+    "id": "iPhone 16 Pro_128GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "128GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 145200,
+    "kaitori_price_max": 145200,
+    "updated_at": "2025-06-18T01:00:16.973472"
+  },
+  {
+    "id": "iPhone 16 Pro_128GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "128GB",
+    "colors": ["灰"],
+    "kaitori_price_min": 145200,
+    "kaitori_price_max": 145200,
+    "updated_at": "2025-06-18T01:00:17.074342"
+  },
+  {
+    "id": "iPhone 16 Pro_128GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "128GB",
+    "colors": ["白"],
+    "kaitori_price_min": 145200,
+    "kaitori_price_max": 145200,
+    "updated_at": "2025-06-18T01:00:17.159937"
+  },
+  {
+    "id": "iPhone 16 Pro_256GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "256GB",
+    "colors": ["金"],
+    "kaitori_price_min": 161700,
+    "kaitori_price_max": 161700,
+    "updated_at": "2025-06-18T01:00:17.210210"
+  },
+  {
+    "id": "iPhone 16 Pro_256GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "256GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 161700,
+    "kaitori_price_max": 161700,
+    "updated_at": "2025-06-18T01:00:17.293907"
+  },
+  {
+    "id": "iPhone 16 Pro_256GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "256GB",
+    "colors": ["灰"],
+    "kaitori_price_min": 161700,
+    "kaitori_price_max": 161700,
+    "updated_at": "2025-06-18T01:00:17.336522"
+  },
+  {
+    "id": "iPhone 16 Pro_256GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "256GB",
+    "colors": ["白"],
+    "kaitori_price_min": 161700,
+    "kaitori_price_max": 161700,
+    "updated_at": "2025-06-18T01:00:17.384861"
+  },
+  {
+    "id": "iPhone 16 Pro_512GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "512GB",
+    "colors": ["金"],
+    "kaitori_price_min": 189200,
+    "kaitori_price_max": 189200,
+    "updated_at": "2025-06-18T01:00:17.491511"
+  },
+  {
+    "id": "iPhone 16 Pro_512GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "512GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 189200,
+    "kaitori_price_max": 189200,
+    "updated_at": "2025-06-18T01:00:17.576589"
+  },
+  {
+    "id": "iPhone 16 Pro_512GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "512GB",
+    "colors": ["灰"],
+    "kaitori_price_min": 189200,
+    "kaitori_price_max": 189200,
+    "updated_at": "2025-06-18T01:00:17.660182"
+  },
+  {
+    "id": "iPhone 16 Pro_512GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "512GB",
+    "colors": ["白"],
+    "kaitori_price_min": 189200,
+    "kaitori_price_max": 189200,
+    "updated_at": "2025-06-18T01:00:17.755875"
+  },
+  {
+    "id": "iPhone 16 Pro_1GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "1GB",
+    "colors": ["金"],
+    "kaitori_price_min": 223200,
+    "kaitori_price_max": 223200,
+    "updated_at": "2025-06-18T01:00:17.795414"
+  },
+  {
+    "id": "iPhone 16 Pro_1GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "1GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 223200,
+    "kaitori_price_max": 223200,
+    "updated_at": "2025-06-18T01:00:17.881275"
+  },
+  {
+    "id": "iPhone 16 Pro_1GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "1GB",
+    "colors": ["灰"],
+    "kaitori_price_min": 223200,
+    "kaitori_price_max": 223200,
+    "updated_at": "2025-06-18T01:00:17.967340"
+  },
+  {
+    "id": "iPhone 16 Pro_1GB",
+    "series": "iPhone 16 Pro",
+    "capacity": "1GB",
+    "colors": ["白"],
+    "kaitori_price_min": 223200,
+    "kaitori_price_max": 223200,
+    "updated_at": "2025-06-18T01:00:18.056841"
+  },
+  {
+    "id": "iPhone 16 Pro Max_256GB",
+    "series": "iPhone 16 Pro Max",
+    "capacity": "256GB",
+    "colors": ["金"],
+    "kaitori_price_min": 174700,
+    "kaitori_price_max": 174700,
+    "updated_at": "2025-06-18T01:00:22.385322"
+  },
+  {
+    "id": "iPhone 16 Pro Max_256GB",
+    "series": "iPhone 16 Pro Max",
+    "capacity": "256GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 174700,
+    "kaitori_price_max": 174700,
+    "updated_at": "2025-06-18T01:00:22.474770"
+  },
+  {
+    "id": "iPhone 16 Pro Max_256GB",
+    "series": "iPhone 16 Pro Max",
+    "capacity": "256GB",
+    "colors": ["灰"],
+    "kaitori_price_min": 174700,
+    "kaitori_price_max": 174700,
+    "updated_at": "2025-06-18T01:00:22.557144"
+  },
+  {
+    "id": "iPhone 16 Pro Max_256GB",
+    "series": "iPhone 16 Pro Max",
+    "capacity": "256GB",
+    "colors": ["白"],
+    "kaitori_price_min": 174700,
+    "kaitori_price_max": 174700,
+    "updated_at": "2025-06-18T01:00:22.602456"
+  },
+  {
+    "id": "iPhone 16 Pro Max_512GB",
+    "series": "iPhone 16 Pro Max",
+    "capacity": "512GB",
+    "colors": ["金"],
+    "kaitori_price_min": 204700,
+    "kaitori_price_max": 204700,
+    "updated_at": "2025-06-18T01:00:22.757918"
+  },
+  {
+    "id": "iPhone 16 Pro Max_512GB",
+    "series": "iPhone 16 Pro Max",
+    "capacity": "512GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 204700,
+    "kaitori_price_max": 204700,
+    "updated_at": "2025-06-18T01:00:22.800846"
+  },
+  {
+    "id": "iPhone 16 Pro Max_512GB",
+    "series": "iPhone 16 Pro Max",
+    "capacity": "512GB",
+    "colors": ["灰"],
+    "kaitori_price_min": 204700,
+    "kaitori_price_max": 204700,
+    "updated_at": "2025-06-18T01:00:22.895837"
+  },
+  {
+    "id": "iPhone 16 Pro Max_512GB",
+    "series": "iPhone 16 Pro Max",
+    "capacity": "512GB",
+    "colors": ["白"],
+    "kaitori_price_min": 204700,
+    "kaitori_price_max": 204700,
+    "updated_at": "2025-06-18T01:00:22.995391"
+  },
+  {
+    "id": "iPhone 16 Pro Max_1GB",
+    "series": "iPhone 16 Pro Max",
+    "capacity": "1GB",
+    "colors": ["金"],
+    "kaitori_price_min": 230600,
+    "kaitori_price_max": 230600,
+    "updated_at": "2025-06-18T01:00:23.086763"
+  },
+  {
+    "id": "iPhone 16 Pro Max_1GB",
+    "series": "iPhone 16 Pro Max",
+    "capacity": "1GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 231600,
+    "kaitori_price_max": 231600,
+    "updated_at": "2025-06-18T01:00:23.182903"
+  },
+  {
+    "id": "iPhone 16 Pro Max_1GB",
+    "series": "iPhone 16 Pro Max",
+    "capacity": "1GB",
+    "colors": ["灰"],
+    "kaitori_price_min": 231600,
+    "kaitori_price_max": 231600,
+    "updated_at": "2025-06-18T01:00:23.265240"
+  },
+  {
+    "id": "iPhone 16 Pro Max_1GB",
+    "series": "iPhone 16 Pro Max",
+    "capacity": "1GB",
+    "colors": ["白"],
+    "kaitori_price_min": 231600,
+    "kaitori_price_max": 231600,
+    "updated_at": "2025-06-18T01:00:23.354945"
+  },
+  {
+    "id": "iPhone 16 e_128GB",
+    "series": "iPhone 16 e",
+    "capacity": "128GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 87600,
+    "kaitori_price_max": 87600,
+    "updated_at": "2025-06-18T01:00:27.463866"
+  },
+  {
+    "id": "iPhone 16 e_128GB",
+    "series": "iPhone 16 e",
+    "capacity": "128GB",
+    "colors": ["白"],
+    "kaitori_price_min": 87600,
+    "kaitori_price_max": 87600,
+    "updated_at": "2025-06-18T01:00:27.554218"
+  },
+  {
+    "id": "iPhone 16 e_256GB",
+    "series": "iPhone 16 e",
+    "capacity": "256GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 100300,
+    "kaitori_price_max": 100300,
+    "updated_at": "2025-06-18T01:00:27.595177"
+  },
+  {
+    "id": "iPhone 16 e_256GB",
+    "series": "iPhone 16 e",
+    "capacity": "256GB",
+    "colors": ["白"],
+    "kaitori_price_min": 100300,
+    "kaitori_price_max": 100300,
+    "updated_at": "2025-06-18T01:00:27.695707"
+  },
+  {
+    "id": "iPhone 16 e_512GB",
+    "series": "iPhone 16 e",
+    "capacity": "512GB",
+    "colors": ["黒"],
+    "kaitori_price_min": 109300,
+    "kaitori_price_max": 109300,
+    "updated_at": "2025-06-18T01:00:27.784240"
+  },
+  {
+    "id": "iPhone 16 e_512GB",
+    "series": "iPhone 16 e",
+    "capacity": "512GB",
+    "colors": ["白"],
+    "kaitori_price_min": 109300,
+    "kaitori_price_max": 109300,
+    "updated_at": "2025-06-18T01:00:27.887648"
+  }
+]
