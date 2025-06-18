@@ -204,42 +204,30 @@ def create_app():
                 
                 # シリーズが存在しない場合は初期化
                 if series not in price_data:
-                    price_data[series] = {}
+                    price_data[series] = {
+                        'series': series,
+                        'prices': {}
+                    }
                 
                 # 容量が存在しない場合は初期化
-                if capacity not in price_data[series]:
-                    price_data[series][capacity] = {
-                        'colors': {},
-                        'kaitori_price_min': float('inf'),
-                        'kaitori_price_max': 0,
+                if capacity not in price_data[series]['prices']:
+                    price_data[series]['prices'][capacity] = {
                         'official_price': 0,
-                        'price_diff': 0
+                        'kaitori_price': 0,
+                        'price_diff': 0,
+                        'rakuten_diff': 0
                     }
                 
-                # 色ごとの価格を保存
-                for color in colors:
-                    price_data[series][capacity]['colors'][color] = {
-                        'price': kaitori_price_min,
-                        'price_text': f"{kaitori_price_min:,}円"
-                    }
-                
-                # 最小・最大価格を更新
-                if kaitori_price_min < price_data[series][capacity]['kaitori_price_min']:
-                    price_data[series][capacity]['kaitori_price_min'] = kaitori_price_min
-                if kaitori_price_max > price_data[series][capacity]['kaitori_price_max']:
-                    price_data[series][capacity]['kaitori_price_max'] = kaitori_price_max
+                # 最小価格を設定（フロントエンドが期待する形式）
+                price_data[series]['prices'][capacity]['kaitori_price'] = kaitori_price_min
             
             # 公式価格を設定し、価格差を計算
-            for series, capacities in price_data.items():
-                for capacity, data in capacities.items():
+            for series, series_data in price_data.items():
+                for capacity, price_info in series_data['prices'].items():
                     # 公式価格を取得
                     official_price = official_data.get(series, {}).get(capacity, {}).get('price', 0)
-                    data['official_price'] = official_price
-                    data['price_diff'] = data['kaitori_price_min'] - official_price
-                    
-                    # 無限大の場合は0に設定
-                    if data['kaitori_price_min'] == float('inf'):
-                        data['kaitori_price_min'] = 0
+                    price_info['official_price'] = official_price
+                    price_info['price_diff'] = price_info['kaitori_price'] - official_price
 
             app.logger.debug(f"Final price data: {json.dumps(price_data, indent=2)}")
             return jsonify(price_data), 200
