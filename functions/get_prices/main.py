@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from google.cloud import firestore
+from google.cloud import firestore, storage
 
 # ロガーの設定
 logger = logging.getLogger()
@@ -12,6 +12,9 @@ logger.setLevel(logging.INFO)
 
 # Firestoreクライアントの初期化
 db = firestore.Client()
+
+# Cloud Storageクライアントの初期化
+storage_client = storage.Client()
 
 # シリーズごとの有効な容量を定義
 VALID_CAPACITIES = {
@@ -85,7 +88,7 @@ def fetch_prices(series):
     """
     Retrieves price information for all valid capacities of the specified iPhone series.
     
-    Fetches official and buyback (kaitori) prices from Firestore for the given series.
+    Fetches official prices from Firestore and buyback (kaitori) prices from Cloud Storage for the given series.
     Returns a dictionary mapping each valid capacity to its official price, kaitori price,
     the difference between them, and the difference between the kaitori price and 90% of the official price.
     If data is missing for the series, returns zeroed price information for all capacities.
@@ -98,35 +101,52 @@ def fetch_prices(series):
     """
     try:
         logger.info(f"Getting official prices for series: {series}")
-        # 公式価格の取得
-        official_prices = {}
-        for doc in db.collection('official_prices').stream():
-            data = doc.to_dict()
-            if 'price' in data:
-                official_prices[doc.id] = data['price']
-            else:
-                official_prices[doc.id] = data
-
-        logger.info(f"Getting kaitori prices for series: {series}")
-        # 買取価格の取得
-        kaitori_docs = db.collection('kaitori_prices').where('series', '==', series).stream()
-        kaitori_items = [doc.to_dict() for doc in kaitori_docs]
-
-        # 公式価格をマッピング
+        # 公式価格の取得（Firestoreから）
         official_doc = db.collection('official_prices').document(series).get()
         official_data = official_doc.to_dict() if official_doc.exists else {}
-        if 'price' in official_data:
-            official_prices = official_data['price']
-        else:
-            official_prices = official_data
 
-        # 買取価格をマッピング
-        kaitori_map = {item['capacity']: item for item in kaitori_items}
+        logger.info(f"Getting kaitori prices from Cloud Storage for series: {series}")
+        # 買取価格の取得（Cloud Storageから）
+        bucket_name = os.getenv('BUCKET_NAME', 'price-comparison-app-data')
+        bucket = storage_client.bucket(bucket_name)
+        
+        # 現在の日付のパスを生成
+        current_date = datetime.now().strftime('%Y/%m/%d')
+        kaitori_blob = bucket.blob(f'prices/{current_date}/prices.json')
+        
+        if not kaitori_blob.exists():
+            logger.warning(f"No kaitori prices found for date: {current_date}")
+            kaitori_data = []
+        else:
+            kaitori_data = json.loads(kaitori_blob.download_as_string())
+            logger.info(f"Retrieved {len(kaitori_data)} kaitori price items from Cloud Storage")
+
+        # 指定されたシリーズの買取価格をフィルタリング
+        series_kaitori_data = [item for item in kaitori_data if item.get('series') == series]
+        logger.info(f"Found {len(series_kaitori_data)} kaitori price items for series: {series}")
+
+        # 容量ごとに買取価格を集計
+        kaitori_map = {}
+        for item in series_kaitori_data:
+            capacity = item.get('capacity')
+            if capacity:
+                if capacity not in kaitori_map:
+                    kaitori_map[capacity] = {
+                        'kaitori_price_min': float('inf'),
+                        'kaitori_price_max': 0
+                    }
+                kaitori_price_min = item.get('kaitori_price_min', 0)
+                kaitori_price_max = item.get('kaitori_price_max', 0)
+                
+                if kaitori_price_min < kaitori_map[capacity]['kaitori_price_min']:
+                    kaitori_map[capacity]['kaitori_price_min'] = kaitori_price_min
+                if kaitori_price_max > kaitori_map[capacity]['kaitori_price_max']:
+                    kaitori_map[capacity]['kaitori_price_max'] = kaitori_price_max
 
         prices = {}
         for capacity in VALID_CAPACITIES.get(series, []):
             # 公式価格
-            official_price_info = official_prices.get(capacity, {})
+            official_price_info = official_data.get(capacity, {})
             if isinstance(official_price_info, dict) and 'colors' in official_price_info:
                 color_prices = official_price_info['colors']
                 if color_prices:
@@ -136,11 +156,11 @@ def fetch_prices(series):
             else:
                 official_price = safe_int(official_price_info)
 
-            # 買取価格
+            # 買取価格（Cloud Storageから取得した最新データ）
             kaitori_price = 0
             kaitori_item = kaitori_map.get(capacity)
-            if kaitori_item:
-                kaitori_price = safe_int(kaitori_item.get('kaitori_price_max', 0))
+            if kaitori_item and kaitori_item['kaitori_price_min'] != float('inf'):
+                kaitori_price = kaitori_item['kaitori_price_min']
 
             prices[capacity] = {
                 'official_price': official_price,

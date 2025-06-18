@@ -41,7 +41,7 @@ def create_app():
     bucket = storage_client.bucket(os.getenv('BUCKET_NAME', 'price-comparison-app-data'))
 
     # Cloud Runのエンドポイント
-    API_ENDPOINT = os.getenv('CLOUD_RUN_ENDPOINT', 'https://scrape-prices-xxxxx-uc.a.run.app')
+    API_ENDPOINT = os.getenv('CLOUD_RUN_ENDPOINT', 'https://us-central1-price-comparison-app-463007.cloudfunctions.net/get-prices')
 
     @app.route("/favicon.ico")
     def favicon():
