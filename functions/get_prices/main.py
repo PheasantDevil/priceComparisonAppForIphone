@@ -114,15 +114,15 @@ def fetch_prices(series):
         prices = {}
         for capacity in VALID_CAPACITIES.get(series, []):
             # 公式価格
-            official_price_info = official_data.get(capacity, {})
-            if isinstance(official_price_info, dict) and 'colors' in official_price_info:
-                color_prices = official_price_info['colors']
-                if color_prices:
-                    official_price = safe_int(next(iter(color_prices.values())))
+            official_price = 0
+            if 'price' in official_data and capacity in official_data['price']:
+                official_price_info = official_data['price'][capacity]
+                if isinstance(official_price_info, dict) and 'colors' in official_price_info:
+                    color_prices = official_price_info['colors']
+                    if color_prices:
+                        official_price = safe_int(next(iter(color_prices.values())))
                 else:
-                    official_price = 0
-            else:
-                official_price = safe_int(official_price_info)
+                    official_price = safe_int(official_price_info)
 
             # 買取価格（Firestoreから取得）
             kaitori_price = 0
