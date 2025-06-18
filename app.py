@@ -161,77 +161,48 @@ def create_app():
         """
         Retrieves and aggregates the latest buyback and official price data from Cloud Storage.
         
-        Fetches buyback prices and official prices from Cloud Storage, organizing them by iPhone series and capacity.
-        Returns a structured JSON response containing color-specific prices, minimum and maximum buyback prices,
-        and official prices for comparison.
-        
         Returns:
             A JSON response with the aggregated price data and HTTP status 200 on success,
             or an error message with HTTP status 500 on failure.
         """
         try:
-            # Cloud Storageクライアントの初期化
             storage_client = storage.Client()
             bucket = storage_client.bucket(os.getenv('BUCKET_NAME', 'price-comparison-app-data'))
-            
-            # 現在の日付のパスを生成
             current_date = datetime.now().strftime('%Y/%m/%d')
-            
-            # 買取価格データを取得
             kaitori_blob = bucket.blob(f'prices/{current_date}/prices.json')
             kaitori_data = json.loads(kaitori_blob.download_as_string())
             app.logger.info(f"Found {len(kaitori_data)} items in prices.json")
-            
-            # 公式価格データを取得
             official_blob = bucket.blob('config/official_prices.json')
             official_data = json.loads(official_blob.download_as_string())
             app.logger.info(f"Found {len(official_data)} items in official_prices.json")
             app.logger.debug(f"Official prices data: {json.dumps(official_data, indent=2)}")
-            
-            # データを整形（配列形式から辞書形式に変換）
-            price_data = {}
-            
-            # 各アイテムを処理
+
+            # series/pricesネスト形式で整形
+            response = {}
             for item in kaitori_data:
                 series = item.get('series')
                 capacity = item.get('capacity')
-                colors = item.get('colors', [])
                 kaitori_price_min = item.get('kaitori_price_min', 0)
-                kaitori_price_max = item.get('kaitori_price_max', 0)
-                
                 if not series or not capacity:
                     continue
-                
-                # シリーズが存在しない場合は初期化
-                if series not in price_data:
-                    price_data[series] = {
+                if series not in response:
+                    response[series] = {
                         'series': series,
                         'prices': {}
                     }
-                
-                # 容量が存在しない場合は初期化
-                if capacity not in price_data[series]['prices']:
-                    price_data[series]['prices'][capacity] = {
-                        'official_price': 0,
-                        'kaitori_price': 0,
-                        'price_diff': 0,
-                        'rakuten_diff': 0
-                    }
-                
-                # 最小価格を設定（フロントエンドが期待する形式）
-                price_data[series]['prices'][capacity]['kaitori_price'] = kaitori_price_min
-            
-            # 公式価格を設定し、価格差を計算
-            for series, series_data in price_data.items():
-                for capacity, price_info in series_data['prices'].items():
-                    # 公式価格を取得
-                    official_price = official_data.get(series, {}).get(capacity, {}).get('price', 0)
-                    price_info['official_price'] = official_price
-                    price_info['price_diff'] = price_info['kaitori_price'] - official_price
-
-            app.logger.debug(f"Final price data: {json.dumps(price_data, indent=2)}")
-            return jsonify(price_data), 200
-
+                # 公式価格
+                official_price = official_data.get(series, {}).get(capacity, {}).get('price', 0)
+                # 差額
+                price_diff = kaitori_price_min - official_price
+                # rakuten_diffは現状0固定
+                response[series]['prices'][capacity] = {
+                    'official_price': official_price,
+                    'kaitori_price': kaitori_price_min,
+                    'price_diff': price_diff,
+                    'rakuten_diff': 0
+                }
+            app.logger.debug(f"Final price data: {json.dumps(response, indent=2)}")
+            return jsonify(response), 200
         except Exception as e:
             app.logger.error(f"エラー: {str(e)}")
             app.logger.exception("Detailed error information:")
