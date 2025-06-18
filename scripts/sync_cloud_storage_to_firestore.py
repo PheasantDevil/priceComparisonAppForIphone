@@ -120,6 +120,7 @@ def sync_cloud_storage_to_firestore():
                 'kaitori_price_min': data['kaitori_price_min'],
                 'kaitori_price_max': data['kaitori_price_max'],
                 'source': data['source'],
+                'date': datetime.now().strftime('%Y-%m-%d'),
                 'expiration_time': int((datetime.now() + timedelta(days=14)).timestamp())
             }
             
@@ -129,9 +130,42 @@ def sync_cloud_storage_to_firestore():
         
         logger.info(f"Successfully synced {len(series_capacity_map)} items to Firestore")
         
+        # 古い履歴データのクリーンアップ（2週間以上前）
+        cleanup_old_history_data(db)
+        
     except Exception as e:
         logger.error(f"Error syncing data: {str(e)}")
         raise
+
+def cleanup_old_history_data(db):
+    """2週間以上古い履歴データを削除"""
+    try:
+        # 2週間前のタイムスタンプ
+        cutoff_timestamp = int((datetime.now() - timedelta(days=14)).timestamp())
+        
+        # 古いデータを検索
+        query = (
+            db.collection('price_history')
+            .where('timestamp', '<', cutoff_timestamp)
+        )
+        
+        docs = query.stream()
+        deleted_count = 0
+        
+        # 古いデータを削除
+        for doc in docs:
+            doc.reference.delete()
+            deleted_count += 1
+        
+        if deleted_count > 0:
+            logger.info(f"Cleaned up {deleted_count} old price history records")
+        else:
+            logger.info("No old price history records to clean up")
+            
+    except Exception as e:
+        logger.error(f"Error cleaning up old history data: {str(e)}")
+        # クリーンアップの失敗は他の処理に影響を与えない
+        pass
 
 if __name__ == "__main__":
     sync_cloud_storage_to_firestore() 
