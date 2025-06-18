@@ -188,24 +188,58 @@ def create_app():
             app.logger.info(f"Found {len(official_data)} items in official_prices.json")
             app.logger.debug(f"Official prices data: {json.dumps(official_data, indent=2)}")
             
-            # データを整形
+            # データを整形（配列形式から辞書形式に変換）
             price_data = {}
-            for series, capacities in kaitori_data.items():
-                price_data[series] = {}
+            
+            # 各アイテムを処理
+            for item in kaitori_data:
+                series = item.get('series')
+                capacity = item.get('capacity')
+                colors = item.get('colors', [])
+                kaitori_price_min = item.get('kaitori_price_min', 0)
+                kaitori_price_max = item.get('kaitori_price_max', 0)
                 
+                if not series or not capacity:
+                    continue
+                
+                # シリーズが存在しない場合は初期化
+                if series not in price_data:
+                    price_data[series] = {}
+                
+                # 容量が存在しない場合は初期化
+                if capacity not in price_data[series]:
+                    price_data[series][capacity] = {
+                        'colors': {},
+                        'kaitori_price_min': float('inf'),
+                        'kaitori_price_max': 0,
+                        'official_price': 0,
+                        'price_diff': 0
+                    }
+                
+                # 色ごとの価格を保存
+                for color in colors:
+                    price_data[series][capacity]['colors'][color] = {
+                        'price': kaitori_price_min,
+                        'price_text': f"{kaitori_price_min:,}円"
+                    }
+                
+                # 最小・最大価格を更新
+                if kaitori_price_min < price_data[series][capacity]['kaitori_price_min']:
+                    price_data[series][capacity]['kaitori_price_min'] = kaitori_price_min
+                if kaitori_price_max > price_data[series][capacity]['kaitori_price_max']:
+                    price_data[series][capacity]['kaitori_price_max'] = kaitori_price_max
+            
+            # 公式価格を設定し、価格差を計算
+            for series, capacities in price_data.items():
                 for capacity, data in capacities.items():
                     # 公式価格を取得
-                    official_colors = official_data.get(series, {}).get(capacity, {})
-                    app.logger.debug(f"Found official colors for {series} {capacity}: {official_colors}")
+                    official_price = official_data.get(series, {}).get(capacity, {}).get('price', 0)
+                    data['official_price'] = official_price
+                    data['price_diff'] = data['kaitori_price_min'] - official_price
                     
-                    # レスポンス形式を統一
-                    price_data[series][capacity] = {
-                        'kaitori_price': data.get('kaitori_price_min', 0),
-                        'official_price': official_colors.get('price', 0),
-                        'price_diff': data.get('kaitori_price_min', 0) - official_colors.get('price', 0),
-                        'rakuten_diff': 0,  # 必要に応じて計算
-                        'colors': data.get('colors', {})
-                    }
+                    # 無限大の場合は0に設定
+                    if data['kaitori_price_min'] == float('inf'):
+                        data['kaitori_price_min'] = 0
 
             app.logger.debug(f"Final price data: {json.dumps(price_data, indent=2)}")
             return jsonify(price_data), 200
