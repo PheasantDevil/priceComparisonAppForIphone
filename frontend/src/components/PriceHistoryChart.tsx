@@ -1,7 +1,7 @@
 'use client';
 
 import axios from 'axios';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -48,7 +48,7 @@ const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPriceHistory = async () => {
+  const fetchPriceHistory = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -71,11 +71,11 @@ const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [series, capacity, days]);
 
   useEffect(() => {
     fetchPriceHistory();
-  }, [series, capacity, days]);
+  }, [series, capacity, days, fetchPriceHistory]);
 
   const formatPrice = (value: number) => {
     return `¥${value.toLocaleString()}`;

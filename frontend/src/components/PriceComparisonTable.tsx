@@ -110,7 +110,7 @@ export const PriceComparisonTable = memo(function PriceComparisonTable({
           </tr>
         </thead>
         <tbody className='bg-white divide-y divide-gray-200'>
-          {rows.map((row, idx) => {
+          {rows.map(row => {
             const diffColor = getPriceDiffColor(row.price_diff);
             return (
               <tr key={`${row.series}-${row.capacity}`}>
