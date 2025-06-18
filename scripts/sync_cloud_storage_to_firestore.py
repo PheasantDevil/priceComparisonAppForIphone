@@ -68,11 +68,17 @@ def sync_cloud_storage_to_firestore():
             if not series or not capacity:
                 continue
             
-            key = f"{series}_{capacity}"
+            # 容量の正規化: 1GB → 1TB
+            normalized_capacity = capacity
+            if capacity == "1GB":
+                normalized_capacity = "1TB"
+                logger.info(f"Normalized capacity from 1GB to 1TB for {series}")
+            
+            key = f"{series}_{normalized_capacity}"
             if key not in series_capacity_map:
                 series_capacity_map[key] = {
                     'series': series,
-                    'capacity': capacity,
+                    'capacity': normalized_capacity,
                     'kaitori_price_min': float('inf'),
                     'kaitori_price_max': 0,
                     'colors': {},
