@@ -45,7 +45,7 @@ def create_app():
     @app.route("/favicon.ico")
     def favicon():
         """
-        Serves the favicon.ico file from the static directory.
+        Serves the favicon.ico file from the assets directory.
         
         Returns:
             The favicon.ico file with the appropriate MIME type, or an empty response with
@@ -53,7 +53,7 @@ def create_app():
         """
         try:
             return send_from_directory(
-                os.path.join(app.root_path, "static"),
+                os.path.join(app.root_path, "assets"),
                 "favicon.ico",
                 mimetype="image/vnd.microsoft.icon"
             )
