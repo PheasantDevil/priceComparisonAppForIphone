@@ -9,7 +9,7 @@
 ### 本番環境 (main ブランチ)
 
 - **自動デプロイ**: main ブランチへのプッシュ時に自動デプロイ
-- **設定ファイル**: `deploy/render.yaml`
+- **設定ファイル**: `render.yaml` (ルートディレクトリ)
 - **サービス名**: `price-comparison-app`
 
 ## 必要な環境変数
@@ -92,6 +92,7 @@
    - 解決策: 動的インストール方式を採用
    - アプリケーション起動時に必要に応じてブラウザをインストール
    - `/scrape-prices`エンドポイントでスクレイピング実行時に自動インストール
+   - ブラウザインストールは非 root ユーザーで実行
 
 2. **GCP 認証エラー**
 
@@ -99,7 +100,11 @@
    - JSON ファイルの内容が正しくコピーされているか確認
 
 3. **メモリ不足エラー**
+
    - 解決策: `startCommand`のワーカー数を 1 に減らし、`--preload`オプションを使用
+
+4. **Build Command エラー**
+   - 解決策: 複数行のコマンドを`&&`で連結して 1 行にまとめる
 
 ### ログの確認方法
 
@@ -145,3 +150,19 @@ curl -X POST https://your-app.onrender.com/scrape-prices
 ### 自動スクレイピング
 
 GitHub Actions を使用して定期的にスクレイピングを実行する場合は、`.github/workflows/scrape_prices.yml`を参照してください。
+
+## 設定ファイル
+
+### render.yaml
+
+ルートディレクトリの`render.yaml`ファイルで以下の設定を行っています：
+
+- **Build Command**: `pip install -r requirements.txt && pip install playwright`
+- **Start Command**: `gunicorn app:app --workers 1 --bind 0.0.0.0:$PORT --timeout 120 --preload`
+- **環境変数**: Playwright 関連の設定を含む
+
+### 重要な設定
+
+- `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`: ビルド時のブラウザダウンロードをスキップ
+- `PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright`: ブラウザのキャッシュパス
+- ワーカー数 1 と`--preload`オプションでメモリ使用量を最適化
