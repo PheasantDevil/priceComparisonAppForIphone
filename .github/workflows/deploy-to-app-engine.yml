@@ -58,6 +58,11 @@ jobs:
       with:
         project_id: ${{ secrets.GCP_PROJECT_ID }}
 
+    - name: Configure gcloud
+      run: |
+        gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+        gcloud auth list
+
     - name: Enable App Engine API
       run: gcloud services enable appengine.googleapis.com
 
