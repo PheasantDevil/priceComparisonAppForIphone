@@ -1,7 +1,6 @@
 --only-binary :all: Cython==3.1.1
 boto3==1.38.38
 requests==2.32.4
-playwright==1.52.0
 pytest==8.4.1
 pytest-asyncio==0.26.0
 pytest-cov==6.2.1
