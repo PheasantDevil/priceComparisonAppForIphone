@@ -49,4 +49,4 @@ jobs:
             } catch (error) {
               console.log('PRコメントの投稿に失敗しました:', error.message);
               // エラーが発生してもデプロイは続行
-            }) 
+            } 
