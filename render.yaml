@@ -7,6 +7,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: APP_ENV
+        value: production
       - key: BUCKET_NAME
         value: price-comparison-app-data
       - key: CLOUD_RUN_ENDPOINT
