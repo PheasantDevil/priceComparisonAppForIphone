@@ -10,7 +10,6 @@ from google.cloud import storage
 from playwright.sync_api import sync_playwright
 
 from config import config
-from services.dynamodb_service import get_prices_by_series
 
 
 def create_app():

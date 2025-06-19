@@ -1,8 +1,0 @@
-environment               = "production"
-project                   = "iphone_price_tracker"
-alert_email               = "konishi.b0engineer@gmail.com"
-budget_notification_email = "konishi.b0engineer@gmail.com"
-aws_account_id            = "273354647319"
-vpc_id                    = "vpc-059f369ee085199f7"
-line_channel_access_token = "mi4hNJnN61OAfMHeqNoPgS7yl979kQWtuKTqKlqg4tuoi5C/hb1uzVCCiT7LQ5iTYN9Grx4tgAlItJ15wFUK8Z3nRi5zebSl9XTmoCC1VtZhAT/vpy09Dl+Y815eNcwIoZHsNSbcf57mZ5Rj6+emagdB04t89/1O/w1cDnyilFU="
-line_notify_token         = "0Gtx0g/muPh9vdELL0wgYqOCXNxh2q+b0UHX12NKuhQwadStPGhvLpKcOwldwf49YN9Grx4tgAlItJ15wFUK8Z3nRi5zebSl9XTmoCC1Vtbj/xTFBqNlSzIwTM9f5UeWTqacxhemtAsJQuUDqdLuuQdB04t89/1O/w1cDnyilFU="
