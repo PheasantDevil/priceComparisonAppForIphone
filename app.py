@@ -9,6 +9,27 @@ from datetime import datetime
 import requests
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from google.cloud import storage
+from google.oauth2 import service_account
+
+# Google Cloud認証情報を環境変数から設定
+try:
+    # 環境変数から認証情報を取得
+    credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+    if credentials_json:
+        try:
+            credentials_info = json.loads(credentials_json)
+            credentials = service_account.Credentials.from_service_account_info(credentials_info)
+            storage_client = storage.Client(credentials=credentials)
+            print("✅ Google Cloud Storage client initialized with service account")
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"Warning: Failed to parse credentials JSON: {e}")
+            storage_client = None
+    else:
+        print("Warning: GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable not set")
+        storage_client = None
+except ImportError as e:
+    print(f"Warning: Could not import Google Cloud Storage: {e}")
+    storage_client = None
 
 # configモジュールのインポートを試行
 try:
@@ -90,8 +111,16 @@ def create_app():
     )
 
     # Cloud Storageクライアントの初期化
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(os.getenv('BUCKET_NAME', 'price-comparison-app-data'))
+    bucket = None
+    if storage_client:
+        try:
+            bucket = storage_client.bucket(os.getenv('BUCKET_NAME', 'price-comparison-app-data'))
+            app.logger.info("Google Cloud Storage client initialized successfully")
+        except Exception as e:
+            app.logger.error(f"Failed to initialize Google Cloud Storage: {e}")
+            bucket = None
+    else:
+        app.logger.warning("Google Cloud Storage client not available")
 
     # Cloud Runのエンドポイント
     API_ENDPOINT = os.getenv('CLOUD_RUN_ENDPOINT', 'https://us-central1-price-comparison-app-463007.cloudfunctions.net/get-prices')
@@ -128,6 +157,9 @@ def create_app():
     def scrape_prices():
         """価格スクレイピングを実行するエンドポイント"""
         try:
+            if not bucket:
+                return jsonify({'error': 'Cloud Storage not available'}), 500
+                
             # Playwrightのブラウザがインストールされているかチェック
             if not os.path.exists('/opt/render/.cache/ms-playwright'):
                 app.logger.info("Playwright browser not found, installing...")
@@ -171,6 +203,9 @@ def create_app():
     @app.route('/set-alert', methods=['POST'])
     def set_alert():
         try:
+            if not bucket:
+                return jsonify({'error': 'Cloud Storage not available'}), 500
+                
             data = request.get_json()
             threshold = data.get('threshold')
             
@@ -203,6 +238,9 @@ def create_app():
         Returns a completion message or an error response.
         """
         try:
+            if not bucket:
+                return jsonify({'error': 'Cloud Storage not available'}), 500
+                
             # 価格データを取得
             current_date = datetime.now().strftime('%Y/%m/%d')
             prices_blob = bucket.blob(f'prices/{current_date}/prices.json')
@@ -268,8 +306,9 @@ def create_app():
             or an error message with HTTP status 500 on failure.
         """
         try:
-            storage_client = storage.Client()
-            bucket = storage_client.bucket(os.getenv('BUCKET_NAME', 'price-comparison-app-data'))
+            if not bucket:
+                return jsonify({'error': 'Cloud Storage not available'}), 500
+                
             current_date = datetime.now().strftime('%Y/%m/%d')
             kaitori_blob = bucket.blob(f'prices/{current_date}/prices.json')
             kaitori_data = json.loads(kaitori_blob.download_as_string())
