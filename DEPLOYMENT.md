@@ -18,14 +18,43 @@
 
 #### 必須
 
-- `AWS_ACCESS_KEY_ID`: AWS アクセスキー
-- `AWS_SECRET_ACCESS_KEY`: AWS シークレットキー
 - `GOOGLE_APPLICATION_CREDENTIALS`: GCP 認証情報の JSON ファイル内容
 
 #### オプション
 
 - `LINE_CHANNEL_ACCESS_TOKEN`: LINE 通知用トークン
 - `LINE_CHANNEL_SECRET`: LINE 通知用シークレット
+
+### GCP 認証情報の取得方法
+
+1. **Google Cloud Console にアクセス**
+
+   - https://console.cloud.google.com/
+
+2. **サービスアカウントの作成**
+
+   - IAM と管理 → サービスアカウント
+   - 「サービスアカウントを作成」をクリック
+   - 名前: `price-comparison-app-render`
+   - 説明: `Render.com deployment service account`
+
+3. **必要な権限を付与**
+
+   - Cloud Storage 管理者 (`roles/storage.admin`)
+   - または、より制限的な権限:
+     - Storage オブジェクト管理者 (`roles/storage.objectAdmin`)
+     - Storage オブジェクト閲覧者 (`roles/storage.objectViewer`)
+
+4. **キーの作成**
+
+   - 作成したサービスアカウントをクリック
+   - 「キー」タブ → 「鍵を追加」→ 「新しい鍵を作成」
+   - JSON 形式を選択
+   - ダウンロードされた JSON ファイルの内容をコピー
+
+5. **Render.com で環境変数として設定**
+   - キー: `GOOGLE_APPLICATION_CREDENTIALS`
+   - 値: ダウンロードした JSON ファイルの内容（全体）
 
 ## GitHub Secrets 設定
 
@@ -70,6 +99,7 @@
 2. **GCP 認証エラー**
 
    - 解決策: 環境変数`GOOGLE_APPLICATION_CREDENTIALS`を正しく設定
+   - JSON ファイルの内容が正しくコピーされているか確認
 
 3. **メモリ不足エラー**
    - 解決策: `startCommand`のワーカー数を 1 に減らす
