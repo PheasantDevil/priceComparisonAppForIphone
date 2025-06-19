@@ -9,7 +9,7 @@
 ### 本番環境 (main ブランチ)
 
 - **自動デプロイ**: main ブランチへのプッシュ時に自動デプロイ
-- **設定ファイル**: `render.yaml`
+- **設定ファイル**: `deploy/render.yaml`
 - **サービス名**: `price-comparison-app`
 
 ## 必要な環境変数
@@ -89,7 +89,9 @@
 
 1. **Playwright のインストールエラー**
 
-   - 解決策: `buildCommand`で`playwright install chromium`を実行
+   - 解決策: 動的インストール方式を採用
+   - アプリケーション起動時に必要に応じてブラウザをインストール
+   - `/scrape-prices`エンドポイントでスクレイピング実行時に自動インストール
 
 2. **GCP 認証エラー**
 
@@ -97,7 +99,7 @@
    - JSON ファイルの内容が正しくコピーされているか確認
 
 3. **メモリ不足エラー**
-   - 解決策: `startCommand`のワーカー数を 1 に減らす
+   - 解決策: `startCommand`のワーカー数を 1 に減らし、`--preload`オプションを使用
 
 ### ログの確認方法
 
@@ -112,6 +114,7 @@
 pip install -r requirements.txt
 
 # Playwrightのインストール
+pip install playwright
 playwright install chromium
 
 # アプリケーションの起動
@@ -121,3 +124,24 @@ python app.py
 ### 環境変数の設定
 
 `.env`ファイルを作成して必要な環境変数を設定してください。
+
+## 価格スクレイピング
+
+### スクレイピングの実行
+
+価格スクレイピングは以下のエンドポイントで実行できます：
+
+```bash
+curl -X POST https://your-app.onrender.com/scrape-prices
+```
+
+このエンドポイントは：
+
+1. Playwright ブラウザの存在をチェック
+2. 必要に応じてブラウザをインストール
+3. 価格スクレイピングを実行
+4. 結果を Cloud Storage に保存
+
+### 自動スクレイピング
+
+GitHub Actions を使用して定期的にスクレイピングを実行する場合は、`.github/workflows/scrape_prices.yml`を参照してください。
