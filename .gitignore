@@ -378,3 +378,5 @@ yarn-error.log*
 key.json
 *.json.key
 credentials/
+
+secrets

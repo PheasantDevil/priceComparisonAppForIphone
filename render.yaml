@@ -13,8 +13,8 @@ services:
         value: price-comparison-app-data
       - key: CLOUD_RUN_ENDPOINT
         value: https://us-central1-price-comparison-app-463007.cloudfunctions.net/get-prices
-      - key: GOOGLE_APPLICATION_CREDENTIALS
-        value: /opt/render/project/src/config/gcp/key.json
+      - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+        sync: false
       - key: PLAYWRIGHT_BROWSERS_PATH
         value: /opt/render/.cache/ms-playwright
       - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
