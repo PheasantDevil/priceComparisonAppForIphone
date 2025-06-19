@@ -18,16 +18,27 @@ def install_playwright_browser():
     """Playwrightのブラウザをインストールする"""
     try:
         app.logger.info("Installing Playwright browser...")
+        
+        # 環境変数を設定
+        env = os.environ.copy()
+        env['PLAYWRIGHT_BROWSERS_PATH'] = '/opt/render/.cache/ms-playwright'
+        env['PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD'] = '0'
+        
+        # ブラウザインストールを実行
         result = subprocess.run([
             sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"
-        ], capture_output=True, text=True, timeout=300)
+        ], capture_output=True, text=True, timeout=600, env=env)
         
         if result.returncode == 0:
             app.logger.info("Playwright browser installed successfully")
             return True
         else:
             app.logger.error(f"Failed to install Playwright browser: {result.stderr}")
+            app.logger.error(f"Return code: {result.returncode}")
             return False
+    except subprocess.TimeoutExpired:
+        app.logger.error("Playwright browser installation timed out")
+        return False
     except Exception as e:
         app.logger.error(f"Error installing Playwright browser: {str(e)}")
         return False
@@ -292,113 +303,129 @@ def price_text_to_int(price_text):
 
 def get_kaitori_prices():
     """買取価格データをスクレイピングで取得"""
-    all_product_details = {
-        "iPhone 16": {},
-        "iPhone 16 Plus": {},
-        "iPhone 16 Pro": {},
-        "iPhone 16 Pro Max": {},
-        "iPhone 16e": {},
-    }
+    try:
+        all_product_details = {
+            "iPhone 16": {},
+            "iPhone 16 Plus": {},
+            "iPhone 16 Pro": {},
+            "iPhone 16 Pro Max": {},
+            "iPhone 16e": {},
+        }
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(chromium_sandbox=False)
-        page = browser.new_page()
+        with sync_playwright() as p:
+            # ブラウザの起動オプションを設定
+            browser = p.chromium.launch(
+                chromium_sandbox=False,
+                args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+            )
+            page = browser.new_page()
 
-        for url in config.scraper.KAITORI_RUDEA_URLS:
-            try:
-                page.goto(url)
-                page.wait_for_load_state("networkidle")
-                app.logger.info(f"Scraping URL: {url}")
+            for url in config.scraper.KAITORI_RUDEA_URLS:
+                try:
+                    page.goto(url, timeout=30000)
+                    page.wait_for_load_state("networkidle", timeout=30000)
+                    app.logger.info(f"Scraping URL: {url}")
 
-                items = page.query_selector_all(".tr")
-                app.logger.info(f"Found {len(items)} items on page")
+                    items = page.query_selector_all(".tr")
+                    app.logger.info(f"Found {len(items)} items on page")
 
-                for item in items:
-                    try:
-                        model_element = item.query_selector(".ttl h2")
-                        model_name = model_element.inner_text().strip() if model_element else ""
-                        app.logger.debug(f"Processing model: {model_name}")
+                    for item in items:
+                        try:
+                            model_element = item.query_selector(".ttl h2")
+                            model_name = model_element.inner_text().strip() if model_element else ""
+                            app.logger.debug(f"Processing model: {model_name}")
 
-                        # モデル名からシリーズを判定
-                        if "Pro Max" in model_name:
-                            series = "iPhone 16 Pro Max"
-                        elif "Pro" in model_name:
-                            series = "iPhone 16 Pro"
-                        elif "Plus" in model_name:
-                            series = "iPhone 16 Plus"
-                        elif "16e" in model_name or "16 e" in model_name:
-                            series = "iPhone 16e"
-                        elif "16" in model_name:
-                            series = "iPhone 16"
-                        else:
-                            app.logger.debug(f"Skipping unknown model: {model_name}")
-                            continue
+                            # モデル名からシリーズを判定
+                            if "Pro Max" in model_name:
+                                series = "iPhone 16 Pro Max"
+                            elif "Pro" in model_name:
+                                series = "iPhone 16 Pro"
+                            elif "Plus" in model_name:
+                                series = "iPhone 16 Plus"
+                            elif "16e" in model_name or "16 e" in model_name:
+                                series = "iPhone 16e"
+                            elif "16" in model_name:
+                                series = "iPhone 16"
+                            else:
+                                app.logger.debug(f"Skipping unknown model: {model_name}")
+                                continue
 
-                        # 容量を抽出（例: "128GB" または "1TB"）
-                        capacity_match = re.search(r"(\d+)(GB|TB)", model_name)
-                        if not capacity_match:
-                            app.logger.debug(f"No capacity found in model: {model_name}")
-                            continue
-                        
-                        # 容量の正規化
-                        capacity_value = int(capacity_match.group(1))
-                        capacity_unit = capacity_match.group(2)
-                        if capacity_unit == "TB":
-                            capacity = f"{capacity_value}TB"
-                        else:
-                            capacity = f"{capacity_value}GB"
+                            # 容量を抽出（例: "128GB" または "1TB"）
+                            capacity_match = re.search(r"(\d+)(GB|TB)", model_name)
+                            if not capacity_match:
+                                app.logger.debug(f"No capacity found in model: {model_name}")
+                                continue
+                            
+                            # 容量の正規化
+                            capacity_value = int(capacity_match.group(1))
+                            capacity_unit = capacity_match.group(2)
+                            if capacity_unit == "TB":
+                                capacity = f"{capacity_value}TB"
+                            else:
+                                capacity = f"{capacity_value}GB"
 
-                        price_element = item.query_selector(".td.td2 .td2wrap")
-                        price_text = price_element.inner_text().strip() if price_element else ""
+                            price_element = item.query_selector(".td.td2 .td2wrap")
+                            price_text = price_element.inner_text().strip() if price_element else ""
 
-                        if model_name and price_text and "円" in price_text:
-                            # カラーを抽出
-                            color_match = re.search(r"(黒|白|桃|緑|青|金|灰)", model_name)
-                            color = color_match.group(1) if color_match else "不明"
+                            if model_name and price_text and "円" in price_text:
+                                # カラーを抽出
+                                color_match = re.search(r"(黒|白|桃|緑|青|金|灰)", model_name)
+                                color = color_match.group(1) if color_match else "不明"
 
-                            # 容量ごとのデータを初期化・更新
-                            if capacity not in all_product_details[series]:
-                                all_product_details[series][capacity] = {
-                                    "colors": {},
-                                    "kaitori_price_min": None,
-                                    "kaitori_price_max": None,
+                                # 容量ごとのデータを初期化・更新
+                                if capacity not in all_product_details[series]:
+                                    all_product_details[series][capacity] = {
+                                        "colors": {},
+                                        "kaitori_price_min": None,
+                                        "kaitori_price_max": None,
+                                    }
+
+                                # 色ごとの価格を保存
+                                price_value = price_text_to_int(price_text)
+                                all_product_details[series][capacity]["colors"][color] = {
+                                    "price_text": price_text,
+                                    "price_value": price_value,
                                 }
 
-                            # 色ごとの価格を保存
-                            price_value = price_text_to_int(price_text)
-                            all_product_details[series][capacity]["colors"][color] = {
-                                "price_text": price_text,
-                                "price_value": price_value,
-                            }
+                                # 最小・最大価格を更新
+                                current_min = all_product_details[series][capacity]["kaitori_price_min"]
+                                current_max = all_product_details[series][capacity]["kaitori_price_max"]
 
-                            # 最小・最大価格を更新
-                            current_min = all_product_details[series][capacity]["kaitori_price_min"]
-                            current_max = all_product_details[series][capacity]["kaitori_price_max"]
+                                if current_min is None or price_value < current_min:
+                                    all_product_details[series][capacity]["kaitori_price_min"] = price_value
+                                if current_max is None or price_value > current_max:
+                                    all_product_details[series][capacity]["kaitori_price_max"] = price_value
 
-                            if current_min is None or price_value < current_min:
-                                all_product_details[series][capacity]["kaitori_price_min"] = price_value
-                            if current_max is None or price_value > current_max:
-                                all_product_details[series][capacity]["kaitori_price_max"] = price_value
+                                app.logger.debug(f"Added price data for {series} {capacity} {color}: {price_value}円")
 
-                            app.logger.debug(f"Added price data for {series} {capacity} {color}: {price_value}円")
+                        except Exception as e:
+                            app.logger.error(f"Error processing item: {str(e)}")
+                            continue
 
-                    except Exception as e:
-                        app.logger.error(f"Error processing item: {str(e)}")
-                        continue
+                except Exception as e:
+                    app.logger.error(f"Error processing URL {url}: {str(e)}")
+                    continue
 
-            except Exception as e:
-                app.logger.error(f"Error processing URL {url}: {str(e)}")
-                continue
+            browser.close()
 
-        browser.close()
+        # 結果のログ出力
+        for series, capacities in all_product_details.items():
+            app.logger.info(f"Scraped data for {series}:")
+            for capacity, data in capacities.items():
+                app.logger.info(f"  {capacity}: min={data['kaitori_price_min']}, max={data['kaitori_price_max']}")
 
-    # 結果のログ出力
-    for series, capacities in all_product_details.items():
-        app.logger.info(f"Scraped data for {series}:")
-        for capacity, data in capacities.items():
-            app.logger.info(f"  {capacity}: min={data['kaitori_price_min']}, max={data['kaitori_price_max']}")
-
-    return all_product_details
+        return all_product_details
+        
+    except Exception as e:
+        app.logger.error(f"Error in get_kaitori_prices: {str(e)}")
+        # エラーが発生した場合は空のデータを返す
+        return {
+            "iPhone 16": {},
+            "iPhone 16 Plus": {},
+            "iPhone 16 Pro": {},
+            "iPhone 16 Pro Max": {},
+            "iPhone 16e": {},
+        }
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
