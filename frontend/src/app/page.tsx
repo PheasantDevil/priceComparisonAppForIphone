@@ -5,16 +5,29 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LoadingState } from '../components/LoadingState';
 import { ModelSelector } from '../components/ModelSelector';
 import { PriceComparisonTable } from '../components/PriceComparisonTable';
+import PriceHistoryChart from '../components/PriceHistoryChart';
 import { clearCache, fetchPrices, PricesResponse } from '../lib/api';
 
-const SERIES = ['iPhone 16', 'iPhone 16 Pro', 'iPhone 16 Plus', 'iPhone 16 Pro Max', 'iPhone 16 e'];
+const SERIES = [
+  'iPhone 16',
+  'iPhone 16 Pro',
+  'iPhone 16 Plus',
+  'iPhone 16 Pro Max',
+  'iPhone 16 e',
+];
 const STORAGE_KEY = 'selected_iphone_models';
+const RAKUTEN_COLUMNS_STORAGE_KEY = 'show_rakuten_columns';
 
 export default function Home() {
   const [selectedSeries, setSelectedSeries] = useState<string[]>([]);
   const [data, setData] = useState<Record<string, PricesResponse>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [showPriceHistory, setShowPriceHistory] = useState(false);
+  const [selectedHistorySeries, setSelectedHistorySeries] =
+    useState('iPhone 16 Pro');
+  const [selectedHistoryCapacity, setSelectedHistoryCapacity] = useState('1TB');
+  const [showRakutenColumns, setShowRakutenColumns] = useState(false);
 
   // ローカルストレージから選択状態を読み込む
   useEffect(() => {
@@ -26,8 +39,16 @@ export default function Home() {
           setSelectedSeries(parsed);
         }
       }
+
+      // 楽天錬金列の表示状態を読み込む
+      const savedRakutenColumns = localStorage.getItem(
+        RAKUTEN_COLUMNS_STORAGE_KEY
+      );
+      if (savedRakutenColumns) {
+        setShowRakutenColumns(JSON.parse(savedRakutenColumns));
+      }
     } catch (error) {
-      console.error('Failed to load saved series:', error);
+      console.error('Failed to load saved settings:', error);
       alert('設定の読み込みに失敗しました。デフォルト設定を使用します。');
     }
   }, []);
@@ -41,6 +62,19 @@ export default function Home() {
       alert('選択状態の保存に失敗しました。');
     }
   }, [selectedSeries]);
+
+  // 楽天錬金列の表示状態をローカルストレージに保存
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        RAKUTEN_COLUMNS_STORAGE_KEY,
+        JSON.stringify(showRakutenColumns)
+      );
+    } catch (error) {
+      console.error('Failed to save rakuten columns setting:', error);
+      alert('楽天錬金列の設定保存に失敗しました。');
+    }
+  }, [showRakutenColumns]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -105,9 +139,103 @@ export default function Home() {
         data={data}
         selectedSeries={selectedSeries}
         loading={loading}
+        showRakutenColumns={showRakutenColumns}
       />
     ),
-    [data, selectedSeries, loading]
+    [data, selectedSeries, loading, showRakutenColumns]
+  );
+
+  const priceHistorySection = useMemo(
+    () => (
+      <div className='mt-8 bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700'>
+        <div className='flex items-center justify-between mb-6'>
+          <h2 className='text-xl font-bold'>価格推移グラフ</h2>
+          <button
+            onClick={() => setShowPriceHistory(!showPriceHistory)}
+            className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500'
+          >
+            {showPriceHistory ? 'グラフを隠す' : 'グラフを表示'}
+          </button>
+        </div>
+
+        {showPriceHistory && (
+          <div className='space-y-6'>
+            {/* グラフ設定 */}
+            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+              <div>
+                <label className='block text-sm font-medium text-gray-700 mb-2'>
+                  シリーズ
+                </label>
+                <select
+                  value={selectedHistorySeries}
+                  onChange={e => setSelectedHistorySeries(e.target.value)}
+                  className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                >
+                  {SERIES.map(series => (
+                    <option key={series} value={series}>
+                      {series}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className='block text-sm font-medium text-gray-700 mb-2'>
+                  容量
+                </label>
+                <select
+                  value={selectedHistoryCapacity}
+                  onChange={e => setSelectedHistoryCapacity(e.target.value)}
+                  className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                >
+                  <option value='128GB'>128GB</option>
+                  <option value='256GB'>256GB</option>
+                  <option value='512GB'>512GB</option>
+                  <option value='1TB'>1TB</option>
+                </select>
+              </div>
+
+              <div className='flex items-end'>
+                <div className='text-sm text-gray-600'>
+                  過去14日間の価格推移を表示
+                </div>
+              </div>
+            </div>
+
+            {/* グラフ表示 */}
+            <div className='bg-gray-50 dark:bg-gray-700 rounded-lg p-4'>
+              <PriceHistoryChart
+                series={selectedHistorySeries}
+                capacity={selectedHistoryCapacity}
+                days={14}
+                height={400}
+                className='w-full'
+              />
+            </div>
+
+            {/* 説明 */}
+            <div className='bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4'>
+              <h3 className='text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2'>
+                グラフの見方
+              </h3>
+              <ul className='text-sm text-blue-800 dark:text-blue-200 space-y-1'>
+                <li>
+                  • <strong>平均価格（緑）</strong>: その日の平均買取価格
+                </li>
+                <li>
+                  • <strong>最高価格（オレンジ）</strong>: その日の最高買取価格
+                </li>
+                <li>
+                  • <strong>最低価格（赤）</strong>: その日の最低買取価格
+                </li>
+                <li>• データは毎日午前9時に自動更新されます</li>
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
+    ),
+    [showPriceHistory, selectedHistorySeries, selectedHistoryCapacity]
   );
 
   return (
@@ -119,6 +247,22 @@ export default function Home() {
           </h1>
 
           <div className='space-y-4 mb-6'>{modelSelector}</div>
+
+          {/* 楽天錬金列の表示/非表示切り替え */}
+          <div className='mb-6'>
+            <label className='inline-flex items-center space-x-2 cursor-pointer'>
+              <input
+                type='checkbox'
+                checked={showRakutenColumns}
+                onChange={() => setShowRakutenColumns(!showRakutenColumns)}
+                className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+                aria-label='楽天錬金列を表示'
+              />
+              <span className='text-sm font-medium text-gray-700'>
+                楽天錬金列を表示（楽天錬金時差額・楽天錬金差額率）
+              </span>
+            </label>
+          </div>
 
           {loading ? (
             <LoadingState />
@@ -133,6 +277,9 @@ export default function Home() {
             priceTable
           )}
         </div>
+
+        {/* 価格推移グラフセクション */}
+        {priceHistorySection}
       </div>
     </ErrorBoundary>
   );
