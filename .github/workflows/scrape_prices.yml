@@ -65,9 +65,16 @@ jobs:
         run: |
           python scripts/sync_cloud_storage_to_firestore.py
 
+      - name: Cleanup old Cloud Storage files
+        id: cleanup
+        continue-on-error: true  # エラーが発生しても続行
+        run: |
+          python scripts/cleanup_cloud_storage.py
+
       - name: Send error notification
-        if: steps.scrape.outcome == 'failure' || steps.sync.outcome == 'failure'
+        if: steps.scrape.outcome == 'failure' || steps.sync.outcome == 'failure' || steps.cleanup.outcome == 'failure'
         run: |
           echo "Scrape step outcome: ${{ steps.scrape.outcome }}"
           echo "Sync step outcome: ${{ steps.sync.outcome }}"
+          echo "Cleanup step outcome: ${{ steps.cleanup.outcome }}"
           # 必要に応じて通知処理を追加 
