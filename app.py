@@ -65,6 +65,11 @@ def create_app():
     def index():
         return render_template('index.html')
 
+    @app.route('/health')
+    def health_check():
+        """ヘルスチェックエンドポイント"""
+        return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()}), 200
+
     @app.route('/set-alert', methods=['POST'])
     def set_alert():
         try:
