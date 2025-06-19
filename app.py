@@ -9,9 +9,31 @@ from datetime import datetime
 import requests
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from google.cloud import storage
-from playwright.sync_api import sync_playwright
 
-from config import config
+# configモジュールのインポートを試行
+try:
+    from config import config
+except ImportError as e:
+    print(f"Warning: Could not import config module: {e}")
+    # フォールバック設定
+    class FallbackConfig:
+        class scraper:
+            KAITORI_RUDEA_URLS = [
+                "https://kaitori-rudeya.com/category/detail/183",
+                "https://kaitori-rudeya.com/category/detail/184",
+                "https://kaitori-rudeya.com/category/detail/185",
+                "https://kaitori-rudeya.com/category/detail/186",
+                "https://kaitori-rudeya.com/category/detail/205"
+            ]
+            REQUEST_TIMEOUT = 60
+        class app:
+            DEBUG = False
+            SECRET_KEY = os.getenv('SECRET_KEY', 'default-secret-key-for-production')
+            LOG_LEVEL = 'INFO'
+    
+    config = FallbackConfig()
+
+from playwright.sync_api import sync_playwright
 
 
 def install_playwright_browser():
