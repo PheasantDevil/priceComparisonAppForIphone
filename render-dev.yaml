@@ -1,12 +1,12 @@
 services:
   - type: web
-    name: price-comparison-app
+    name: price-comparison-app-dev
     runtime: python
     buildCommand: |
       pip install -r requirements.txt
       playwright install chromium
     startCommand: |
-      gunicorn app:app --workers 2 --bind 0.0.0.0:$PORT --timeout 120
+      gunicorn app:app --workers 1 --bind 0.0.0.0:$PORT --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -17,7 +17,7 @@ services:
       - key: AWS_REGION
         value: ap-northeast-1
       - key: BUCKET_NAME
-        value: price-comparison-app-data
+        value: price-comparison-app-data-dev
       - key: CLOUD_RUN_ENDPOINT
         value: https://us-central1-price-comparison-app-463007.cloudfunctions.net/get-prices
       - key: GOOGLE_APPLICATION_CREDENTIALS
@@ -25,5 +25,5 @@ services:
       - key: PLAYWRIGHT_BROWSERS_PATH
         value: /opt/render/.cache/ms-playwright
     healthCheckPath: /health
-    autoDeploy: false
-    branch: main
+    autoDeploy: true
+    branch: develop
