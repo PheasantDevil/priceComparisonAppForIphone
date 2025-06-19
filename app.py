@@ -2,6 +2,8 @@ import json
 import logging
 import os
 import re
+import subprocess
+import sys
 from datetime import datetime
 
 import requests
@@ -10,6 +12,25 @@ from google.cloud import storage
 from playwright.sync_api import sync_playwright
 
 from config import config
+
+
+def install_playwright_browser():
+    """Playwrightのブラウザをインストールする"""
+    try:
+        app.logger.info("Installing Playwright browser...")
+        result = subprocess.run([
+            sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"
+        ], capture_output=True, text=True, timeout=300)
+        
+        if result.returncode == 0:
+            app.logger.info("Playwright browser installed successfully")
+            return True
+        else:
+            app.logger.error(f"Failed to install Playwright browser: {result.stderr}")
+            return False
+    except Exception as e:
+        app.logger.error(f"Error installing Playwright browser: {str(e)}")
+        return False
 
 
 def create_app():
@@ -69,6 +90,50 @@ def create_app():
     def health_check():
         """ヘルスチェックエンドポイント"""
         return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()}), 200
+
+    @app.route('/scrape-prices', methods=['POST'])
+    def scrape_prices():
+        """価格スクレイピングを実行するエンドポイント"""
+        try:
+            # Playwrightのブラウザがインストールされているかチェック
+            if not os.path.exists('/opt/render/.cache/ms-playwright'):
+                app.logger.info("Playwright browser not found, installing...")
+                if not install_playwright_browser():
+                    return jsonify({'error': 'Playwright browser installation failed'}), 500
+
+            # 価格スクレイピングを実行
+            prices_data = get_kaitori_prices()
+            
+            # 結果をCloud Storageに保存
+            current_date = datetime.now().strftime('%Y/%m/%d')
+            prices_blob = bucket.blob(f'prices/{current_date}/prices.json')
+            
+            # データ形式を変換
+            formatted_data = []
+            for series, capacities in prices_data.items():
+                for capacity, data in capacities.items():
+                    if data.get('kaitori_price_min') is not None:
+                        formatted_data.append({
+                            'series': series,
+                            'capacity': capacity,
+                            'kaitori_price_min': data['kaitori_price_min'],
+                            'kaitori_price_max': data['kaitori_price_max'],
+                            'colors': data['colors']
+                        })
+            
+            prices_blob.upload_from_string(
+                json.dumps(formatted_data, ensure_ascii=False, indent=2),
+                content_type='application/json'
+            )
+            
+            return jsonify({
+                'message': '価格スクレイピングが完了しました',
+                'scraped_items': len(formatted_data)
+            }), 200
+            
+        except Exception as e:
+            app.logger.error(f"Scraping error: {str(e)}")
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/set-alert', methods=['POST'])
     def set_alert():
