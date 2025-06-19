@@ -1,7 +1,7 @@
 import { ComponentType, Suspense, lazy } from 'react';
 
 type LazyLoadProps = {
-  component: () => Promise<{ default: ComponentType<any> }>;
+  component: () => Promise<{ default: ComponentType<Record<string, unknown>> }>;
   fallback?: React.ReactNode;
 };
 

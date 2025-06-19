@@ -1,0 +1,210 @@
+[
+  {
+    "kaitori_price_max": 100300,
+    "kaitori_price_min": 100300,
+    "capacity": "256GB",
+    "series": "iPhone 16 e",
+    "colors": {
+      "黒": 100300,
+      "白": 100300
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 231600,
+    "kaitori_price_min": 230600,
+    "capacity": "1TB",
+    "series": "iPhone 16 Pro Max",
+    "colors": {
+      "黒": 231600,
+      "灰": 231600,
+      "白": 231600,
+      "金": 230600
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 87600,
+    "kaitori_price_min": 87600,
+    "capacity": "128GB",
+    "series": "iPhone 16 e",
+    "colors": {
+      "黒": 87600,
+      "白": 87600
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 189200,
+    "kaitori_price_min": 189200,
+    "capacity": "512GB",
+    "series": "iPhone 16 Pro",
+    "colors": {
+      "黒": 189200,
+      "灰": 189200,
+      "白": 189200,
+      "金": 189200
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 174700,
+    "kaitori_price_min": 174700,
+    "capacity": "256GB",
+    "series": "iPhone 16 Pro Max",
+    "colors": {
+      "黒": 174700,
+      "灰": 174700,
+      "白": 174700,
+      "金": 174700
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 135600,
+    "kaitori_price_min": 135600,
+    "capacity": "256GB",
+    "series": "iPhone 16 Plus",
+    "colors": {
+      "緑": 135600,
+      "黒": 135600,
+      "白": 135600,
+      "桃": 135600,
+      "青": 135600
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 145600,
+    "kaitori_price_min": 145600,
+    "capacity": "512GB",
+    "series": "iPhone 16 Plus",
+    "colors": {
+      "緑": 145600,
+      "黒": 145600,
+      "白": 145600,
+      "桃": 145600,
+      "青": 145600
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 121600,
+    "kaitori_price_min": 121600,
+    "capacity": "256GB",
+    "series": "iPhone 16",
+    "colors": {
+      "緑": 121600,
+      "黒": 121600,
+      "白": 121600,
+      "桃": 121600,
+      "青": 121600
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 145200,
+    "kaitori_price_min": 145200,
+    "capacity": "128GB",
+    "series": "iPhone 16 Pro",
+    "colors": {
+      "黒": 145200,
+      "灰": 145200,
+      "白": 145200,
+      "金": 145200
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 128600,
+    "kaitori_price_min": 128600,
+    "capacity": "512GB",
+    "series": "iPhone 16",
+    "colors": {
+      "緑": 128600,
+      "黒": 128600,
+      "白": 128600,
+      "桃": 128600,
+      "青": 128600
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 109300,
+    "kaitori_price_min": 109300,
+    "capacity": "512GB",
+    "series": "iPhone 16 e",
+    "colors": {
+      "黒": 109300,
+      "白": 109300
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 109000,
+    "kaitori_price_min": 109000,
+    "capacity": "128GB",
+    "series": "iPhone 16",
+    "colors": {
+      "緑": 109000,
+      "黒": 109000,
+      "白": 109000,
+      "桃": 109000,
+      "青": 109000
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 223200,
+    "kaitori_price_min": 223200,
+    "capacity": "1TB",
+    "series": "iPhone 16 Pro",
+    "colors": {
+      "黒": 223200,
+      "灰": 223200,
+      "白": 223200,
+      "金": 223200
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 120100,
+    "kaitori_price_min": 120100,
+    "capacity": "128GB",
+    "series": "iPhone 16 Plus",
+    "colors": {
+      "緑": 120100,
+      "黒": 120100,
+      "白": 120100,
+      "桃": 120100,
+      "青": 120100
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 161700,
+    "kaitori_price_min": 161700,
+    "capacity": "256GB",
+    "series": "iPhone 16 Pro",
+    "colors": {
+      "黒": 161700,
+      "灰": 161700,
+      "白": 161700,
+      "金": 161700
+    },
+    "source": "kaitori-rudea"
+  },
+  {
+    "kaitori_price_max": 204700,
+    "kaitori_price_min": 204700,
+    "capacity": "512GB",
+    "series": "iPhone 16 Pro Max",
+    "colors": {
+      "黒": 204700,
+      "灰": 204700,
+      "白": 204700,
+      "金": 204700
+    },
+    "source": "kaitori-rudea"
+  }
+]

@@ -1,1 +1,0 @@
-# This file makes the get_prices_lambda directory a Python package 
