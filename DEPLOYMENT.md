@@ -20,11 +20,6 @@
 
 - `GOOGLE_APPLICATION_CREDENTIALS`: GCP 認証情報の JSON ファイル内容
 
-#### オプション
-
-- `LINE_CHANNEL_ACCESS_TOKEN`: LINE 通知用トークン
-- `LINE_CHANNEL_SECRET`: LINE 通知用シークレット
-
 ### GCP 認証情報の取得方法
 
 1. **Google Cloud Console にアクセス**
