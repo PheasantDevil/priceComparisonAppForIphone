@@ -16,6 +16,7 @@ const SERIES = [
   'iPhone 16 e',
 ];
 const STORAGE_KEY = 'selected_iphone_models';
+const RAKUTEN_COLUMNS_STORAGE_KEY = 'show_rakuten_columns';
 
 export default function Home() {
   const [selectedSeries, setSelectedSeries] = useState<string[]>([]);
@@ -26,6 +27,7 @@ export default function Home() {
   const [selectedHistorySeries, setSelectedHistorySeries] =
     useState('iPhone 16 Pro');
   const [selectedHistoryCapacity, setSelectedHistoryCapacity] = useState('1TB');
+  const [showRakutenColumns, setShowRakutenColumns] = useState(false);
 
   // ローカルストレージから選択状態を読み込む
   useEffect(() => {
@@ -37,8 +39,16 @@ export default function Home() {
           setSelectedSeries(parsed);
         }
       }
+
+      // 楽天錬金列の表示状態を読み込む
+      const savedRakutenColumns = localStorage.getItem(
+        RAKUTEN_COLUMNS_STORAGE_KEY
+      );
+      if (savedRakutenColumns) {
+        setShowRakutenColumns(JSON.parse(savedRakutenColumns));
+      }
     } catch (error) {
-      console.error('Failed to load saved series:', error);
+      console.error('Failed to load saved settings:', error);
       alert('設定の読み込みに失敗しました。デフォルト設定を使用します。');
     }
   }, []);
@@ -52,6 +62,19 @@ export default function Home() {
       alert('選択状態の保存に失敗しました。');
     }
   }, [selectedSeries]);
+
+  // 楽天錬金列の表示状態をローカルストレージに保存
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        RAKUTEN_COLUMNS_STORAGE_KEY,
+        JSON.stringify(showRakutenColumns)
+      );
+    } catch (error) {
+      console.error('Failed to save rakuten columns setting:', error);
+      alert('楽天錬金列の設定保存に失敗しました。');
+    }
+  }, [showRakutenColumns]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -116,9 +139,10 @@ export default function Home() {
         data={data}
         selectedSeries={selectedSeries}
         loading={loading}
+        showRakutenColumns={showRakutenColumns}
       />
     ),
-    [data, selectedSeries, loading]
+    [data, selectedSeries, loading, showRakutenColumns]
   );
 
   const priceHistorySection = useMemo(
@@ -223,6 +247,22 @@ export default function Home() {
           </h1>
 
           <div className='space-y-4 mb-6'>{modelSelector}</div>
+
+          {/* 楽天錬金列の表示/非表示切り替え */}
+          <div className='mb-6'>
+            <label className='inline-flex items-center space-x-2 cursor-pointer'>
+              <input
+                type='checkbox'
+                checked={showRakutenColumns}
+                onChange={() => setShowRakutenColumns(!showRakutenColumns)}
+                className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+                aria-label='楽天錬金列を表示'
+              />
+              <span className='text-sm font-medium text-gray-700'>
+                楽天錬金列を表示（楽天錬金時差額・楽天錬金差額率）
+              </span>
+            </label>
+          </div>
 
           {loading ? (
             <LoadingState />
