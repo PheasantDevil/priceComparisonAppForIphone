@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # 依存関係ファイルを先にコピーしてキャッシュを活用
-COPY requirements.txt .
+COPY python/requirements.txt .
 
 # Pythonパッケージのインストール
 RUN pip install --no-cache-dir -r requirements.txt
