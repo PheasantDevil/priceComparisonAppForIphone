@@ -53,8 +53,10 @@ const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
       setLoading(true);
       setError(null);
 
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://us-central1-price-comparison-app-463007.cloudfunctions.net';
+
       const response = await axios.get<PriceHistoryResponse>(
-        `https://us-central1-price-comparison-app-463007.cloudfunctions.net/get_price_history`,
+        `${API_BASE_URL}/get_price_history`,
         {
           params: {
             series,
