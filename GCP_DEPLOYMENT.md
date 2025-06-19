@@ -1,8 +1,8 @@
-# Google Cloud Platform (GCP) デプロイメントガイド
+# Google Cloud Platform (GCP) App Engine Standard デプロイメントガイド
 
 ## 概要
 
-このアプリケーションを Google Cloud Platform でデプロイする方法を説明します。Cloud Run を使用することで、サーバーレスでスケーラブルなデプロイが可能です。
+このアプリケーションを Google Cloud Platform の App Engine Standard でデプロイする方法を説明します。App Engine Standard は無料枠が使いやすく、コスト効率の良いプラットフォームです。
 
 ## 前提条件
 
@@ -13,11 +13,8 @@
 ## 必要な API の有効化
 
 ```bash
-# Cloud Run API
-gcloud services enable run.googleapis.com
-
-# Container Registry API
-gcloud services enable containerregistry.googleapis.com
+# App Engine API
+gcloud services enable appengine.googleapis.com
 
 # Cloud Storage API
 gcloud services enable storage.googleapis.com
@@ -80,33 +77,18 @@ gsutil mb gs://price-comparison-app-data-$PROJECT_ID
 export BUCKET_NAME="price-comparison-app-data-$PROJECT_ID"
 ```
 
-### 6. Docker イメージのビルドとプッシュ
+### 6. App Engine アプリケーションの作成
 
 ```bash
-# Dockerイメージをビルド
-docker build -t gcr.io/$PROJECT_ID/price-comparison-app .
-
-# Container Registryにプッシュ
-docker push gcr.io/$PROJECT_ID/price-comparison-app
+# App Engineアプリケーションを作成
+gcloud app create --region=us-central
 ```
 
-### 7. Cloud Run にデプロイ
+### 7. App Engine Standard にデプロイ
 
 ```bash
-# Cloud Runにデプロイ
-gcloud run deploy price-comparison-app \
-    --image gcr.io/$PROJECT_ID/price-comparison-app \
-    --platform managed \
-    --region us-central1 \
-    --allow-unauthenticated \
-    --service-account=price-comparison-app@$PROJECT_ID.iam.gserviceaccount.com \
-    --set-secrets=GOOGLE_APPLICATION_CREDENTIALS_JSON=gcp-credentials:latest \
-    --set-env-vars=BUCKET_NAME=$BUCKET_NAME,APP_ENV=production \
-    --memory 512Mi \
-    --cpu 1 \
-    --timeout 300 \
-    --concurrency 80 \
-    --max-instances 10
+# App Engineにデプロイ
+gcloud app deploy app.yaml --quiet
 ```
 
 ## デプロイ後の確認
@@ -115,27 +97,24 @@ gcloud run deploy price-comparison-app \
 
 ```bash
 # サービスURLを取得
-gcloud run services describe price-comparison-app \
-    --platform managed \
-    --region us-central1 \
-    --format="value(status.url)"
+gcloud app browse --no-launch-browser
 ```
 
 ### 2. ヘルスチェック
 
 ```bash
 # ヘルスチェック
-curl https://your-service-url/health
+curl https://your-app-id.uc.r.appspot.com/health
 ```
 
 ### 3. アプリケーションの動作確認
 
 ```bash
 # メインページ
-curl https://your-service-url/
+curl https://your-app-id.uc.r.appspot.com/
 
 # 価格データ取得
-curl https://your-service-url/get_prices
+curl https://your-app-id.uc.r.appspot.com/get_prices
 ```
 
 ## 自動デプロイの設定
@@ -143,8 +122,8 @@ curl https://your-service-url/get_prices
 ### GitHub Actions を使用した自動デプロイ
 
 ```yaml
-# .github/workflows/deploy.yml
-name: Deploy to Cloud Run
+# .github/workflows/deploy-to-app-engine.yml
+name: Deploy to App Engine Standard
 
 on:
   push:
@@ -153,50 +132,38 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Build and push Docker image
-        run: |
-          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/price-comparison-app .
-          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/price-comparison-app
-
-      - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy price-comparison-app \
-            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/price-comparison-app \
-            --platform managed \
-            --region us-central1 \
-            --allow-unauthenticated
+      - name: Deploy to App Engine
+        run: gcloud app deploy app.yaml --quiet
 ```
 
 ## コスト最適化
 
-### 1. スケーリング設定
+### 1. リソース設定
 
-```bash
-# 最小インスタンス数を0に設定（コスト削減）
-gcloud run services update price-comparison-app \
-    --region us-central1 \
-    --min-instances 0 \
-    --max-instances 5
+```yaml
+# app.yaml
+resources:
+  cpu: 0.5
+  memory_gb: 0.25
+  disk_size_gb: 1
 ```
 
-### 2. リソース制限
+### 2. スケーリング設定
 
-```bash
-# メモリとCPUを最適化
-gcloud run services update price-comparison-app \
-    --region us-central1 \
-    --memory 256Mi \
-    --cpu 0.5
+```yaml
+# app.yaml
+automatic_scaling:
+  target_cpu_utilization: 0.6
+  min_instances: 0
+  max_instances: 1
 ```
 
 ## 監視とログ
@@ -205,16 +172,14 @@ gcloud run services update price-comparison-app \
 
 ```bash
 # リアルタイムログ
-gcloud logs tail --service=price-comparison-app
+gcloud app logs tail -s default
 ```
 
 ### 2. メトリクスの確認
 
 ```bash
-# Cloud Runメトリクス
-gcloud run services describe price-comparison-app \
-    --region us-central1 \
-    --format="value(status.conditions)"
+# App Engineメトリクス
+gcloud app instances list
 ```
 
 ## トラブルシューティング
@@ -230,26 +195,23 @@ gcloud run services describe price-comparison-app \
 
 2. **メモリ不足**
 
-   ```bash
-   # メモリを増やす
-   gcloud run services update price-comparison-app \
-       --region us-central1 \
-       --memory 1Gi
+   ```yaml
+   # app.yamlでメモリを増やす
+   resources:
+     memory_gb: 0.5
    ```
 
 3. **タイムアウトエラー**
-   ```bash
-   # タイムアウトを延長
-   gcloud run services update price-comparison-app \
-       --region us-central1 \
-       --timeout 600
+   ```yaml
+   # app.yamlでタイムアウトを延長
+   entrypoint: gunicorn -b :$PORT app:app --timeout 300
    ```
 
 ## セキュリティ
 
 1. **HTTPS 強制**
 
-   - Cloud Run は自動的に HTTPS を提供
+   - App Engine は自動的に HTTPS を提供
 
 2. **認証**
 
@@ -260,12 +222,23 @@ gcloud run services describe price-comparison-app \
 
 ## コスト見積もり
 
-Cloud Run の料金（米国リージョン）：
+App Engine Standard の料金（米国リージョン）：
 
-- **CPU**: $0.00002400/秒
-- **メモリ**: $0.00000250/秒/GB
-- **リクエスト**: $0.40/100 万リクエスト
+- **無料枠**: 月 28 時間
+- **追加料金**: $0.05/時間
+- **リクエスト**: 無料
 
-月間 100 万リクエスト、平均実行時間 30 秒の場合：
+月間使用例：
 
-- **約$5-10/月**程度
+- **軽量使用**: $0（無料枠内）
+- **中程度使用**: $1-5/月
+- **本格運用**: $10-20/月
+
+## アプリケーションの動作確認
+
+デプロイ完了後、以下のエンドポイントで動作確認：
+
+1. **ヘルスチェック**: `https://your-app-id.uc.r.appspot.com/health`
+2. **メインページ**: `https://your-app-id.uc.r.appspot.com/`
+3. **価格データ取得**: `https://your-app-id.uc.r.appspot.com/get_prices`
+4. **スクレイピング実行**: `https://your-app-id.uc.r.appspot.com/scrape-prices` (POST)
