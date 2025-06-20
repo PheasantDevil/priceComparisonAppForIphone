@@ -1,32 +1,20 @@
 import json
 import logging
 import os
-import subprocess
-import sys
 from datetime import datetime
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
-from google.cloud import storage
 
 # Google Cloud Storageクライアントの初期化
 storage_client = None
 try:
+    from google.cloud import storage
     storage_client = storage.Client()
 except Exception as e:
     print(f"Warning: Could not initialize Google Cloud Storage client: {e}")
 
 # 設定クラス
 class FallbackConfig:
-    class scraper:
-        KAITORI_RUDEA_URLS = [
-            "https://kaitori-rudeya.com/category/detail/183",
-            "https://kaitori-rudeya.com/category/detail/184",
-            "https://kaitori-rudeya.com/category/detail/185",
-            "https://kaitori-rudeya.com/category/detail/186",
-            "https://kaitori-rudeya.com/category/detail/205"
-        ]
-        REQUEST_TIMEOUT = 60
-    
     class app:
         DEBUG = False
         SECRET_KEY = os.getenv('SECRET_KEY', 'default-secret-key-for-production')
@@ -36,10 +24,7 @@ config = FallbackConfig()
 
 def create_app():
     """
-    Creates and configures the Flask application with integrated GCP services.
-    
-    Initializes the Flask app with settings from the configuration, sets up logging, and configures GCP Cloud Storage.
-    Defines routes for serving the favicon, rendering the index page, and basic API endpoints.
+    Creates and configures the Flask application.
     """
     app = Flask(__name__, static_folder='static')
 
@@ -69,10 +54,6 @@ def create_app():
     def favicon():
         """
         Serves the favicon.ico file from the assets directory.
-        
-        Returns:
-            The favicon.ico file with the appropriate MIME type, or an empty response with
-            HTTP 204 status if an error occurs.
         """
         try:
             return send_from_directory(
@@ -94,7 +75,9 @@ def create_app():
         return jsonify({
             'status': 'healthy', 
             'timestamp': datetime.now().isoformat(),
-            'storage_available': bucket is not None
+            'storage_available': bucket is not None,
+            'app': 'Price Comparison App',
+            'version': '1.0.0'
         }), 200
 
     @app.route('/api/status')
