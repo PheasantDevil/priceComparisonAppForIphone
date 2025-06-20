@@ -43,7 +43,7 @@ App Engine Standard の内部エラーを回避し、安定した無料デプロ
 # 必須環境変数
 BUCKET_NAME=price-comparison-app-data
 APP_ENV=production
-SECRET_KEY=your-super-secret-key-2024-railway
+SECRET_KEY=3C2jgeNUv6cfkksXVxiDuw1nI1WvCRxZYpUzeAZzsIIQ2uXh7UCSoTXYwNlRmThrdNRqN6cd0x4VYAQ-mF7lAg
 
 # オプション（Google Cloud Storage使用時）
 GOOGLE_APPLICATION_CREDENTIALS_JSON={"type":"service_account","project_id":"your-project-id",...}
