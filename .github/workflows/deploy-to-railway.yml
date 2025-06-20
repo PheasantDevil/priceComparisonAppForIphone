@@ -60,11 +60,11 @@ jobs:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       run: |
         echo "Setting up Railway authentication..."
-        # Railway CLIは環境変数RAILWAY_TOKENを自動的に使用します
-        export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
+        # Railway CLIの設定ディレクトリを作成
+        mkdir -p ~/.railway
         
-        echo "Verifying Railway authentication..."
-        railway whoami
+        # トークンを設定ファイルに保存
+        echo "{\"token\": \"${{ secrets.RAILWAY_TOKEN }}\"}" > ~/.railway/config.json
         
         echo "Deploying to Railway..."
         railway up --service ${{ secrets.RAILWAY_SERVICE_NAME }} --detach
@@ -82,7 +82,12 @@ jobs:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       run: |
         echo "Getting deployment URL..."
-        export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
+        # Railway CLIの設定ディレクトリを作成
+        mkdir -p ~/.railway
+        
+        # トークンを設定ファイルに保存
+        echo "{\"token\": \"${{ secrets.RAILWAY_TOKEN }}\"}" > ~/.railway/config.json
+        
         URL=$(railway status --service ${{ secrets.RAILWAY_SERVICE_NAME }} --json | jq -r '.url')
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
