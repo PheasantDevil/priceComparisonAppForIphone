@@ -7,11 +7,48 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 
 # Google Cloud Storageクライアントの初期化
 storage_client = None
-try:
-    from google.cloud import storage
-    storage_client = storage.Client()
-except Exception as e:
-    print(f"Warning: Could not initialize Google Cloud Storage client: {e}")
+bucket = None
+
+# Railway環境ではGoogle Cloud Storageはオプション
+USE_GOOGLE_CLOUD_STORAGE = os.getenv('USE_GOOGLE_CLOUD_STORAGE', 'false').lower() == 'true'
+
+if USE_GOOGLE_CLOUD_STORAGE:
+    try:
+        from google.cloud import storage
+        from google.oauth2 import service_account
+
+        # 環境変数から認証情報を取得
+        credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+        
+        if credentials_json:
+            try:
+                # JSON文字列から認証情報を作成
+                credentials_info = json.loads(credentials_json)
+                credentials = service_account.Credentials.from_service_account_info(credentials_info)
+                storage_client = storage.Client(credentials=credentials)
+                print("Google Cloud Storage client initialized with service account")
+            except Exception as e:
+                print(f"Warning: Could not initialize Google Cloud Storage client with service account: {e}")
+                # デフォルトの認証方法を試行
+                try:
+                    storage_client = storage.Client()
+                    print("Google Cloud Storage client initialized with default credentials")
+                except Exception as e2:
+                    print(f"Warning: Could not initialize Google Cloud Storage client: {e2}")
+        else:
+            # 環境変数がない場合はデフォルトの認証方法を試行
+            try:
+                storage_client = storage.Client()
+                print("Google Cloud Storage client initialized with default credentials")
+            except Exception as e:
+                print(f"Warning: Could not initialize Google Cloud Storage client: {e}")
+                
+    except ImportError as e:
+        print(f"Warning: Google Cloud Storage library not available: {e}")
+    except Exception as e:
+        print(f"Warning: Could not initialize Google Cloud Storage client: {e}")
+else:
+    print("Google Cloud Storage is disabled for Railway environment")
 
 # 設定クラス
 class FallbackConfig:
@@ -39,16 +76,17 @@ def create_app():
     )
 
     # Cloud Storageクライアントの初期化
-    bucket = None
-    if storage_client:
+    global bucket
+    if storage_client and USE_GOOGLE_CLOUD_STORAGE:
         try:
-            bucket = storage_client.bucket(os.getenv('BUCKET_NAME', 'price-comparison-app-data'))
-            app.logger.info("Google Cloud Storage client initialized successfully")
+            bucket_name = os.getenv('BUCKET_NAME', 'price-comparison-app-data')
+            bucket = storage_client.bucket(bucket_name)
+            app.logger.info(f"Google Cloud Storage client initialized successfully with bucket: {bucket_name}")
         except Exception as e:
-            app.logger.error(f"Failed to initialize Google Cloud Storage: {e}")
+            app.logger.error(f"Failed to initialize Google Cloud Storage bucket: {e}")
             bucket = None
     else:
-        app.logger.warning("Google Cloud Storage client not available")
+        app.logger.info("Google Cloud Storage is disabled - using local storage or no storage")
 
     @app.route("/favicon.ico")
     def favicon():
@@ -76,8 +114,10 @@ def create_app():
             'status': 'healthy', 
             'timestamp': datetime.now().isoformat(),
             'storage_available': bucket is not None,
+            'storage_enabled': USE_GOOGLE_CLOUD_STORAGE,
             'app': 'Price Comparison App',
-            'version': '1.0.0'
+            'version': '1.0.0',
+            'environment': os.getenv('APP_ENV', 'production')
         }), 200
 
     @app.route('/api/status')
@@ -88,6 +128,7 @@ def create_app():
             'version': '1.0.0',
             'environment': os.getenv('APP_ENV', 'production'),
             'storage_available': bucket is not None,
+            'storage_enabled': USE_GOOGLE_CLOUD_STORAGE,
             'timestamp': datetime.now().isoformat()
         }), 200
 
@@ -95,15 +136,15 @@ def create_app():
     def scrape_prices():
         """価格スクレイピングエンドポイント（現在は無効化）"""
         return jsonify({
-            'error': 'Scraping functionality is currently disabled in App Engine Standard environment',
-            'message': 'This feature requires Cloud Run or App Engine Flexible environment'
+            'error': 'Scraping functionality is currently disabled in Railway environment',
+            'message': 'This feature requires additional setup for web scraping'
         }), 503
 
     @app.route('/set-alert', methods=['POST'])
     def set_alert():
         """アラート設定エンドポイント（現在は無効化）"""
         return jsonify({
-            'error': 'Alert functionality is currently disabled in App Engine Standard environment',
+            'error': 'Alert functionality is currently disabled in Railway environment',
             'message': 'This feature requires Cloud Storage access'
         }), 503
 
@@ -111,7 +152,7 @@ def create_app():
     def check_prices():
         """価格チェックエンドポイント（現在は無効化）"""
         return jsonify({
-            'error': 'Price checking functionality is currently disabled in App Engine Standard environment',
+            'error': 'Price checking functionality is currently disabled in Railway environment',
             'message': 'This feature requires Cloud Storage access'
         }), 503
 
@@ -119,7 +160,7 @@ def create_app():
     def proxy_prices():
         """価格データプロキシエンドポイント（現在は無効化）"""
         return jsonify({
-            'error': 'Price data API is currently disabled in App Engine Standard environment',
+            'error': 'Price data API is currently disabled in Railway environment',
             'message': 'This feature requires external API access'
         }), 503
 
@@ -127,7 +168,7 @@ def create_app():
     def get_prices():
         """価格取得エンドポイント（現在は無効化）"""
         return jsonify({
-            'error': 'Price retrieval functionality is currently disabled in App Engine Standard environment',
+            'error': 'Price retrieval functionality is currently disabled in Railway environment',
             'message': 'This feature requires web scraping capabilities'
         }), 503
 
