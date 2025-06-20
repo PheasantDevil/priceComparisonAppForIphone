@@ -59,8 +59,12 @@ jobs:
       env:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       run: |
-        echo "Logging into Railway..."
-        railway login --token $RAILWAY_TOKEN
+        echo "Setting up Railway authentication..."
+        # Railway CLIは環境変数RAILWAY_TOKENを自動的に使用します
+        export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
+        
+        echo "Verifying Railway authentication..."
+        railway whoami
         
         echo "Deploying to Railway..."
         railway up --service ${{ secrets.RAILWAY_SERVICE_NAME }} --detach
@@ -78,6 +82,7 @@ jobs:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       run: |
         echo "Getting deployment URL..."
+        export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         URL=$(railway status --service ${{ secrets.RAILWAY_SERVICE_NAME }} --json | jq -r '.url')
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
