@@ -63,22 +63,18 @@ jobs:
         # 環境変数を設定
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         
-        # Railway CLIの設定ディレクトリを作成
-        mkdir -p ~/.railway
+        # Railway CLIの設定ディレクトリをクリア
+        rm -rf ~/.railway
         
-        # トークンを設定ファイルに保存（正しい形式）
-        cat > ~/.railway/config.json << EOF
-        {
-          "token": "${{ secrets.RAILWAY_TOKEN }}"
-        }
-        EOF
+        echo "Testing Railway authentication..."
+        railway whoami || echo "Authentication test failed, continuing..."
         
-        echo "Available services:"
-        railway service list || echo "Service list failed, continuing with deployment..."
+        echo "Getting project info..."
+        railway status || echo "Status check failed, continuing..."
         
         echo "Deploying to Railway..."
-        # サービス名を指定せずにデプロイ（プロジェクトのデフォルトサービスを使用）
-        railway up --detach
+        # プロジェクトを指定してデプロイ
+        railway up --detach --service web
         
         echo "Deployment initiated successfully!"
 
@@ -96,18 +92,11 @@ jobs:
         # 環境変数を設定
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         
-        # Railway CLIの設定ディレクトリを作成
-        mkdir -p ~/.railway
-        
-        # トークンを設定ファイルに保存（正しい形式）
-        cat > ~/.railway/config.json << EOF
-        {
-          "token": "${{ secrets.RAILWAY_TOKEN }}"
-        }
-        EOF
+        # Railway CLIの設定ディレクトリをクリア
+        rm -rf ~/.railway
         
         echo "Getting service status..."
-        URL=$(railway status --json | jq -r '.url // .domain // "https://your-app.railway.app"')
+        URL=$(railway status --service web --json | jq -r '.url // .domain // "https://your-app.railway.app"')
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
 
