@@ -57,7 +57,7 @@ jobs:
         id: scrape
         continue-on-error: true  # エラーが発生しても続行
         run: |
-          python scripts/price_scraping/scrape_prices.py
+          python functions/scrape_prices/main.py
 
       - name: Sync to Firestore
         id: sync
