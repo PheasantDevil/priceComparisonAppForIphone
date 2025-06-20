@@ -43,6 +43,14 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
   --member="serviceAccount:price-comparison-app@$PROJECT_ID.iam.gserviceaccount.com" \
   --role="roles/appengine.deployer"
 
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:price-comparison-app@$PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/serviceusage.serviceUsageAdmin"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:price-comparison-app@$PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountUser"
+
 # キーを作成
 gcloud iam service-accounts keys create key.json \
   --iam-account=price-comparison-app@$PROJECT_ID.iam.gserviceaccount.com
