@@ -70,13 +70,42 @@ jobs:
           gcloud services enable appengine.googleapis.com
         fi
         
-        # App Engineアプリを作成（既に存在する場合はスキップ）
-        echo "App Engineアプリを作成中..."
-        gcloud app create --region=asia-northeast1 || echo "App Engine app already exists"
+        # App Engineアプリの存在確認と作成（権限エラーを回避）
+        echo "App Engineアプリの状態を確認中..."
+        if gcloud app describe --format="value(id)" 2>/dev/null; then
+          echo "App Engineアプリは既に存在します。"
+        else
+          echo "App Engineアプリを作成中..."
+          # 複数のリージョンを試行
+          for region in asia-northeast1 us-central1 europe-west1; do
+            echo "リージョン $region でアプリ作成を試行中..."
+            if gcloud app create --region=$region --quiet 2>/dev/null; then
+              echo "App Engineアプリをリージョン $region で作成しました。"
+              break
+            else
+              echo "リージョン $region での作成に失敗しました。"
+            fi
+          done
+        fi
         
-        # デプロイを実行
+        # デプロイを実行（リトライ機能付き）
         echo "App Engineにデプロイ中..."
-        gcloud app deploy app.yaml --quiet
+        for attempt in 1 2 3; do
+          echo "デプロイ試行 $attempt/3"
+          if gcloud app deploy app.yaml --quiet; then
+            echo "デプロイが成功しました！"
+            break
+          else
+            echo "デプロイ試行 $attempt が失敗しました。"
+            if [ $attempt -lt 3 ]; then
+              echo "30秒待機してから再試行します..."
+              sleep 30
+            else
+              echo "すべてのデプロイ試行が失敗しました。"
+              exit 1
+            fi
+          fi
+        done
 
     - name: Get service URL
       id: get-url
