@@ -31,8 +31,10 @@ jobs:
     - name: Run tests
       env:
         BUCKET_NAME: "price-comparison-app-data"
+        APP_ENV: "test"
       run: |
         python -c "import app; print('App imports successfully')"
+        python -c "from app import app; print('Flask app created successfully')"
 
   deploy:
     name: Deploy to Railway
@@ -44,21 +46,47 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
     - name: Install Railway CLI
       run: |
-        npm install -g @railway/cli
+        npm install -g @railway/cli@latest
 
     - name: Deploy to Railway
       env:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       run: |
+        echo "Logging into Railway..."
         railway login --token $RAILWAY_TOKEN
-        railway up --service ${{ secrets.RAILWAY_SERVICE_NAME }}
+        
+        echo "Deploying to Railway..."
+        railway up --service ${{ secrets.RAILWAY_SERVICE_NAME }} --detach
+        
+        echo "Deployment initiated successfully!"
 
     - name: Wait for deployment
       run: |
         echo "Waiting for deployment to complete..."
+        sleep 60
+
+    - name: Get deployment URL
+      id: get-url
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      run: |
+        echo "Getting deployment URL..."
+        URL=$(railway status --service ${{ secrets.RAILWAY_SERVICE_NAME }} --json | jq -r '.url')
+        echo "deployment_url=$URL" >> $GITHUB_OUTPUT
+        echo "Deployment URL: $URL"
+
+    - name: Health check
+      run: |
+        echo "Performing health check..."
         sleep 30
+        # Health check will be performed by Railway's built-in healthcheck
 
     - name: Comment on PR
       if: github.event_name == 'pull_request'
@@ -74,7 +102,8 @@ jobs:
               
               **プラットフォーム**: Railway.app
               **無料枠**: 月500時間まで無料
-              **安定性**: 高（App Engine Standardより安定）`
+              **安定性**: 高（App Engine Standardより安定）
+              **デプロイURL**: ${{ steps.get-url.outputs.deployment_url }}`
             });
             console.log('PRコメントを投稿しました');
           } catch (error) {
