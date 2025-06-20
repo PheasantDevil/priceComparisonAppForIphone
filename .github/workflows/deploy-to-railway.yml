@@ -72,9 +72,12 @@ jobs:
         echo "Getting project info..."
         railway status || echo "Status check failed, continuing..."
         
+        echo "Listing available services..."
+        railway service list || echo "Service list failed, continuing..."
+        
         echo "Deploying to Railway..."
-        # プロジェクトを指定してデプロイ
-        railway up --detach --service web
+        # プロジェクトIDを明示的に指定してデプロイ
+        railway up --detach --project price-comparison-app
         
         echo "Deployment initiated successfully!"
 
@@ -96,7 +99,7 @@ jobs:
         rm -rf ~/.railway
         
         echo "Getting service status..."
-        URL=$(railway status --service web --json | jq -r '.url // .domain // "https://your-app.railway.app"')
+        URL=$(railway status --project price-comparison-app --json | jq -r '.url // .domain // "https://your-app.railway.app"')
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
 
