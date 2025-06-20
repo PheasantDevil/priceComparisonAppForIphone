@@ -63,32 +63,21 @@ jobs:
         # 環境変数を設定
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         
-        # Railway CLIの設定ディレクトリをクリアして再作成
+        # Railway CLIの設定ディレクトリを完全にクリア
         rm -rf ~/.railway
-        mkdir -p ~/.railway
-        
-        # 正しい形式で設定ファイルを作成
-        cat > ~/.railway/config.json << 'EOF'
-        {
-          "token": "$RAILWAY_TOKEN"
-        }
-        EOF
-        
-        # 環境変数を設定ファイルに展開
-        sed -i "s/\$RAILWAY_TOKEN/${{ secrets.RAILWAY_TOKEN }}/g" ~/.railway/config.json
         
         echo "Testing Railway authentication..."
         railway whoami || echo "Authentication test failed, continuing..."
         
-        echo "Linking to project..."
-        railway link || echo "Project linking failed, continuing..."
-        
         echo "Getting project info..."
         railway status || echo "Status check failed, continuing..."
         
+        echo "Listing services to identify correct service name..."
+        railway service list || echo "Service list failed, trying default service..."
+        
         echo "Deploying to Railway..."
-        # シンプルなデプロイコマンド
-        railway up --detach
+        # プロジェクトIDとサービス名を明示的に指定してデプロイ
+        railway up --detach --service web --project price-comparison-app
         
         echo "Deployment initiated successfully!"
 
@@ -106,22 +95,11 @@ jobs:
         # 環境変数を設定
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         
-        # Railway CLIの設定ディレクトリをクリアして再作成
+        # Railway CLIの設定ディレクトリを完全にクリア
         rm -rf ~/.railway
-        mkdir -p ~/.railway
-        
-        # 正しい形式で設定ファイルを作成
-        cat > ~/.railway/config.json << 'EOF'
-        {
-          "token": "$RAILWAY_TOKEN"
-        }
-        EOF
-        
-        # 環境変数を設定ファイルに展開
-        sed -i "s/\$RAILWAY_TOKEN/${{ secrets.RAILWAY_TOKEN }}/g" ~/.railway/config.json
         
         echo "Getting service status..."
-        URL=$(railway status --json | jq -r '.url // .domain // "https://your-app.railway.app"')
+        URL=$(railway status --service web --project price-comparison-app --json | jq -r '.url // .domain // "https://your-app.railway.app"')
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
 
