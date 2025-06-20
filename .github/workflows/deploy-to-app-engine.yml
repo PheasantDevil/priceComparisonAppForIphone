@@ -60,8 +60,22 @@ jobs:
     - name: Deploy to App Engine
       run: |
         gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
-        gcloud services enable appengine.googleapis.com
-        gcloud app create --region=us-central || echo "App Engine app already exists"
+        
+        # App Engine APIを有効化（既に有効化されている場合はスキップ）
+        echo "App Engine APIの状態を確認中..."
+        if gcloud services list --enabled --filter="name:appengine.googleapis.com" --format="value(name)" | grep -q "appengine.googleapis.com"; then
+          echo "App Engine APIは既に有効化されています。"
+        else
+          echo "App Engine APIを有効化中..."
+          gcloud services enable appengine.googleapis.com
+        fi
+        
+        # App Engineアプリを作成（既に存在する場合はスキップ）
+        echo "App Engineアプリを作成中..."
+        gcloud app create --region=asia-northeast1 || echo "App Engine app already exists"
+        
+        # デプロイを実行
+        echo "App Engineにデプロイ中..."
         gcloud app deploy app.yaml --quiet
 
     - name: Get service URL
@@ -89,7 +103,7 @@ jobs:
               
               **デプロイ先**: ${{ steps.get-url.outputs.service_url }}
               **プラットフォーム**: App Engine Standard
-              **リージョン**: us-central`
+              **リージョン**: asia-northeast1`
             });
             console.log('PRコメントを投稿しました');
           } catch (error) {

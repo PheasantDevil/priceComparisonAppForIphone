@@ -4,8 +4,6 @@ service: default
 env_variables:
   BUCKET_NAME: "price-comparison-app-data"
   APP_ENV: "production"
-  # Secret Managerから認証情報を取得（デプロイ時にPROJECT_IDを置換）
-  GOOGLE_APPLICATION_CREDENTIALS_JSON: "projects/PROJECT_ID/secrets/gcp-credentials/versions/latest"
 
 automatic_scaling:
   target_cpu_utilization: 0.6
