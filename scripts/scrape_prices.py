@@ -467,10 +467,7 @@ async def main():
     """メイン処理"""
     try:
         # 設定ファイルの読み込み
-        config_file = os.environ.get('CONFIG_FILE', 'config/config.production.yaml')
-        with open(config_file, 'r') as f:
-            config = yaml.safe_load(f)
-        logger.info(f"設定ファイルを読み込みました: {config_file}")
+        config = load_config()
 
         # スクレイピングの実行
         async with PriceScraper(config) as scraper:

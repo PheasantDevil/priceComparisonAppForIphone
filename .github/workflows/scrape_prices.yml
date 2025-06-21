@@ -57,19 +57,30 @@ jobs:
         id: scrape
         continue-on-error: true  # エラーが発生しても続行
         run: |
+          echo "Starting price scraping..."
+          echo "Current directory: $(pwd)"
+          echo "Files in scripts directory:"
+          ls -la scripts/
+          echo "Config file exists: $(test -f config/config.production.yaml && echo 'Yes' || echo 'No')"
+          echo "Key file exists: $(test -f key.json && echo 'Yes' || echo 'No')"
           python scripts/scrape_prices.py
+          echo "Price scraping completed with exit code: $?"
 
       - name: Sync to Firestore
         id: sync
         continue-on-error: true  # エラーが発生しても続行
         run: |
+          echo "Starting Firestore sync..."
           python scripts/sync_cloud_storage_to_firestore.py
+          echo "Firestore sync completed with exit code: $?"
 
       - name: Cleanup old Cloud Storage files
         id: cleanup
         continue-on-error: true  # エラーが発生しても続行
         run: |
+          echo "Starting Cloud Storage cleanup..."
           python scripts/cleanup_cloud_storage.py
+          echo "Cloud Storage cleanup completed with exit code: $?"
 
       - name: Send error notification
         if: steps.scrape.outcome == 'failure' || steps.sync.outcome == 'failure' || steps.cleanup.outcome == 'failure'
