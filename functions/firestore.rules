@@ -2,22 +2,9 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 公式価格コレクションのルール
-    match /official_prices/{document=**} {
-      allow read: if true;  // 誰でも読み取り可能
-      allow write: if request.auth != null;  // 認証済みユーザーのみ書き込み可能
-    }
-    
-    // 買取価格コレクションのルール
-    match /kaitori_prices/{document=**} {
-      allow read: if true;  // 誰でも読み取り可能
-      allow write: if true;  // サービスアカウントからの書き込みを許可
-    }
-    
-    // 価格履歴コレクションのルール
-    match /price_history/{document=**} {
-      allow read: if true;  // 誰でも読み取り可能
-      allow write: if true;  // サービスアカウントからの書き込みを許可
+    // 全てのコレクションに対して読み書きを許可（開発・テスト用）
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 } 
