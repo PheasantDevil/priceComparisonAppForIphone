@@ -53,6 +53,11 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Create service account key file
+        run: |
+          echo '${{ secrets.GCP_SA_KEY }}' > key.json
+          echo "Service account key file created"
+
       - name: Run price scraping
         id: scrape
         continue-on-error: true  # エラーが発生しても続行
@@ -71,6 +76,11 @@ jobs:
         continue-on-error: true  # エラーが発生しても続行
         run: |
           echo "Starting Firestore sync..."
+          # key.jsonファイルが存在することを確認
+          if [ ! -f key.json ]; then
+            echo '${{ secrets.GCP_SA_KEY }}' > key.json
+            echo "Service account key file recreated for sync step"
+          fi
           python scripts/sync_cloud_storage_to_firestore.py
           echo "Firestore sync completed with exit code: $?"
 
@@ -79,6 +89,11 @@ jobs:
         continue-on-error: true  # エラーが発生しても続行
         run: |
           echo "Starting Cloud Storage cleanup..."
+          # key.jsonファイルが存在することを確認
+          if [ ! -f key.json ]; then
+            echo '${{ secrets.GCP_SA_KEY }}' > key.json
+            echo "Service account key file recreated for cleanup step"
+          fi
           python scripts/cleanup_cloud_storage.py
           echo "Cloud Storage cleanup completed with exit code: $?"
 
@@ -88,4 +103,11 @@ jobs:
           echo "Scrape step outcome: ${{ steps.scrape.outcome }}"
           echo "Sync step outcome: ${{ steps.sync.outcome }}"
           echo "Cleanup step outcome: ${{ steps.cleanup.outcome }}"
-          # 必要に応じて通知処理を追加 
+          # 必要に応じて通知処理を追加
+
+      - name: Cleanup sensitive files
+        if: always()
+        run: |
+          echo "Cleaning up sensitive files..."
+          rm -f key.json
+          echo "key.json file removed" 
