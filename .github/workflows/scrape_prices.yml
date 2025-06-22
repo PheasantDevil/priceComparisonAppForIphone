@@ -58,20 +58,6 @@ jobs:
           echo '${{ secrets.GCP_SA_KEY }}' > key.json
           echo "Service account key file created"
 
-      - name: Set up Firestore permissions
-        run: |
-          echo "Setting up Firestore permissions..."
-          # サービスアカウントにFirestore権限を付与
-          gcloud projects add-iam-policy-binding price-comparison-app-463007 \
-            --member="serviceAccount:price-comparison-app@price-comparison-app-463007.iam.gserviceaccount.com" \
-            --role="roles/datastore.user"
-          
-          # Firestoreセキュリティルールを確認
-          echo "Current Firestore rules:"
-          gcloud firestore rules list --project=price-comparison-app-463007
-          
-          echo "Firestore permissions setup completed"
-
       - name: Deploy Firestore security rules
         run: |
           echo "Deploying Firestore security rules..."
