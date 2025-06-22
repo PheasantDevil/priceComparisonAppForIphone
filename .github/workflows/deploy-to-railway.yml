@@ -77,11 +77,11 @@ jobs:
         railway status || echo "Status check failed, continuing..."
         
         echo "Listing services to identify correct service name..."
-        railway service || echo "Service command failed, trying default service..."
+        railway service list --json || echo "Service list failed, trying default service..."
         
         echo "Deploying to Railway..."
         # サービス名を明示的に指定してデプロイ
-        railway up --detach
+        railway up --detach --service web
         
         echo "Deployment initiated successfully!"
 
@@ -108,7 +108,7 @@ jobs:
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
         
         echo "Getting service status..."
-        URL=$(railway status --json | jq -r '.url // .domain // "https://your-app.railway.app"')
+        URL=$(railway status --service web --json | jq -r '.url // .domain // "https://your-app.railway.app"')
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
 
