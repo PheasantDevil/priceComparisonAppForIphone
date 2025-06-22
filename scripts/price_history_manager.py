@@ -85,8 +85,8 @@ class PriceHistoryManager:
             # クエリ実行（インデックスを避けるため、シンプルなクエリに変更）
             query = (
                 self.db.collection('price_history')
-                .where('series', '==', series)
-                .where('capacity', '==', capacity)
+                .filter('series', '==', series)
+                .filter('capacity', '==', capacity)
             )
             
             docs = query.stream()
@@ -134,7 +134,7 @@ class PriceHistoryManager:
             # 古いデータを検索
             query = (
                 self.db.collection('price_history')
-                .where('timestamp', '<', cutoff_timestamp)
+                .filter('timestamp', '<', cutoff_timestamp)
             )
             
             docs = query.stream()

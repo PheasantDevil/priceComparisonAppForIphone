@@ -146,7 +146,7 @@ def cleanup_old_history_data(db):
         # 古いデータを検索
         query = (
             db.collection('price_history')
-            .where('timestamp', '<', cutoff_timestamp)
+            .filter('timestamp', '<', cutoff_timestamp)
         )
         
         docs = query.stream()

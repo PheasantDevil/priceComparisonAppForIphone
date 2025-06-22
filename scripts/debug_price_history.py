@@ -26,12 +26,11 @@ def debug_price_history():
         print(f"  Data: {json.dumps(data, indent=2, ensure_ascii=False)}")
         print()
     
-    # 特定のシリーズと容量のデータを確認
-    print("=== Specific Series Data ===")
+    # 特定のシリーズと容量の履歴を取得
     query = (
         db.collection('price_history')
-        .where('series', '==', 'iPhone 16 Pro')
-        .where('capacity', '==', '1TB')
+        .filter('series', '==', 'iPhone 16 Pro')
+        .filter('capacity', '==', '1TB')
     )
     
     docs = query.stream()
