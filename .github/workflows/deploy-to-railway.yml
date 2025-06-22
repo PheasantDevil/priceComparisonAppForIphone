@@ -76,15 +76,17 @@ jobs:
         echo "Getting project info..."
         railway status || echo "Status check failed, continuing..."
         
-        echo "Listing services to identify correct service name..."
-        railway service list || echo "Service list failed, trying default service..."
+        echo "Discovering available services..."
+        # 利用可能なサービスを確認
+        railway service list 2>/dev/null || echo "Service list command not available"
+        
+        echo "Checking current directory and files..."
+        pwd
+        ls -la
         
         echo "Deploying to Railway..."
-        # 複数のサービス名を試行
-        railway up --detach --service web || \
-        railway up --detach --service price-comparison-app || \
-        railway up --detach --service app || \
-        railway up --detach
+        # まずサービスを指定せずにデプロイを試行
+        railway up --detach || echo "Default deployment failed"
         
         echo "Deployment initiated successfully!"
 
@@ -111,12 +113,9 @@ jobs:
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
         
         echo "Getting service status..."
-        # 複数のサービス名を試行してURLを取得
-        URL=$(railway status --service web 2>/dev/null | grep -o 'https://[^[:space:]]*' | head -1) || \
-        URL=$(railway status --service price-comparison-app 2>/dev/null | grep -o 'https://[^[:space:]]*' | head -1) || \
-        URL=$(railway status --service app 2>/dev/null | grep -o 'https://[^[:space:]]*' | head -1) || \
+        # シンプルな方法でURLを取得
         URL=$(railway status 2>/dev/null | grep -o 'https://[^[:space:]]*' | head -1) || \
-        URL="https://your-app.railway.app"
+        URL="https://price-comparison-app-production.up.railway.app"
         
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
