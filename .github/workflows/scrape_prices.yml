@@ -79,6 +79,21 @@ jobs:
             --project=price-comparison-app-463007
           echo "Firestore security rules deployed"
 
+      - name: Verify Firestore rules deployment
+        run: |
+          echo "Verifying Firestore rules deployment..."
+          # ルールのデプロイ完了を待機
+          sleep 30
+          
+          # 現在のルールを確認
+          echo "Current Firestore rules:"
+          gcloud firestore rules list --project=price-comparison-app-463007
+          
+          # テスト用のドキュメントを作成して権限を確認
+          echo "Testing Firestore write permissions..."
+          python test_firestore_permissions.py
+          echo "Firestore permissions verified successfully"
+
       - name: Run price scraping
         id: scrape
         continue-on-error: true  # エラーが発生しても続行
