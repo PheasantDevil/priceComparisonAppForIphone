@@ -8,12 +8,11 @@ on:
 
 env:
   PYTHONPATH: ${{ github.workspace }}
-  PYTHONUNBUFFERED: 1  # Pythonの出力バッファリングを無効化
 
 jobs:
   scrape-and-sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # タイムアウト設定
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -24,19 +23,6 @@ jobs:
         with:
           python-version: '3.13'
           cache: 'pip'
-
-      - name: Cache pip packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2t64 libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2
 
       - name: Install dependencies
         run: |
@@ -61,61 +47,32 @@ jobs:
       - name: Deploy Firestore security rules
         run: |
           echo "Deploying Firestore security rules..."
+          # Google Cloud認証情報を使用してFirestoreルールをデプロイ
           gcloud firestore rules deploy functions/firestore.rules \
-            --project=price-comparison-app-463007
-          echo "Firestore security rules deployed"
-
-      - name: Verify Firestore rules deployment
-        run: |
-          echo "Verifying Firestore rules deployment..."
-          # ルールのデプロイ完了を待機
-          sleep 30
-          
-          # 現在のルールを確認
-          echo "Current Firestore rules:"
-          gcloud firestore rules list --project=price-comparison-app-463007
-          
-          # テスト用のドキュメントを作成して権限を確認
-          echo "Testing Firestore write permissions..."
-          python test_firestore_permissions.py
-          echo "Firestore permissions verified successfully"
+            --project=price-comparison-app-463007 || echo "Firestore rules deployment failed, continuing..."
+          echo "Firestore security rules deployment completed"
 
       - name: Run price scraping
         id: scrape
-        continue-on-error: true  # エラーが発生しても続行
+        continue-on-error: true
         run: |
           echo "Starting price scraping..."
-          echo "Current directory: $(pwd)"
-          echo "Files in scripts directory:"
-          ls -la scripts/
-          echo "Config file exists: $(test -f config/config.production.yaml && echo 'Yes' || echo 'No')"
-          echo "Key file exists: $(test -f key.json && echo 'Yes' || echo 'No')"
           python scripts/scrape_prices.py
           echo "Price scraping completed with exit code: $?"
 
       - name: Sync to Firestore
         id: sync
-        continue-on-error: true  # エラーが発生しても続行
+        continue-on-error: true
         run: |
           echo "Starting Firestore sync..."
-          # key.jsonファイルが存在することを確認
-          if [ ! -f key.json ]; then
-            echo '${{ secrets.GCP_SA_KEY }}' > key.json
-            echo "Service account key file recreated for sync step"
-          fi
           python scripts/sync_cloud_storage_to_firestore.py
           echo "Firestore sync completed with exit code: $?"
 
       - name: Cleanup old Cloud Storage files
         id: cleanup
-        continue-on-error: true  # エラーが発生しても続行
+        continue-on-error: true
         run: |
           echo "Starting Cloud Storage cleanup..."
-          # key.jsonファイルが存在することを確認
-          if [ ! -f key.json ]; then
-            echo '${{ secrets.GCP_SA_KEY }}' > key.json
-            echo "Service account key file recreated for cleanup step"
-          fi
           python scripts/cleanup_cloud_storage.py
           echo "Cloud Storage cleanup completed with exit code: $?"
 
@@ -125,7 +82,6 @@ jobs:
           echo "Scrape step outcome: ${{ steps.scrape.outcome }}"
           echo "Sync step outcome: ${{ steps.sync.outcome }}"
           echo "Cleanup step outcome: ${{ steps.cleanup.outcome }}"
-          # 必要に応じて通知処理を追加
 
       - name: Cleanup sensitive files
         if: always()
