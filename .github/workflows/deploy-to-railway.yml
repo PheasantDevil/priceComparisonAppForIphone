@@ -69,17 +69,17 @@ jobs:
         rm -rf ~/.railway
         
         echo "Testing Railway authentication..."
-        railway whoami || echo "Authentication test failed, continuing..."
+        railway login --token "$RAILWAY_TOKEN" || echo "Login failed, continuing..."
         
         echo "Getting project info..."
         railway status || echo "Status check failed, continuing..."
         
         echo "Listing services to identify correct service name..."
-        railway service list || echo "Service list failed, trying default service..."
+        railway service || echo "Service command failed, trying default service..."
         
         echo "Deploying to Railway..."
         # プロジェクトIDとサービス名を明示的に指定してデプロイ
-        railway up --detach --service web --project price-comparison-app
+        railway up --detach --service web
         
         echo "Deployment initiated successfully!"
 
@@ -100,8 +100,11 @@ jobs:
         # Railway CLIの設定ディレクトリを完全にクリア
         rm -rf ~/.railway
         
+        echo "Logging in to Railway..."
+        railway login --token "$RAILWAY_TOKEN" || echo "Login failed, continuing..."
+        
         echo "Getting service status..."
-        URL=$(railway status --service web --project price-comparison-app --json | jq -r '.url // .domain // "https://your-app.railway.app"')
+        URL=$(railway status --service web --json | jq -r '.url // .domain // "https://your-app.railway.app"')
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
 
