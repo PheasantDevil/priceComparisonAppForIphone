@@ -285,8 +285,8 @@ class PriceScraper:
             # 既存のドキュメントを検索して更新、または新規作成
             query = (
                 self.db.collection('kaitori_prices')
-                .filter('series', '==', data["series"])
-                .filter('capacity', '==', data["capacity"])
+                .where('series', '==', data["series"])
+                .where('capacity', '==', data["capacity"])
             )
             docs = query.stream()
             
@@ -332,7 +332,7 @@ class PriceScraper:
             # 2週間以上前のデータを検索
             query = (
                 self.db.collection('price_history')
-                .filter('timestamp', '<', two_weeks_ago)
+                .where('timestamp', '<', two_weeks_ago)
             )
             
             docs = query.stream()
