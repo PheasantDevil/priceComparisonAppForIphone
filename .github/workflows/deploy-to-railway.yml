@@ -85,8 +85,11 @@ jobs:
         ls -la
         
         echo "Deploying to Railway..."
-        # まずサービスを指定せずにデプロイを試行
-        railway up --detach || echo "Default deployment failed"
+        # サービス名を明示的に指定してデプロイ
+        railway up --detach --service price-comparison-app || \
+        railway up --detach --service web || \
+        railway up --detach --service app || \
+        (echo "All service deployments failed, trying default" && railway up --detach)
         
         echo "Deployment initiated successfully!"
 
