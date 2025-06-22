@@ -53,6 +53,16 @@ roles/datastore.user
 roles/datastore.owner
 ```
 
+### Firestore セキュリティルールの手動デプロイ（オプション）
+
+ワークフローでエラーが発生した場合、手動でデプロイできます：
+
+```bash
+# gcloud CLIでFirestoreルールをデプロイ
+gcloud firestore rules deploy functions/firestore.rules \
+  --project=price-comparison-app-463007
+```
+
 ### トラブルシューティング
 
 **エラー: "does not have permission to access projects instance"**
@@ -64,6 +74,11 @@ roles/datastore.owner
 
 - サービスアカウント名が正しいことを確認
 - サービスアカウントが作成されていることを確認
+
+**エラー: "gcloud firestore rules command not found"**
+
+- Google Cloud SDK が最新版であることを確認
+- `gcloud components update`を実行
 
 ### セキュリティ注意事項
 
