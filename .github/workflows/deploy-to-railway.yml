@@ -69,17 +69,17 @@ jobs:
         rm -rf ~/.railway
         
         echo "Testing Railway authentication..."
-        railway login --token "$RAILWAY_TOKEN" || echo "Login failed, continuing..."
+        echo "$RAILWAY_TOKEN" | railway login || echo "Login failed, continuing..."
         
         echo "Getting project info..."
         railway status || echo "Status check failed, continuing..."
         
         echo "Listing services to identify correct service name..."
-        railway service || echo "Service command failed, trying default service..."
+        railway service list --json || echo "Service list failed, trying default service..."
         
         echo "Deploying to Railway..."
-        # プロジェクトIDとサービス名を明示的に指定してデプロイ
-        railway up --detach --service web
+        # サービス名を明示的に指定してデプロイ
+        railway up --detach --service price-comparison-app
         
         echo "Deployment initiated successfully!"
 
@@ -101,10 +101,10 @@ jobs:
         rm -rf ~/.railway
         
         echo "Logging in to Railway..."
-        railway login --token "$RAILWAY_TOKEN" || echo "Login failed, continuing..."
+        echo "$RAILWAY_TOKEN" | railway login || echo "Login failed, continuing..."
         
         echo "Getting service status..."
-        URL=$(railway status --service web --json | jq -r '.url // .domain // "https://your-app.railway.app"')
+        URL=$(railway status --service price-comparison-app --json | jq -r '.url // .domain // "https://your-app.railway.app"')
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
 
