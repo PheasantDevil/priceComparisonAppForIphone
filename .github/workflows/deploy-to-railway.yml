@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [ main ]
 
+  workflow_dispatch:  # 手動実行も可能
+
 env:
   RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
