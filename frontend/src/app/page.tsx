@@ -8,6 +8,18 @@ import { ModelSelector } from '../components/ModelSelector';
 import { PriceComparisonTable } from '../components/PriceComparisonTable';
 import PriceHistoryChart from '../components/PriceHistoryChart';
 
+// GitHub Pages 404 redirect handling
+useEffect(() => {
+  // Check if we're on GitHub Pages and need to redirect
+  if (typeof window !== 'undefined') {
+    const { pathname } = window.location;
+    if (pathname.includes('/?/')) {
+      const newPath = pathname.replace('/?/', '/').replace(/~and~/g, '&');
+      window.history.replaceState(null, '', newPath);
+    }
+  }
+}, []);
+
 const SERIES = [
   'iPhone 16',
   'iPhone 16 Pro',
