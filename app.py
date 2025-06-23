@@ -5,6 +5,15 @@ from datetime import datetime
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
+
+# CORS対応のための関数
+def add_cors_headers(response):
+    """CORSヘッダーを追加する関数"""
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
+
 # Google Cloud Storageクライアントの初期化
 storage_client = None
 bucket = None
@@ -222,23 +231,26 @@ def create_app():
         }
         
         if series in sample_data:
-            return jsonify({
+            response = jsonify({
                 'series': series,
                 'prices': sample_data[series]
             })
+            return add_cors_headers(response)
         else:
-            return jsonify({
+            response = jsonify({
                 'error': 'Series not found',
                 'message': f'Series "{series}" is not available'
             }), 404
+            return add_cors_headers(response[0]), response[1]
 
     @app.route("/get_prices")
     def get_prices():
         """価格取得エンドポイント（現在は無効化）"""
-        return jsonify({
+        response = jsonify({
             'error': 'Price retrieval functionality is currently disabled in Railway environment',
             'message': 'This feature requires web scraping capabilities'
         }), 503
+        return add_cors_headers(response[0]), response[1]
 
     return app
 
