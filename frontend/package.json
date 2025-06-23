@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p $PORT",
     "lint": "next lint"
   },
   "dependencies": {
@@ -31,5 +31,8 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "webpack-bundle-analyzer": "^4.10.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

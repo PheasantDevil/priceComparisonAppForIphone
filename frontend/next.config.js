@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: 'standalone',
+  experimental: {
+    outputFileTracingRoot: undefined,
+  },
   webpack: (config, { dev, isServer }) => {
     // 本番環境でのみバンドル分析を有効化
     if (!dev && !isServer) {
