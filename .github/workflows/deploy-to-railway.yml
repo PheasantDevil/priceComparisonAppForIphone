@@ -1,12 +1,15 @@
 name: Deploy to Railway
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+# 一時的に無効化
+# on:
+#   push:
+#     branches: [ main ]
+#   pull_request:
+#     branches: [ main ]
+#   workflow_dispatch:  # 手動実行も可能
 
-  workflow_dispatch:  # 手動実行も可能
+on:
+  workflow_dispatch:  # 手動実行のみ有効
 
 env:
   RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
