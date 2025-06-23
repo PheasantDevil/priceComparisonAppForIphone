@@ -68,7 +68,15 @@ jobs:
         mkdir -p ~/.railway
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
         
+        echo "Discovering Railway services..."
+        # 利用可能なサービスを確認
+        railway service list 2>/dev/null || echo "Service list not available"
+        
         echo "Deploying to Railway..."
+        # サービス名を明示的に指定してデプロイ
+        railway up --detach --service web || \
+        railway up --detach --service price-comparison-app || \
+        railway up --detach --service app || \
         railway up --detach
         
         echo "Deployment completed successfully!"

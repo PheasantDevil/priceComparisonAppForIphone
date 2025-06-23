@@ -4,7 +4,7 @@
   "description": "Price comparison application with Next.js frontend",
   "private": true,
   "scripts": {
-    "build": "cd frontend && npm install && npm run build",
+    "build": "cd frontend && npm install --include=dev && npm run build",
     "start": "cd frontend && npm start",
     "dev": "cd frontend && npm run dev"
   },
