@@ -62,36 +62,16 @@ jobs:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       run: |
         echo "Setting up Railway authentication..."
-        # 環境変数を設定
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         
-        # Railway CLIの設定ディレクトリを完全にクリア
-        rm -rf ~/.railway
-        
-        echo "Testing Railway authentication..."
-        # CI環境での認証方法
+        # CI環境での認証設定
         mkdir -p ~/.railway
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
         
-        echo "Getting project info..."
-        railway status || echo "Status check failed, continuing..."
-        
-        echo "Discovering available services..."
-        # 利用可能なサービスを確認
-        railway service list 2>/dev/null || echo "Service list command not available"
-        
-        echo "Checking current directory and files..."
-        pwd
-        ls -la
-        
         echo "Deploying to Railway..."
-        # サービス名を明示的に指定してデプロイ
-        railway up --detach --service price-comparison-app || \
-        railway up --detach --service web || \
-        railway up --detach --service app || \
-        (echo "All service deployments failed, trying default" && railway up --detach)
+        railway up --detach
         
-        echo "Deployment initiated successfully!"
+        echo "Deployment completed successfully!"
 
     - name: Wait for deployment
       run: |
@@ -104,22 +84,14 @@ jobs:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       run: |
         echo "Getting deployment URL..."
-        # 環境変数を設定
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         
-        # Railway CLIの設定ディレクトリを完全にクリア
-        rm -rf ~/.railway
-        
-        echo "Setting up Railway authentication..."
-        # CI環境での認証方法
+        # CI環境での認証設定
         mkdir -p ~/.railway
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
         
-        echo "Getting service status..."
-        # シンプルな方法でURLを取得
-        URL=$(railway status 2>/dev/null | grep -o 'https://[^[:space:]]*' | head -1) || \
-        URL="https://price-comparison-app-production.up.railway.app"
-        
+        # デプロイURLを取得
+        URL=$(railway status | grep -o 'https://[^[:space:]]*' | head -1 || echo "https://price-comparison-app-production.up.railway.app")
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
 
