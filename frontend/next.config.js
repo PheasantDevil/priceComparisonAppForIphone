@@ -6,10 +6,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  assetPrefix:
-    process.env.NODE_ENV === 'production' ? '/priceComparisonAppForIphone' : '',
-  basePath:
-    process.env.NODE_ENV === 'production' ? '/priceComparisonAppForIphone' : '',
   webpack: (config, { dev, isServer }) => {
     // 本番環境でのみバンドル分析を有効化
     if (!dev && !isServer) {
