@@ -8,18 +8,6 @@ import { ModelSelector } from '../components/ModelSelector';
 import { PriceComparisonTable } from '../components/PriceComparisonTable';
 import PriceHistoryChart from '../components/PriceHistoryChart';
 
-// GitHub Pages 404 redirect handling
-useEffect(() => {
-  // Check if we're on GitHub Pages and need to redirect
-  if (typeof window !== 'undefined') {
-    const { pathname } = window.location;
-    if (pathname.includes('/?/')) {
-      const newPath = pathname.replace('/?/', '/').replace(/~and~/g, '&');
-      window.history.replaceState(null, '', newPath);
-    }
-  }
-}, []);
-
 const SERIES = [
   'iPhone 16',
   'iPhone 16 Pro',
@@ -40,6 +28,18 @@ export default function Home() {
     useState('iPhone 16 Pro');
   const [selectedHistoryCapacity, setSelectedHistoryCapacity] = useState('1TB');
   const [showRakutenColumns, setShowRakutenColumns] = useState(false);
+
+  // GitHub Pages 404 redirect handling
+  useEffect(() => {
+    // Check if we're on GitHub Pages and need to redirect
+    if (typeof window !== 'undefined') {
+      const { pathname } = window.location;
+      if (pathname.includes('/?/')) {
+        const newPath = pathname.replace('/?/', '/').replace(/~and~/g, '&');
+        window.history.replaceState(null, '', newPath);
+      }
+    }
+  }, []);
 
   // ローカルストレージから選択状態を読み込む
   useEffect(() => {
