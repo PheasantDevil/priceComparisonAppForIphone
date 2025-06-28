@@ -28,6 +28,7 @@ jobs:
       run: |
         npm install -g @railway/cli@latest
         railway --version
+        echo "Railway CLI installed successfully"
 
     - name: Debug Railway Token
       run: |
@@ -51,19 +52,36 @@ jobs:
         mkdir -p ~/.railway
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
         
+        echo "Initializing Railway CLI..."
+        railway login --token "$RAILWAY_TOKEN" || echo "Login failed - continuing"
+        
         echo "Getting project status..."
         railway status || echo "Status check failed - continuing with deployment"
+        
+        echo "Linking to project..."
+        railway link || echo "Link failed - continuing"
         
         echo "Listing available services..."
         railway service list || echo "Service list not available"
         
         echo "Deploying to Railway..."
-        # 複数のサービスがある場合は、webサービスを指定してデプロイ
-        railway up --detach --service web || \
-        railway up --detach --service price-comparison-app || \
-        railway up --detach --service app || \
-        railway up --detach || {
-          echo "❌ Deployment failed"
+        # まずサービスをリンクしてからデプロイ
+        railway service || echo "Service link failed"
+        
+        # 複数のアプローチでデプロイを試行
+        echo "Attempting deployment with different approaches..."
+        
+        # アプローチ1: サービス名を指定
+        railway up --detach --service web && echo "✅ Deployed with --service web" || \
+        railway up --detach --service price-comparison-app && echo "✅ Deployed with --service price-comparison-app" || \
+        railway up --detach --service app && echo "✅ Deployed with --service app" || \
+        
+        # アプローチ2: プロジェクトIDを指定
+        railway up --detach --project price-comparison-app && echo "✅ Deployed with --project" || \
+        
+        # アプローチ3: デフォルトデプロイ
+        railway up --detach && echo "✅ Deployed with default settings" || {
+          echo "❌ All deployment approaches failed"
           echo "Checking Railway logs..."
           railway logs || echo "Could not retrieve logs"
           exit 1
