@@ -54,11 +54,18 @@ jobs:
         echo "Getting project status..."
         railway status || echo "Status check failed - continuing with deployment"
         
+        echo "Listing available services..."
+        railway service list || echo "Service list not available"
+        
         echo "Deploying to Railway..."
+        # 複数のサービスがある場合は、webサービスを指定してデプロイ
+        railway up --detach --service web || \
+        railway up --detach --service price-comparison-app || \
+        railway up --detach --service app || \
         railway up --detach || {
           echo "❌ Deployment failed"
           echo "Checking Railway logs..."
-          railway logs --tail 50 || echo "Could not retrieve logs"
+          railway logs || echo "Could not retrieve logs"
           exit 1
         }
         
@@ -76,8 +83,12 @@ jobs:
         mkdir -p ~/.railway
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
         
-        # デプロイURLを取得
-        URL=$(railway status | grep -o 'https://[^[:space:]]*' | head -1 || echo "https://price-comparison-app-production.up.railway.app")
+        # デプロイURLを取得（複数のサービスに対応）
+        URL=$(railway status --service web | grep -o 'https://[^[:space:]]*' | head -1 || \
+              railway status --service price-comparison-app | grep -o 'https://[^[:space:]]*' | head -1 || \
+              railway status --service app | grep -o 'https://[^[:space:]]*' | head -1 || \
+              railway status | grep -o 'https://[^[:space:]]*' | head -1 || \
+              echo "https://price-comparison-app-production.up.railway.app")
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
 
