@@ -56,15 +56,34 @@ GOOGLE_APPLICATION_CREDENTIALS_JSON={"type":"service_account","project_id":"your
 4. **"Generate Token"** をクリック
 5. 生成されたトークンをコピー
 
-#### 4.2 GitHub Secrets の設定
+#### 4.2 Project ID と Service ID の取得
+
+1. Railway ダッシュボードでプロジェクトを選択
+2. **"Settings"** タブをクリック
+3. **Project ID** をコピー（例: `4f0bf6cf-f794-41a9-9c8c-1f74bc38ab48`）
+4. サービスページで **Service ID** をコピー（例: `9b4de8d6-2fab-4cc6-80a2-3d742b566990`）
+
+#### 4.3 GitHub Secrets の設定
 
 1. GitHub リポジトリ `priceComparisonAppForIphone` にアクセス
 2. **"Settings"** タブをクリック
 3. **"Secrets and variables"** → **"Actions"** をクリック
-4. **"New repository secret"** をクリック
-5. **Name**: `RAILWAY_TOKEN`
-6. **Value**: Railway で生成したトークン
-7. **"Add secret"** をクリック
+4. 以下の 3 つのシークレットを追加：
+
+**RAILWAY_TOKEN**
+
+- **Name**: `RAILWAY_TOKEN`
+- **Value**: Railway で生成したトークン
+
+**RAILWAY_PROJECT_ID**
+
+- **Name**: `RAILWAY_PROJECT_ID`
+- **Value**: Railway プロジェクトの ID（例: `4f0bf6cf-f794-41a9-9c8c-1f74bc38ab48`）
+
+**RAILWAY_SERVICE_ID**
+
+- **Name**: `RAILWAY_SERVICE_ID`
+- **Value**: Railway サービスの ID（例: `9b4de8d6-2fab-4cc6-80a2-3d742b566990`）
 
 ### 5. 動作確認
 
@@ -101,6 +120,7 @@ curl https://your-app-url.railway.app/health
 
 - Railway ダッシュボードのログを確認
 - 環境変数が正しく設定されているか確認
+- Project ID と Service ID が正しいか確認
 
 **アプリが起動しない**
 
@@ -112,12 +132,19 @@ curl https://your-app-url.railway.app/health
 - 値に特殊文字が含まれていないか確認
 - キー名が正しいか確認
 
+**Project ID または Service ID エラー**
+
+- Railway ダッシュボードで正しい ID を確認
+- GitHub Secrets に正しく設定されているか確認
+
 ### 7. 完了チェックリスト
 
 - [ ] Railway プロジェクト作成
 - [ ] 環境変数設定完了
 - [ ] Railway Token 取得
-- [ ] GitHub Secrets 設定
+- [ ] Project ID 取得
+- [ ] Service ID 取得
+- [ ] GitHub Secrets 設定（3 つすべて）
 - [ ] 初回デプロイ成功
 - [ ] ヘルスチェック成功
 - [ ] アプリケーション動作確認
