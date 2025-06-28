@@ -9,6 +9,8 @@ on:
 
 env:
   RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+  RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+  RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
 
 jobs:
   deploy:
@@ -40,10 +42,30 @@ jobs:
           echo "❌ Railway token is not available"
           exit 1
         fi
+        
+        echo "Checking Railway Project ID availability..."
+        if [ -n "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
+          echo "✅ Railway Project ID is available"
+          echo "Project ID: ${{ secrets.RAILWAY_PROJECT_ID }}"
+        else
+          echo "❌ Railway Project ID is not available"
+          exit 1
+        fi
+        
+        echo "Checking Railway Service ID availability..."
+        if [ -n "${{ secrets.RAILWAY_SERVICE_ID }}" ]; then
+          echo "✅ Railway Service ID is available"
+          echo "Service ID: ${{ secrets.RAILWAY_SERVICE_ID }}"
+        else
+          echo "❌ Railway Service ID is not available"
+          exit 1
+        fi
 
     - name: Deploy to Railway
       env:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
       run: |
         echo "Setting up Railway authentication..."
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
@@ -52,38 +74,11 @@ jobs:
         mkdir -p ~/.railway
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
         
-        echo "Initializing Railway CLI..."
-        railway login --token "$RAILWAY_TOKEN" || echo "Login failed - continuing"
-        
-        echo "Getting project status..."
-        railway status || echo "Status check failed - continuing with deployment"
-        
-        echo "Linking to project..."
-        railway link || echo "Link failed - continuing"
-        
-        echo "Listing available services..."
-        railway service list || echo "Service list not available"
-        
-        echo "Deploying to Railway..."
-        # まずサービスをリンクしてからデプロイ
-        railway service || echo "Service link failed"
-        
-        # 複数のアプローチでデプロイを試行
-        echo "Attempting deployment with different approaches..."
-        
-        # アプローチ1: サービス名を指定
-        railway up --detach --service web && echo "✅ Deployed with --service web" || \
-        railway up --detach --service price-comparison-app && echo "✅ Deployed with --service price-comparison-app" || \
-        railway up --detach --service app && echo "✅ Deployed with --service app" || \
-        
-        # アプローチ2: プロジェクトIDを指定
-        railway up --detach --project price-comparison-app && echo "✅ Deployed with --project" || \
-        
-        # アプローチ3: デフォルトデプロイ
-        railway up --detach && echo "✅ Deployed with default settings" || {
-          echo "❌ All deployment approaches failed"
+        echo "Deploying to Railway with Project ID: $RAILWAY_PROJECT_ID, Service ID: $RAILWAY_SERVICE_ID"
+        railway up --detach --project $RAILWAY_PROJECT_ID --service $RAILWAY_SERVICE_ID || {
+          echo "❌ Deployment failed"
           echo "Checking Railway logs..."
-          railway logs || echo "Could not retrieve logs"
+          railway logs --project $RAILWAY_PROJECT_ID --service $RAILWAY_SERVICE_ID || echo "Could not retrieve logs"
           exit 1
         }
         
@@ -93,6 +88,8 @@ jobs:
       id: get-url
       env:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
       run: |
         echo "Getting deployment URL..."
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
@@ -101,11 +98,8 @@ jobs:
         mkdir -p ~/.railway
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
         
-        # デプロイURLを取得（複数のサービスに対応）
-        URL=$(railway status --service web | grep -o 'https://[^[:space:]]*' | head -1 || \
-              railway status --service price-comparison-app | grep -o 'https://[^[:space:]]*' | head -1 || \
-              railway status --service app | grep -o 'https://[^[:space:]]*' | head -1 || \
-              railway status | grep -o 'https://[^[:space:]]*' | head -1 || \
+        # デプロイURLを取得（Project IDとService IDを使用）
+        URL=$(railway status --project $RAILWAY_PROJECT_ID --service $RAILWAY_SERVICE_ID | grep -o 'https://[^[:space:]]*' | head -1 || \
               echo "https://price-comparison-app-production.up.railway.app")
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
@@ -138,4 +132,14 @@ jobs:
             console.log('PRコメントを投稿しました');
           } catch (error) {
             console.log('PRコメントの投稿に失敗しました:', error.message);
-          } 
+          }
+
+    - name: Get Railway logs
+      run: |
+        echo "Getting Railway logs..."
+        railway logs --project $RAILWAY_PROJECT_ID --service $RAILWAY_SERVICE_ID
+
+    - name: Get Railway status
+      run: |
+        echo "Getting Railway status..."
+        railway status --project $RAILWAY_PROJECT_ID --service $RAILWAY_SERVICE_ID
