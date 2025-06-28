@@ -11,5 +11,6 @@
     "restartPolicyMaxRetries": 10,
     "numReplicas": 1
   },
-  "service": "web"
+  "service": "web",
+  "project": "price-comparison-app"
 }
