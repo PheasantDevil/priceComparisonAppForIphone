@@ -131,12 +131,12 @@ jobs:
             console.log('PRコメントの投稿に失敗しました:', error.message);
           }
 
-    - name: Get Railway logs
-      run: |
-        echo "Getting Railway logs..."
-        railway logs --service $RAILWAY_SERVICE_ID
+    # - name: Get Railway logs
+    #   run: |
+    #     echo "Getting Railway logs..."
+    #     railway logs --service $RAILWAY_SERVICE_ID
 
-    - name: Get Railway status
-      run: |
-        echo "Getting Railway status..."
-        railway status --service $RAILWAY_SERVICE_ID
+    # - name: Get Railway status
+    #   run: |
+    #     echo "Getting Railway status..."
+    #     railway status --service $RAILWAY_SERVICE_ID
