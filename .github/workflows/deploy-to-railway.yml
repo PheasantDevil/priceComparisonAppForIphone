@@ -64,42 +64,33 @@ jobs:
     - name: Deploy to Railway
       env:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
         RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
       run: |
         echo "Setting up Railway authentication..."
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
-        
-        # CI環境での認証設定
         mkdir -p ~/.railway
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
-        
-        echo "Deploying to Railway with Project ID: $RAILWAY_PROJECT_ID, Service ID: $RAILWAY_SERVICE_ID"
-        railway up --detach --project $RAILWAY_PROJECT_ID --service $RAILWAY_SERVICE_ID || {
+
+        echo "Deploying to Railway with Service ID: $RAILWAY_SERVICE_ID"
+        railway up --detach --service $RAILWAY_SERVICE_ID || {
           echo "❌ Deployment failed"
           echo "Checking Railway logs..."
-          railway logs --project $RAILWAY_PROJECT_ID --service $RAILWAY_SERVICE_ID || echo "Could not retrieve logs"
+          railway logs --service $RAILWAY_SERVICE_ID || echo "Could not retrieve logs"
           exit 1
         }
-        
         echo "✅ Deployment completed successfully!"
 
     - name: Get deployment URL
       id: get-url
       env:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
         RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
       run: |
         echo "Getting deployment URL..."
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
-        
-        # CI環境での認証設定
         mkdir -p ~/.railway
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
-        
-        # デプロイURLを取得（Project IDとService IDを使用）
-        URL=$(railway status --project $RAILWAY_PROJECT_ID --service $RAILWAY_SERVICE_ID | grep -o 'https://[^[:space:]]*' | head -1 || \
+        URL=$(railway status --service $RAILWAY_SERVICE_ID | grep -o 'https://[^[:space:]]*' | head -1 || \
               echo "https://price-comparison-app-production.up.railway.app")
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
@@ -137,9 +128,9 @@ jobs:
     - name: Get Railway logs
       run: |
         echo "Getting Railway logs..."
-        railway logs --project $RAILWAY_PROJECT_ID --service $RAILWAY_SERVICE_ID
+        railway logs --service $RAILWAY_SERVICE_ID
 
     - name: Get Railway status
       run: |
         echo "Getting Railway status..."
-        railway status --project $RAILWAY_PROJECT_ID --service $RAILWAY_SERVICE_ID
+        railway status --service $RAILWAY_SERVICE_ID
