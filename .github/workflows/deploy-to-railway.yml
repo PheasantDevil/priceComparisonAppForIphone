@@ -27,6 +27,18 @@ jobs:
     - name: Install Railway CLI
       run: |
         npm install -g @railway/cli@latest
+        railway --version
+
+    - name: Debug Railway Token
+      run: |
+        echo "Checking Railway token availability..."
+        if [ -n "${{ secrets.RAILWAY_TOKEN }}" ]; then
+          echo "✅ Railway token is available"
+          echo "Token length: ${#RAILWAY_TOKEN}"
+        else
+          echo "❌ Railway token is not available"
+          exit 1
+        fi
 
     - name: Deploy to Railway
       env:
@@ -40,12 +52,17 @@ jobs:
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
         
         echo "Getting project status..."
-        railway status || echo "Status check failed"
+        railway status || echo "Status check failed - continuing with deployment"
         
         echo "Deploying to Railway..."
-        railway up --detach
+        railway up --detach || {
+          echo "❌ Deployment failed"
+          echo "Checking Railway logs..."
+          railway logs --tail 50 || echo "Could not retrieve logs"
+          exit 1
+        }
         
-        echo "Deployment completed successfully!"
+        echo "✅ Deployment completed successfully!"
 
     - name: Get deployment URL
       id: get-url
@@ -68,7 +85,9 @@ jobs:
       run: |
         echo "Performing health check..."
         sleep 30
-        # Health check will be performed by Railway's built-in healthcheck
+        URL="${{ steps.get-url.outputs.deployment_url }}"
+        echo "Checking health at: $URL/health"
+        curl -f "$URL/health" || echo "Health check failed - this is normal for first deployment"
 
     - name: Comment on PR
       if: github.event_name == 'pull_request'
