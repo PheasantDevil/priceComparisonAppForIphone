@@ -31,6 +31,17 @@ jobs:
       with:
         node-version: '18'
 
+    - name: Debug file structure
+      run: |
+        echo "=== Current directory ==="
+        pwd
+        echo "=== Repository structure ==="
+        find . -name "*.ts" -o -name "*.tsx" | head -10
+        echo "=== Frontend structure ==="
+        ls -la frontend/src/
+        echo "=== API file check ==="
+        ls -la frontend/src/lib/api.ts
+
     - name: Install dependencies
       working-directory: frontend
       run: npm install
