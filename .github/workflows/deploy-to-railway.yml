@@ -73,7 +73,7 @@ jobs:
     - name: Deploy to Railway
       run: |
         echo "Setting up Railway authentication..."
-        echo "${{ secrets.RAILWAY_TOKEN }}" | railway login --token || {
+        echo "${{ secrets.RAILWAY_TOKEN }}" | railway login || {
           echo "❌ Railway login failed"
           exit 1
         }
@@ -91,7 +91,7 @@ jobs:
       id: get-url
       run: |
         echo "Getting deployment URL..."
-        echo "${{ secrets.RAILWAY_TOKEN }}" | railway login --token || echo "Login failed - continuing"
+        echo "${{ secrets.RAILWAY_TOKEN }}" | railway login || echo "Login failed - continuing"
         URL=$(railway status --service $RAILWAY_SERVICE_ID | grep -o 'https://[^[:space:]]*' | head -1 || \
               echo "https://price-comparison-app-production.up.railway.app")
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
@@ -130,11 +130,11 @@ jobs:
     - name: Get Railway logs
       run: |
         echo "Getting Railway logs..."
-        echo "${{ secrets.RAILWAY_TOKEN }}" | railway login --token || echo "Login failed - continuing"
+        echo "${{ secrets.RAILWAY_TOKEN }}" | railway login || echo "Login failed - continuing"
         railway logs --service $RAILWAY_SERVICE_ID
 
     - name: Get Railway status
       run: |
         echo "Getting Railway status..."
-        echo "${{ secrets.RAILWAY_TOKEN }}" | railway login --token || echo "Login failed - continuing"
+        echo "${{ secrets.RAILWAY_TOKEN }}" | railway login || echo "Login failed - continuing"
         railway status --service $RAILWAY_SERVICE_ID
