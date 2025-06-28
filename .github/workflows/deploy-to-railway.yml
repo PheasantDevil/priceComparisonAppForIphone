@@ -70,11 +70,19 @@ jobs:
           echo "Frontend files: $(find frontend -type f | wc -l)"
         fi
 
-    - name: Deploy to Railway
+    - name: Setup Railway authentication
       run: |
         echo "Setting up Railway authentication..."
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         
+        # Railway CLIの認証設定ファイルを作成
+        mkdir -p ~/.railway
+        echo "$RAILWAY_TOKEN" > ~/.railway/token.json
+        
+        echo "✅ Railway authentication setup completed"
+
+    - name: Deploy to Railway
+      run: |
         echo "Deploying to Railway with Service ID: $RAILWAY_SERVICE_ID"
         railway up --detach --service $RAILWAY_SERVICE_ID || {
           echo "❌ Deployment failed"
@@ -88,7 +96,6 @@ jobs:
       id: get-url
       run: |
         echo "Getting deployment URL..."
-        export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         URL=$(railway status --service $RAILWAY_SERVICE_ID | grep -o 'https://[^[:space:]]*' | head -1 || \
               echo "https://price-comparison-app-production.up.railway.app")
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
@@ -127,11 +134,9 @@ jobs:
     - name: Get Railway logs
       run: |
         echo "Getting Railway logs..."
-        export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         railway logs --service $RAILWAY_SERVICE_ID
 
     - name: Get Railway status
       run: |
         echo "Getting Railway status..."
-        export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         railway status --service $RAILWAY_SERVICE_ID
