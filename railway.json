@@ -12,5 +12,7 @@
     "numReplicas": 1
   },
   "service": "web",
-  "project": "price-comparison-app"
+  "project": "price-comparison-app",
+  "projectId": "4f0bf6cf-f794-41a9-9c8c-1f74bc38ab48",
+  "serviceId": "9b4de8d6-2fab-4cc6-80a2-3d742b566990"
 }
