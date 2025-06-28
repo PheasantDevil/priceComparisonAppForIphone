@@ -7,15 +7,13 @@ on:
     branches: [ main ]
   workflow_dispatch:  # 手動実行も可能
 
-env:
-  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-  RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-  RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
-
 jobs:
   deploy:
     name: Deploy to Railway
     runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
     
     steps:
     - name: Checkout repository
@@ -62,9 +60,6 @@ jobs:
         fi
 
     - name: Deploy to Railway
-      env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
       run: |
         echo "Setting up Railway authentication..."
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
@@ -82,9 +77,6 @@ jobs:
 
     - name: Get deployment URL
       id: get-url
-      env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
       run: |
         echo "Getting deployment URL..."
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
@@ -126,9 +118,6 @@ jobs:
           }
 
     - name: Get Railway logs
-      env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
       run: |
         echo "Getting Railway logs..."
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
@@ -137,9 +126,6 @@ jobs:
         railway logs --service $RAILWAY_SERVICE_ID
 
     - name: Get Railway status
-      env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
       run: |
         echo "Getting Railway status..."
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
