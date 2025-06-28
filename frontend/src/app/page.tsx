@@ -1,12 +1,12 @@
 'use client';
 
+import { clearCache, fetchPrices, PricesResponse } from '@/lib/api';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LoadingState } from '../components/LoadingState';
 import { ModelSelector } from '../components/ModelSelector';
 import { PriceComparisonTable } from '../components/PriceComparisonTable';
 import PriceHistoryChart from '../components/PriceHistoryChart';
-import { clearCache, fetchPrices, PricesResponse } from '../lib/api';
 
 const SERIES = [
   'iPhone 16',
