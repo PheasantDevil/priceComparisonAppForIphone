@@ -26,7 +26,9 @@ else
   exit 1
 fi
 
-echo "📂 Project root: $PROJECT_ROOT"
+# プロジェクトルートを絶対パスに変換
+PROJECT_ROOT=$(realpath "$PROJECT_ROOT")
+echo "📂 Project root (absolute): $PROJECT_ROOT"
 
 # プロジェクトルートの内容を確認
 echo "📂 Project root contents:"
