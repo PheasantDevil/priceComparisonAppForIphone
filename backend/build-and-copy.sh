@@ -85,9 +85,19 @@ echo "📂 Current directory after build: $(pwd)"
 echo "📂 Current directory contents after build:"
 ls -la
 
-# プロジェクトルートに戻る
+# プロジェクトルートに戻る（絶対パスを使用）
+echo "📂 Returning to project root..."
 cd "$PROJECT_ROOT"
-echo "📂 Returned to project root: $(pwd)"
+echo "📂 Current directory after return: $(pwd)"
+
+# プロジェクトルートにいることを確認
+if [ "$(pwd)" != "$PROJECT_ROOT" ]; then
+  echo "❌ Failed to return to project root"
+  echo "Current: $(pwd), Expected: $PROJECT_ROOT"
+  exit 1
+fi
+
+echo "✅ Successfully returned to project root"
 
 # ビルド後のディレクトリ状態を確認
 echo "📂 Post-build project root contents:"
