@@ -1,11 +1,18 @@
 [phases.setup]
-nixPkgs = ["python3", "nodejs"]
+nixPkgs = ["python3", "nodejs", "curl"]
 
 [phases.install]
-cmds = ["pip install -r backend/requirements.txt"]
+cmds = [
+  "curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py",
+  "python3 get-pip.py --user",
+  "python3 -m pip install --user -r backend/requirements.txt"
+]
 
 [phases.build]
-cmds = ["chmod +x backend/build-and-copy.sh", "backend/build-and-copy.sh"]
+cmds = [
+  "chmod +x backend/build-and-copy.sh",
+  "backend/build-and-copy.sh"
+]
 
 [start]
 cmd = "python backend/app.py"
