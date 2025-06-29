@@ -89,11 +89,47 @@ jobs:
         mkdir -p ~/.railway
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
         
+        # 環境変数でも認証を設定
+        echo "RAILWAY_TOKEN=$RAILWAY_TOKEN" >> $GITHUB_ENV
+        
+        # 認証テスト
+        echo "Testing Railway authentication..."
+        railway whoami || {
+          echo "❌ Railway authentication failed"
+          echo "Token content (first 10 chars): ${RAILWAY_TOKEN:0:10}..."
+          echo "Trying alternative authentication method..."
+          
+          # 代替認証方法
+          echo "$RAILWAY_TOKEN" | railway login --token-stdin || {
+            echo "❌ Alternative authentication also failed"
+            exit 1
+          }
+        }
+        
         echo "✅ Railway authentication setup completed"
+
+    - name: Clean up unnecessary files
+      run: |
+        echo "Cleaning up unnecessary files..."
+        # 不要なartifactsディレクトリを削除（存在する場合）
+        if [ -d "artifacts" ]; then
+          echo "Removing artifacts directory..."
+          rm -rf artifacts/
+        fi
+        
+        # 不要なzipファイルを削除
+        find . -name "*.zip" -not -path "./frontend/node_modules/*" -delete || true
+        
+        echo "✅ Cleanup completed"
 
     - name: Deploy to Railway
       run: |
         echo "Deploying to Railway with Service ID: $RAILWAY_SERVICE_ID"
+        
+        # デプロイ前の確認
+        echo "Current directory contents:"
+        ls -la
+        
         railway up --detach --service $RAILWAY_SERVICE_ID || {
           echo "❌ Deployment failed"
           echo "Checking Railway logs..."
