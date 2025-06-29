@@ -1,0 +1,372 @@
+{
+  "iPhone 16": {
+    "128GB": {
+      "official_price": 124800,
+      "kaitori_price": 65000,
+      "price_diff": -59800,
+      "rakuten_diff": -45000,
+      "colors": {
+        "Black": {
+          "official": 124800,
+          "kaitori": 65000
+        },
+        "White": {
+          "official": 124800,
+          "kaitori": 65000
+        },
+        "Blue": {
+          "official": 124800,
+          "kaitori": 65000
+        },
+        "Green": {
+          "official": 124800,
+          "kaitori": 65000
+        }
+      }
+    },
+    "256GB": {
+      "official_price": 139800,
+      "kaitori_price": 70000,
+      "price_diff": -69800,
+      "rakuten_diff": -55000,
+      "colors": {
+        "Black": {
+          "official": 139800,
+          "kaitori": 70000
+        },
+        "White": {
+          "official": 139800,
+          "kaitori": 70000
+        },
+        "Blue": {
+          "official": 139800,
+          "kaitori": 70000
+        },
+        "Green": {
+          "official": 139800,
+          "kaitori": 70000
+        }
+      }
+    },
+    "512GB": {
+      "official_price": 169800,
+      "kaitori_price": 80000,
+      "price_diff": -89800,
+      "rakuten_diff": -75000,
+      "colors": {
+        "Black": {
+          "official": 169800,
+          "kaitori": 80000
+        },
+        "White": {
+          "official": 169800,
+          "kaitori": 80000
+        },
+        "Blue": {
+          "official": 169800,
+          "kaitori": 80000
+        },
+        "Green": {
+          "official": 169800,
+          "kaitori": 80000
+        }
+      }
+    }
+  },
+  "iPhone 16 Plus": {
+    "128GB": {
+      "official_price": 139800,
+      "kaitori_price": 70000,
+      "price_diff": -69800,
+      "rakuten_diff": -55000,
+      "colors": {
+        "Black": {
+          "official": 139800,
+          "kaitori": 70000
+        },
+        "White": {
+          "official": 139800,
+          "kaitori": 70000
+        },
+        "Blue": {
+          "official": 139800,
+          "kaitori": 70000
+        },
+        "Green": {
+          "official": 139800,
+          "kaitori": 70000
+        }
+      }
+    },
+    "256GB": {
+      "official_price": 154800,
+      "kaitori_price": 75000,
+      "price_diff": -79800,
+      "rakuten_diff": -65000,
+      "colors": {
+        "Black": {
+          "official": 154800,
+          "kaitori": 75000
+        },
+        "White": {
+          "official": 154800,
+          "kaitori": 75000
+        },
+        "Blue": {
+          "official": 154800,
+          "kaitori": 75000
+        },
+        "Green": {
+          "official": 154800,
+          "kaitori": 75000
+        }
+      }
+    },
+    "512GB": {
+      "official_price": 184800,
+      "kaitori_price": 85000,
+      "price_diff": -99800,
+      "rakuten_diff": -85000,
+      "colors": {
+        "Black": {
+          "official": 184800,
+          "kaitori": 85000
+        },
+        "White": {
+          "official": 184800,
+          "kaitori": 85000
+        },
+        "Blue": {
+          "official": 184800,
+          "kaitori": 85000
+        },
+        "Green": {
+          "official": 184800,
+          "kaitori": 85000
+        }
+      }
+    }
+  },
+  "iPhone 16 Pro": {
+    "128GB": {
+      "official_price": 159800,
+      "kaitori_price": 85000,
+      "price_diff": -74800,
+      "rakuten_diff": -60000,
+      "colors": {
+        "Natural Titanium": {
+          "official": 159800,
+          "kaitori": 85000
+        },
+        "Blue Titanium": {
+          "official": 159800,
+          "kaitori": 85000
+        },
+        "White Titanium": {
+          "official": 159800,
+          "kaitori": 85000
+        },
+        "Black Titanium": {
+          "official": 159800,
+          "kaitori": 85000
+        }
+      }
+    },
+    "256GB": {
+      "official_price": 174800,
+      "kaitori_price": 90000,
+      "price_diff": -84800,
+      "rakuten_diff": -70000,
+      "colors": {
+        "Natural Titanium": {
+          "official": 174800,
+          "kaitori": 90000
+        },
+        "Blue Titanium": {
+          "official": 174800,
+          "kaitori": 90000
+        },
+        "White Titanium": {
+          "official": 174800,
+          "kaitori": 90000
+        },
+        "Black Titanium": {
+          "official": 174800,
+          "kaitori": 90000
+        }
+      }
+    },
+    "512GB": {
+      "official_price": 204800,
+      "kaitori_price": 100000,
+      "price_diff": -104800,
+      "rakuten_diff": -90000,
+      "colors": {
+        "Natural Titanium": {
+          "official": 204800,
+          "kaitori": 100000
+        },
+        "Blue Titanium": {
+          "official": 204800,
+          "kaitori": 100000
+        },
+        "White Titanium": {
+          "official": 204800,
+          "kaitori": 100000
+        },
+        "Black Titanium": {
+          "official": 204800,
+          "kaitori": 100000
+        }
+      }
+    },
+    "1TB": {
+      "official_price": 234800,
+      "kaitori_price": 110000,
+      "price_diff": -124800,
+      "rakuten_diff": -110000,
+      "colors": {
+        "Natural Titanium": {
+          "official": 234800,
+          "kaitori": 110000
+        },
+        "Blue Titanium": {
+          "official": 234800,
+          "kaitori": 110000
+        },
+        "White Titanium": {
+          "official": 234800,
+          "kaitori": 110000
+        },
+        "Black Titanium": {
+          "official": 234800,
+          "kaitori": 110000
+        }
+      }
+    }
+  },
+  "iPhone 16 Pro Max": {
+    "256GB": {
+      "official_price": 189800,
+      "kaitori_price": 95000,
+      "price_diff": -94800,
+      "rakuten_diff": -80000,
+      "colors": {
+        "Natural Titanium": {
+          "official": 189800,
+          "kaitori": 95000
+        },
+        "Blue Titanium": {
+          "official": 189800,
+          "kaitori": 95000
+        },
+        "White Titanium": {
+          "official": 189800,
+          "kaitori": 95000
+        },
+        "Black Titanium": {
+          "official": 189800,
+          "kaitori": 95000
+        }
+      }
+    },
+    "512GB": {
+      "official_price": 219800,
+      "kaitori_price": 105000,
+      "price_diff": -114800,
+      "rakuten_diff": -100000,
+      "colors": {
+        "Natural Titanium": {
+          "official": 219800,
+          "kaitori": 105000
+        },
+        "Blue Titanium": {
+          "official": 219800,
+          "kaitori": 105000
+        },
+        "White Titanium": {
+          "official": 219800,
+          "kaitori": 105000
+        },
+        "Black Titanium": {
+          "official": 219800,
+          "kaitori": 105000
+        }
+      }
+    },
+    "1TB": {
+      "official_price": 249800,
+      "kaitori_price": 115000,
+      "price_diff": -134800,
+      "rakuten_diff": -120000,
+      "colors": {
+        "Natural Titanium": {
+          "official": 249800,
+          "kaitori": 115000
+        },
+        "Blue Titanium": {
+          "official": 249800,
+          "kaitori": 115000
+        },
+        "White Titanium": {
+          "official": 249800,
+          "kaitori": 115000
+        },
+        "Black Titanium": {
+          "official": 249800,
+          "kaitori": 115000
+        }
+      }
+    }
+  },
+  "iPhone 16e": {
+    "128GB": {
+      "official_price": 99800,
+      "kaitori_price": 55000,
+      "price_diff": -44800,
+      "rakuten_diff": -30000,
+      "colors": {
+        "Black": {
+          "official": 99800,
+          "kaitori": 55000
+        },
+        "White": {
+          "official": 99800,
+          "kaitori": 55000
+        }
+      }
+    },
+    "256GB": {
+      "official_price": 114800,
+      "kaitori_price": 60000,
+      "price_diff": -54800,
+      "rakuten_diff": -40000,
+      "colors": {
+        "Black": {
+          "official": 114800,
+          "kaitori": 60000
+        },
+        "White": {
+          "official": 114800,
+          "kaitori": 60000
+        }
+      }
+    },
+    "512GB": {
+      "official_price": 144800,
+      "kaitori_price": 70000,
+      "price_diff": -74800,
+      "rakuten_diff": -60000,
+      "colors": {
+        "Black": {
+          "official": 144800,
+          "kaitori": 70000
+        },
+        "White": {
+          "official": 144800,
+          "kaitori": 70000
+        }
+      }
+    }
+  }
+}

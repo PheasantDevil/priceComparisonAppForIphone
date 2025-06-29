@@ -1,0 +1,106 @@
+{
+  "iPhone 16": {
+    "128GB": {
+      "predictions": [
+        {
+          "timestamp": 1746368793,
+          "date": "2025-01-03",
+          "predicted_price": 85000,
+          "confidence": 0.85,
+          "factors": {
+            "market_trend": "stable",
+            "seasonal_factor": "high",
+            "model_age": "new",
+            "demand_level": "medium"
+          },
+          "prediction_horizon": "30_days",
+          "algorithm": "linear_regression"
+        },
+        {
+          "timestamp": 1746455193,
+          "date": "2025-01-04",
+          "predicted_price": 86000,
+          "confidence": 0.82,
+          "factors": {
+            "market_trend": "slight_up",
+            "seasonal_factor": "high",
+            "model_age": "new",
+            "demand_level": "medium"
+          },
+          "prediction_horizon": "30_days",
+          "algorithm": "linear_regression"
+        }
+      ],
+      "latest_prediction": {
+        "price": 86000,
+        "confidence": 0.82,
+        "trend": "up",
+        "change": 1000
+      }
+    },
+    "256GB": {
+      "predictions": [
+        {
+          "timestamp": 1746368793,
+          "date": "2025-01-03",
+          "predicted_price": 95000,
+          "confidence": 0.88,
+          "factors": {
+            "market_trend": "stable",
+            "seasonal_factor": "high",
+            "model_age": "new",
+            "demand_level": "high"
+          },
+          "prediction_horizon": "30_days",
+          "algorithm": "linear_regression"
+        }
+      ],
+      "latest_prediction": {
+        "price": 95000,
+        "confidence": 0.88,
+        "trend": "stable",
+        "change": 0
+      }
+    }
+  },
+  "iPhone 16 Pro": {
+    "256GB": {
+      "predictions": [
+        {
+          "timestamp": 1746368793,
+          "date": "2025-01-03",
+          "predicted_price": 120000,
+          "confidence": 0.82,
+          "factors": {
+            "market_trend": "stable",
+            "seasonal_factor": "high",
+            "model_age": "new",
+            "demand_level": "high"
+          },
+          "prediction_horizon": "30_days",
+          "algorithm": "linear_regression"
+        },
+        {
+          "timestamp": 1746455193,
+          "date": "2025-01-04",
+          "predicted_price": 118000,
+          "confidence": 0.79,
+          "factors": {
+            "market_trend": "slight_down",
+            "seasonal_factor": "high",
+            "model_age": "new",
+            "demand_level": "medium"
+          },
+          "prediction_horizon": "30_days",
+          "algorithm": "linear_regression"
+        }
+      ],
+      "latest_prediction": {
+        "price": 118000,
+        "confidence": 0.79,
+        "trend": "down",
+        "change": -2000
+      }
+    }
+  }
+}
