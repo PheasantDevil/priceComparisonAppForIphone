@@ -2,20 +2,43 @@
 
 echo "🚀 Building Next.js frontend..."
 
+# 現在のディレクトリを確認
+echo "📂 Current directory: $(pwd)"
+echo "📂 Current directory contents:"
+ls -la
+
 # プロジェクトルートを確実に特定
 if [ -f "backend/build-and-copy.sh" ]; then
   # backendディレクトリから実行された場合
   PROJECT_ROOT="$(dirname "$(dirname "$0")")"
+  echo "📂 Detected: running from backend directory"
 elif [ -f "build-and-copy.sh" ]; then
   # プロジェクトルートから実行された場合
   PROJECT_ROOT="$(pwd)"
+  echo "📂 Detected: running from project root"
 else
   echo "❌ build-and-copy.sh not found in expected locations"
+  echo "🔍 Searching for build-and-copy.sh..."
+  find . -name "build-and-copy.sh" 2>/dev/null || echo "No build-and-copy.sh found"
   exit 1
 fi
 
 echo "📂 Project root: $PROJECT_ROOT"
 cd "$PROJECT_ROOT"
+
+# プロジェクトルートの内容を確認
+echo "📂 Project root contents:"
+ls -la
+
+# frontendディレクトリの存在確認
+if [ ! -d "frontend" ]; then
+  echo "❌ frontend directory not found in project root"
+  echo "🔍 Available directories:"
+  ls -la
+  exit 1
+fi
+
+echo "✅ frontend directory found"
 
 # frontendディレクトリに移動
 cd frontend
