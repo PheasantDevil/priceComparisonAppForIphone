@@ -8,6 +8,7 @@ on:
 
 env:
   PYTHONPATH: ${{ github.workspace }}
+  CONFIG_FILE: config/config.production.yaml
 
 jobs:
   scrape-and-sync:
@@ -27,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r backend/requirements.txt
           pip install playwright
           playwright install chromium
 
@@ -48,7 +49,7 @@ jobs:
         run: |
           echo "Deploying Firestore security rules..."
           # Google Cloud認証情報を使用してFirestoreルールをデプロイ
-          gcloud firestore rules deploy functions/firestore.rules \
+          gcloud firestore rules deploy infrastructure/gcp/functions/firestore.rules \
             --project=price-comparison-app-463007 || echo "Firestore rules deployment failed, continuing..."
           echo "Firestore security rules deployment completed"
 
