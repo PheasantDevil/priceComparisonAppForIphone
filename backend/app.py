@@ -130,6 +130,14 @@ def create_app():
             # ファイルが見つからない場合は404
             return "File not found", 404
 
+    @app.route('/_next/<path:filename>')
+    def next_static_files(filename):
+        """Next.jsの静的ファイルを配信"""
+        try:
+            return send_from_directory('templates/_next', filename)
+        except FileNotFoundError:
+            return "File not found", 404
+
     @app.route('/health')
     def health_check():
         """ヘルスチェックエンドポイント"""

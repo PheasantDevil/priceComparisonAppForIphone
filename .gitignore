@@ -4,7 +4,8 @@ secrets/
 *.json
 !data/templates/*.json
 !package.json
-!package-lock.json
+!/frontend/package-lock.json
+/package-lock.json
 !tsconfig.json
 !next.config.js
 !tailwind.config.js
