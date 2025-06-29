@@ -1,5 +1,3 @@
-/templates/
-
 # 機密情報・認証ファイル
 config/key.json
 secrets/
@@ -34,6 +32,13 @@ __pycache__/
 .Python
 venv/
 .venv/
+
+# ビルド成果物・生成ファイル
+templates/
+frontend/out/
+frontend/.next/
+dist/
+build/
 
 # IDE
 .vscode/
