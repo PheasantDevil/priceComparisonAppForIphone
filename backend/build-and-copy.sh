@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# エラー時に即座に終了
+set -e
+
 echo "🚀 Building Next.js frontend..."
 
 # 現在のディレクトリを確認
@@ -23,7 +26,9 @@ else
   exit 1
 fi
 
-echo "📂 Project root: $PROJECT_ROOT"
+# プロジェクトルートを絶対パスに変換
+PROJECT_ROOT=$(realpath "$PROJECT_ROOT")
+echo "📂 Project root (absolute): $PROJECT_ROOT"
 
 # プロジェクトルートの内容を確認
 echo "📂 Project root contents:"
@@ -41,12 +46,39 @@ echo "✅ frontend directory found"
 
 # frontendディレクトリに移動
 cd "$PROJECT_ROOT/frontend"
+echo "📂 Moved to frontend directory: $(pwd)"
+
+# Node.jsとnpmの確認
+echo "🔍 Checking Node.js and npm..."
+node --version || echo "❌ Node.js not found"
+npm --version || echo "❌ npm not found"
+
+# package.jsonの確認
+if [ ! -f "package.json" ]; then
+  echo "❌ package.json not found in frontend directory"
+  ls -la
+  exit 1
+fi
+
+echo "✅ package.json found"
 
 # 依存関係をインストール
-npm install
+echo "📦 Installing dependencies..."
+npm install || {
+  echo "❌ npm install failed"
+  exit 1
+}
+
+echo "✅ Dependencies installed successfully"
 
 # Next.jsをビルド
-npm run build
+echo "🔨 Building Next.js application..."
+npm run build || {
+  echo "❌ npm run build failed"
+  exit 1
+}
+
+echo "✅ Next.js build completed successfully"
 
 echo "📁 Copying static files to templates directory..."
 
@@ -55,16 +87,29 @@ echo "📂 Current directory after build: $(pwd)"
 echo "📂 Current directory contents after build:"
 ls -la
 
-# プロジェクトルートに戻る
+# プロジェクトルートに戻る（絶対パスを使用）
+echo "📂 Returning to project root..."
 cd "$PROJECT_ROOT"
+echo "📂 Current directory after return: $(pwd)"
+
+# プロジェクトルートにいることを確認
+if [ "$(pwd)" != "$PROJECT_ROOT" ]; then
+  echo "❌ Failed to return to project root"
+  echo "Current: $(pwd), Expected: $PROJECT_ROOT"
+  exit 1
+fi
+
+echo "✅ Successfully returned to project root"
 
 # ビルド後のディレクトリ状態を確認
 echo "📂 Post-build project root contents:"
 ls -la
 
 # templatesディレクトリをクリア
+echo "🧹 Clearing templates directory..."
 rm -rf templates/*
 mkdir -p templates
+echo "✅ Templates directory cleared and created"
 
 # Next.js 15の静的エクスポート出力を確認
 echo "🔍 Checking Next.js build output structure..."
@@ -73,45 +118,8 @@ echo "🔍 Checking Next.js build output structure..."
 CURRENT_DIR=$(pwd)
 echo "📂 Current working directory: $CURRENT_DIR"
 
-# 現在のディレクトリがfrontend内かどうかを確認
-if [[ "$CURRENT_DIR" == */frontend ]]; then
-  echo "📂 Currently in frontend directory, checking for out/.next"
-  
-  # 現在のディレクトリ（frontend）内でoutディレクトリを確認
-  if [ -d "out" ]; then
-    echo "📋 Copying static files from out/ to ../templates/"
-    cp -r out/* ../templates/
-    echo "✅ Static files copied successfully from out/"
-  elif [ -d ".next" ]; then
-    echo "📂 .next directory found in current directory"
-    
-    if [ -d ".next/server/app" ]; then
-      echo "📋 Copying HTML files from .next/server/app/ to ../templates/"
-      cp -r .next/server/app/* ../templates/
-      echo "✅ HTML files copied successfully"
-    else
-      echo "❌ .next/server/app directory not found"
-      echo "🔍 Available directories in .next:"
-      find .next -type d -maxdepth 2
-      exit 1
-    fi
-    
-    # 静的アセットをコピー
-    if [ -d ".next/static" ]; then
-      echo "📋 Copying static assets from .next/static/ to ../templates/_next/static/"
-      mkdir -p ../templates/_next/static
-      cp -r .next/static/* ../templates/_next/static/
-      echo "✅ Static assets copied successfully"
-    else
-      echo "⚠️ .next/static directory not found"
-    fi
-  else
-    echo "❌ Neither out nor .next directory found in current directory"
-    echo "🔍 Available directories:"
-    ls -la
-    exit 1
-  fi
-else
+# プロジェクトルートにいることを確認
+if [ "$CURRENT_DIR" = "$PROJECT_ROOT" ]; then
   echo "📂 Currently in project root, checking frontend/out and frontend/.next"
   
   # frontendディレクトリの内容を確認
@@ -121,7 +129,10 @@ else
   # まず、static exportのoutディレクトリを確認（Next.js 15のoutput: 'export'）
   if [ -d "frontend/out" ]; then
     echo "📋 Copying static files from frontend/out/ to templates/"
-    cp -r frontend/out/* templates/
+    cp -r frontend/out/* templates/ || {
+      echo "❌ Failed to copy files from frontend/out/"
+      exit 1
+    }
     echo "✅ Static files copied successfully from out/"
   else
     echo "⚠️ frontend/out directory not found, checking .next directory"
@@ -134,7 +145,10 @@ else
       # 従来の方法を試す
       if [ -d "frontend/.next/server/app" ]; then
         echo "📋 Copying HTML files from frontend/.next/server/app/ to templates/"
-        cp -r frontend/.next/server/app/* templates/
+        cp -r frontend/.next/server/app/* templates/ || {
+          echo "❌ Failed to copy files from frontend/.next/server/app/"
+          exit 1
+        }
         echo "✅ HTML files copied successfully"
       else
         echo "❌ frontend/.next/server/app directory not found"
@@ -147,7 +161,10 @@ else
       if [ -d "frontend/.next/static" ]; then
         echo "📋 Copying static assets from frontend/.next/static/ to templates/_next/static/"
         mkdir -p templates/_next/static
-        cp -r frontend/.next/static/* templates/_next/static/
+        cp -r frontend/.next/static/* templates/_next/static/ || {
+          echo "❌ Failed to copy static assets"
+          exit 1
+        }
         echo "✅ Static assets copied successfully"
       else
         echo "⚠️ frontend/.next/static directory not found"
@@ -159,8 +176,12 @@ else
       exit 1
     fi
   fi
+else
+  echo "❌ Not in project root. Current: $CURRENT_DIR, Expected: $PROJECT_ROOT"
+  exit 1
 fi
 
 echo "✅ Build and copy completed!"
 echo "📊 Templates directory contents:"
-ls -la templates/ 
+ls -la templates/
+echo "🎉 All operations completed successfully!" 
