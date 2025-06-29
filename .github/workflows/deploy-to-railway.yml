@@ -30,46 +30,6 @@ jobs:
         railway --version
         echo "Railway CLI installed successfully"
 
-    - name: Debug Railway Token
-      run: |
-        echo "Checking Railway token availability..."
-        if [ -n "${{ secrets.RAILWAY_TOKEN }}" ]; then
-          echo "✅ Railway token is available"
-          echo "Token length: ${#RAILWAY_TOKEN}"
-        else
-          echo "❌ Railway token is not available"
-          exit 1
-        fi
-        
-        echo "Checking Railway Project ID availability..."
-        if [ -n "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
-          echo "✅ Railway Project ID is available"
-          echo "Project ID: ${{ secrets.RAILWAY_PROJECT_ID }}"
-        else
-          echo "❌ Railway Project ID is not available"
-          exit 1
-        fi
-        
-        echo "Checking Railway Service ID availability..."
-        if [ -n "${{ secrets.RAILWAY_SERVICE_ID }}" ]; then
-          echo "✅ Railway Service ID is available"
-          echo "Service ID: ${{ secrets.RAILWAY_SERVICE_ID }}"
-        else
-          echo "❌ Railway Service ID is not available"
-          exit 1
-        fi
-
-    - name: Prepare for deployment
-      run: |
-        echo "Preparing for deployment..."
-        echo "Current directory: $(pwd)"
-        echo "Repository size: $(du -sh . | cut -f1)"
-        echo "Frontend directory exists: $(test -d frontend && echo 'Yes' || echo 'No')"
-        if [ -d frontend ]; then
-          echo "Frontend size: $(du -sh frontend | cut -f1)"
-          echo "Frontend files: $(find frontend -type f | wc -l)"
-        fi
-
     - name: Build and copy frontend
       run: |
         echo "Building Next.js frontend and copying to templates..."
@@ -85,16 +45,14 @@ jobs:
         echo "Setting up Railway authentication..."
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         
-        # Railway CLIの認証設定ファイルを作成
-        mkdir -p ~/.railway
-        echo "$RAILWAY_TOKEN" > ~/.railway/token.json
-        
-        # 環境変数でも認証を設定
+        # 環境変数を確実に設定
         echo "RAILWAY_TOKEN=$RAILWAY_TOKEN" >> $GITHUB_ENV
         
         echo "✅ Railway authentication setup completed"
 
     - name: Deploy to Railway
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       run: |
         echo "Deploying to Railway with Service ID: $RAILWAY_SERVICE_ID"
         railway up --detach --service $RAILWAY_SERVICE_ID || {
