@@ -106,54 +106,8 @@ echo "🔍 Checking Next.js build output structure..."
 CURRENT_DIR=$(pwd)
 echo "📂 Current working directory: $CURRENT_DIR"
 
-# 現在のディレクトリがfrontend内かどうかを確認
-if [[ "$CURRENT_DIR" == */frontend ]]; then
-  echo "📂 Currently in frontend directory, checking for out/.next"
-  
-  # 現在のディレクトリ（frontend）内でoutディレクトリを確認
-  if [ -d "out" ]; then
-    echo "📋 Copying static files from out/ to ../templates/"
-    cp -r out/* ../templates/ || {
-      echo "❌ Failed to copy files from out/ to ../templates/"
-      exit 1
-    }
-    echo "✅ Static files copied successfully from out/"
-  elif [ -d ".next" ]; then
-    echo "📂 .next directory found in current directory"
-    
-    if [ -d ".next/server/app" ]; then
-      echo "📋 Copying HTML files from .next/server/app/ to ../templates/"
-      cp -r .next/server/app/* ../templates/ || {
-        echo "❌ Failed to copy files from .next/server/app/"
-        exit 1
-      }
-      echo "✅ HTML files copied successfully"
-    else
-      echo "❌ .next/server/app directory not found"
-      echo "🔍 Available directories in .next:"
-      find .next -type d -maxdepth 2
-      exit 1
-    fi
-    
-    # 静的アセットをコピー
-    if [ -d ".next/static" ]; then
-      echo "📋 Copying static assets from .next/static/ to ../templates/_next/static/"
-      mkdir -p ../templates/_next/static
-      cp -r .next/static/* ../templates/_next/static/ || {
-        echo "❌ Failed to copy static assets"
-        exit 1
-      }
-      echo "✅ Static assets copied successfully"
-    else
-      echo "⚠️ .next/static directory not found"
-    fi
-  else
-    echo "❌ Neither out nor .next directory found in current directory"
-    echo "🔍 Available directories:"
-    ls -la
-    exit 1
-  fi
-else
+# プロジェクトルートにいることを確認
+if [ "$CURRENT_DIR" = "$PROJECT_ROOT" ]; then
   echo "📂 Currently in project root, checking frontend/out and frontend/.next"
   
   # frontendディレクトリの内容を確認
@@ -210,6 +164,9 @@ else
       exit 1
     fi
   fi
+else
+  echo "❌ Not in project root. Current: $CURRENT_DIR, Expected: $PROJECT_ROOT"
+  exit 1
 fi
 
 echo "✅ Build and copy completed!"
