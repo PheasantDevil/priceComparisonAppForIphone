@@ -5,7 +5,6 @@
     "buildCommand": "chmod +x backend/build-and-copy.sh && ./backend/build-and-copy.sh"
   },
   "deploy": {
-    "startCommand": "python backend/app.py",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
