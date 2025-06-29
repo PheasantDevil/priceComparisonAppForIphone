@@ -3,19 +3,25 @@ nixPkgs = ["python3", "gcc", "nodejs_18", "npm"]
 
 [phases.install]
 cmds = [
+  "echo '=== INSTALL PHASE ==='",
+  "echo 'Current directory:' && pwd",
+  "echo 'Directory contents:' && ls -la",
   "echo 'Installing Python dependencies...'",
-  "cd backend && pip install -r requirements.txt"
+  "pip install -r backend/requirements.txt"
 ]
 
 [phases.build]
 cmds = [
+  "echo '=== BUILD PHASE ==='",
+  "echo 'Current directory:' && pwd",
+  "echo 'Directory contents:' && ls -la",
   "echo 'Building Next.js frontend...'",
   "chmod +x backend/build-and-copy.sh",
   "timeout 600 backend/build-and-copy.sh"
 ]
 
 [start]
-cmd = "cd backend && python app.py"
+cmd = "echo '=== START PHASE ===' && echo 'Current directory:' && pwd && echo 'Directory contents:' && ls -la && echo 'Starting Flask app...' && python backend/app.py"
 
 [variables]
 NODE_ENV = "production"
