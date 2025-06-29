@@ -70,6 +70,16 @@ jobs:
           echo "Frontend files: $(find frontend -type f | wc -l)"
         fi
 
+    - name: Build and copy frontend
+      run: |
+        echo "Building Next.js frontend and copying to templates..."
+        chmod +x backend/build-and-copy.sh
+        ./backend/build-and-copy.sh
+        
+        echo "✅ Frontend build and copy completed"
+        echo "📊 Templates directory contents:"
+        ls -la templates/ || echo "Templates directory not found"
+
     - name: Setup Railway authentication
       run: |
         echo "Setting up Railway authentication..."

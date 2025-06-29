@@ -1,12 +1,11 @@
-/templates/
-
 # 機密情報・認証ファイル
 config/key.json
 secrets/
 *.json
 !data/templates/*.json
 !package.json
-!package-lock.json
+!/frontend/package-lock.json
+/package-lock.json
 !tsconfig.json
 !next.config.js
 !tailwind.config.js
@@ -34,6 +33,13 @@ __pycache__/
 .Python
 venv/
 .venv/
+
+# ビルド成果物・生成ファイル
+templates/
+frontend/out/
+frontend/.next/
+dist/
+build/
 
 # IDE
 .vscode/
