@@ -2,9 +2,20 @@
 
 echo "🚀 Building Next.js frontend..."
 
-# スクリプトがbackendディレクトリから実行されることを前提とする
-# プロジェクトルートに移動
-cd "$(dirname "$0")/.."
+# プロジェクトルートを確実に特定
+if [ -f "backend/build-and-copy.sh" ]; then
+  # backendディレクトリから実行された場合
+  PROJECT_ROOT="$(dirname "$(dirname "$0")")"
+elif [ -f "build-and-copy.sh" ]; then
+  # プロジェクトルートから実行された場合
+  PROJECT_ROOT="$(pwd)"
+else
+  echo "❌ build-and-copy.sh not found in expected locations"
+  exit 1
+fi
+
+echo "📂 Project root: $PROJECT_ROOT"
+cd "$PROJECT_ROOT"
 
 # frontendディレクトリに移動
 cd frontend
@@ -18,7 +29,7 @@ npm run build
 echo "📁 Copying static files to templates directory..."
 
 # プロジェクトルートに戻る
-cd ..
+cd "$PROJECT_ROOT"
 
 # templatesディレクトリをクリア
 rm -rf templates/*
