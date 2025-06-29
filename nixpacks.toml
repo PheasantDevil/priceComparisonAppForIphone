@@ -2,10 +2,19 @@
 nixPkgs = ["python3", "nodejs"]
 
 [phases.install]
-cmds = ["pip install -r backend/requirements.txt"]
+cmds = [
+  "python3 --version",
+  "python3 -m pip --version",
+  "python3 -m pip install -r backend/requirements.txt"
+]
 
 [phases.build]
-cmds = ["chmod +x backend/build-and-copy.sh", "backend/build-and-copy.sh"]
+cmds = [
+  "node --version",
+  "npm --version",
+  "chmod +x backend/build-and-copy.sh",
+  "backend/build-and-copy.sh"
+]
 
 [start]
 cmd = "python backend/app.py"
