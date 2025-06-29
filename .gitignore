@@ -380,4 +380,4 @@ key.json
 *.json.key
 credentials/
 
-secrets
+secrets/templates/
