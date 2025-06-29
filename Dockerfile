@@ -18,22 +18,16 @@ RUN apt-get update && apt-get install -y \
 # Set work directory
 WORKDIR /app
 
-# Copy package files for Node.js dependencies (for better caching)
-COPY frontend/package*.json ./frontend/
+# Copy application code first
+COPY . .
 
 # Install Node.js dependencies
 WORKDIR /app/frontend
 RUN npm ci --only=production
 
-# Copy Python requirements (for better caching)
-WORKDIR /app
-COPY backend/requirements.txt ./backend/
-
 # Install Python dependencies
+WORKDIR /app
 RUN pip install --no-cache-dir -r backend/requirements.txt
-
-# Copy application code
-COPY . .
 
 # Build Next.js frontend
 WORKDIR /app/frontend
