@@ -114,7 +114,21 @@ def create_app():
 
     @app.route('/')
     def index():
-        return render_template('index.html')
+        """メインページ - 静的HTMLファイルを配信"""
+        try:
+            return send_from_directory('templates', 'index.html')
+        except FileNotFoundError:
+            # 静的ファイルがない場合は従来のテンプレートを使用
+            return render_template('index.html')
+
+    @app.route('/<path:filename>')
+    def static_files(filename):
+        """静的ファイル（CSS、JS、画像など）を配信"""
+        try:
+            return send_from_directory('templates', filename)
+        except FileNotFoundError:
+            # ファイルが見つからない場合は404
+            return "File not found", 404
 
     @app.route('/health')
     def health_check():
