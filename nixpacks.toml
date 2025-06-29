@@ -1,11 +1,11 @@
 [phases.setup]
-nixPkgs = ["python3", "nodejs", "curl"]
+nixPkgs = ["python3", "nodejs", "python3Packages.setuptools"]
 
 [phases.install]
 cmds = [
-  "curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py",
-  "python3 get-pip.py --user",
-  "python3 -m pip install --user -r backend/requirements.txt"
+  "python3 -m ensurepip --upgrade",
+  "python3 -m pip install --upgrade pip setuptools wheel",
+  "python3 -m pip install -r backend/requirements.txt"
 ]
 
 [phases.build]
