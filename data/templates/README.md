@@ -8,11 +8,11 @@
 
 - **用途**: メインの価格比較 API レスポンス形式
 - **構造**:
-  - `official_price`: 公式価格
-  - `kaitori_price`: 買取価格
-  - `price_diff`: 価格差
+  - `official_price`: 公式価格（容量別の基本価格）
+  - `kaitori_price`: 買取価格（容量別の基本価格）
+  - `price_diff`: 価格差（公式価格 - 買取価格）
   - `rakuten_diff`: 楽天での価格差
-  - `colors`: 色別の価格情報
+  - `colors`: 色別の公式価格（直接価格値を保存）
 
 ### `price_history_template.json`
 
@@ -31,6 +31,23 @@
   - `latest_prediction`: 最新予測
   - `confidence`: 予測信頼度
   - `factors`: 予測に使用した要因
+
+## データ形式の統一
+
+### 色別価格の保存形式
+
+```json
+"colors": {
+  "Black": 124800,
+  "White": 124800,
+  "Blue": 124800,
+  "Green": 124800
+}
+```
+
+- 色名をキーとして、直接価格値を保存
+- 公式価格データ（`official_prices.json`）と同じ形式
+- シンプルで扱いやすい構造
 
 ## 使用方法
 
