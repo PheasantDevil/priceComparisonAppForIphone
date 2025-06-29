@@ -24,24 +24,23 @@ else
 fi
 
 echo "📂 Project root: $PROJECT_ROOT"
-cd "$PROJECT_ROOT"
 
 # プロジェクトルートの内容を確認
 echo "📂 Project root contents:"
-ls -la
+ls -la "$PROJECT_ROOT"
 
 # frontendディレクトリの存在確認
-if [ ! -d "frontend" ]; then
+if [ ! -d "$PROJECT_ROOT/frontend" ]; then
   echo "❌ frontend directory not found in project root"
   echo "🔍 Available directories:"
-  ls -la
+  ls -la "$PROJECT_ROOT"
   exit 1
 fi
 
 echo "✅ frontend directory found"
 
 # frontendディレクトリに移動
-cd frontend
+cd "$PROJECT_ROOT/frontend"
 
 # 依存関係をインストール
 npm install
@@ -51,22 +50,17 @@ npm run build
 
 echo "📁 Copying static files to templates directory..."
 
+# 現在のディレクトリを確認（ビルド後）
+echo "📂 Current directory after build: $(pwd)"
+echo "📂 Current directory contents after build:"
+ls -la
+
 # プロジェクトルートに戻る
 cd "$PROJECT_ROOT"
 
 # ビルド後のディレクトリ状態を確認
 echo "📂 Post-build project root contents:"
 ls -la
-
-# frontendディレクトリの再確認
-if [ ! -d "frontend" ]; then
-  echo "❌ frontend directory not found after build"
-  echo "🔍 Available directories:"
-  ls -la
-  exit 1
-fi
-
-echo "✅ frontend directory still exists after build"
 
 # templatesディレクトリをクリア
 rm -rf templates/*
