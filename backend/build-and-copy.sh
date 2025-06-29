@@ -69,49 +69,95 @@ mkdir -p templates
 # Next.js 15の静的エクスポート出力を確認
 echo "🔍 Checking Next.js build output structure..."
 
-# frontendディレクトリの内容を確認
-echo "📂 frontend directory contents:"
-ls -la frontend/
+# 現在のディレクトリを確認
+CURRENT_DIR=$(pwd)
+echo "📂 Current working directory: $CURRENT_DIR"
 
-# まず、static exportのoutディレクトリを確認（Next.js 15のoutput: 'export'）
-if [ -d "frontend/out" ]; then
-  echo "📋 Copying static files from frontend/out/ to templates/"
-  cp -r frontend/out/* templates/
-  echo "✅ Static files copied successfully from out/"
-else
-  echo "⚠️ frontend/out directory not found, checking .next directory"
+# 現在のディレクトリがfrontend内かどうかを確認
+if [[ "$CURRENT_DIR" == */frontend ]]; then
+  echo "📂 Currently in frontend directory, checking for out/.next"
   
-  # .nextディレクトリの確認
-  if [ -d "frontend/.next" ]; then
-    echo "📂 .next directory found"
-    find frontend/.next -type d -maxdepth 3 | head -20
+  # 現在のディレクトリ（frontend）内でoutディレクトリを確認
+  if [ -d "out" ]; then
+    echo "📋 Copying static files from out/ to ../templates/"
+    cp -r out/* ../templates/
+    echo "✅ Static files copied successfully from out/"
+  elif [ -d ".next" ]; then
+    echo "📂 .next directory found in current directory"
     
-    # 従来の方法を試す
-    if [ -d "frontend/.next/server/app" ]; then
-      echo "📋 Copying HTML files from frontend/.next/server/app/ to templates/"
-      cp -r frontend/.next/server/app/* templates/
+    if [ -d ".next/server/app" ]; then
+      echo "📋 Copying HTML files from .next/server/app/ to ../templates/"
+      cp -r .next/server/app/* ../templates/
       echo "✅ HTML files copied successfully"
     else
-      echo "❌ frontend/.next/server/app directory not found"
+      echo "❌ .next/server/app directory not found"
       echo "🔍 Available directories in .next:"
-      find frontend/.next -type d -maxdepth 2
+      find .next -type d -maxdepth 2
       exit 1
     fi
     
     # 静的アセットをコピー
-    if [ -d "frontend/.next/static" ]; then
-      echo "📋 Copying static assets from frontend/.next/static/ to templates/_next/static/"
-      mkdir -p templates/_next/static
-      cp -r frontend/.next/static/* templates/_next/static/
+    if [ -d ".next/static" ]; then
+      echo "📋 Copying static assets from .next/static/ to ../templates/_next/static/"
+      mkdir -p ../templates/_next/static
+      cp -r .next/static/* ../templates/_next/static/
       echo "✅ Static assets copied successfully"
     else
-      echo "⚠️ frontend/.next/static directory not found"
+      echo "⚠️ .next/static directory not found"
     fi
   else
-    echo "❌ Neither frontend/out nor frontend/.next directory found"
-    echo "🔍 Available directories in frontend:"
-    ls -la frontend/
+    echo "❌ Neither out nor .next directory found in current directory"
+    echo "🔍 Available directories:"
+    ls -la
     exit 1
+  fi
+else
+  echo "📂 Currently in project root, checking frontend/out and frontend/.next"
+  
+  # frontendディレクトリの内容を確認
+  echo "📂 frontend directory contents:"
+  ls -la frontend/
+
+  # まず、static exportのoutディレクトリを確認（Next.js 15のoutput: 'export'）
+  if [ -d "frontend/out" ]; then
+    echo "📋 Copying static files from frontend/out/ to templates/"
+    cp -r frontend/out/* templates/
+    echo "✅ Static files copied successfully from out/"
+  else
+    echo "⚠️ frontend/out directory not found, checking .next directory"
+    
+    # .nextディレクトリの確認
+    if [ -d "frontend/.next" ]; then
+      echo "📂 .next directory found"
+      find frontend/.next -type d -maxdepth 3 | head -20
+      
+      # 従来の方法を試す
+      if [ -d "frontend/.next/server/app" ]; then
+        echo "📋 Copying HTML files from frontend/.next/server/app/ to templates/"
+        cp -r frontend/.next/server/app/* templates/
+        echo "✅ HTML files copied successfully"
+      else
+        echo "❌ frontend/.next/server/app directory not found"
+        echo "🔍 Available directories in .next:"
+        find frontend/.next -type d -maxdepth 2
+        exit 1
+      fi
+      
+      # 静的アセットをコピー
+      if [ -d "frontend/.next/static" ]; then
+        echo "📋 Copying static assets from frontend/.next/static/ to templates/_next/static/"
+        mkdir -p templates/_next/static
+        cp -r frontend/.next/static/* templates/_next/static/
+        echo "✅ Static assets copied successfully"
+      else
+        echo "⚠️ frontend/.next/static directory not found"
+      fi
+    else
+      echo "❌ Neither frontend/out nor frontend/.next directory found"
+      echo "🔍 Available directories in frontend:"
+      ls -la frontend/
+      exit 1
+    fi
   fi
 fi
 
