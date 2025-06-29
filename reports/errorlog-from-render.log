@@ -1,0 +1,50 @@
+2025-05-30T11:27:44.247417802Z ==> Running 'python app.py'
+2025-05-30T11:27:53.646947308Z Traceback (most recent call last):
+2025-05-30T11:27:53.646971128Z   File "/opt/render/project/src/app.py", line 131, in <module>
+2025-05-30T11:27:53.64712229Z     app = create_app()
+2025-05-30T11:27:53.647148431Z           ^^^^^^^^^^^^
+2025-05-30T11:27:53.647160721Z   File "/opt/render/project/src/app.py", line 33, in create_app
+2025-05-30T11:27:53.647281883Z     dynamodb = boto3.resource('dynamodb')
+2025-05-30T11:27:53.647300133Z                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-05-30T11:27:53.647305743Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/boto3/__init__.py", line 101, in resource
+2025-05-30T11:27:53.647428374Z     return _get_default_session().resource(*args, **kwargs)
+2025-05-30T11:27:53.647440225Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-05-30T11:27:53.647445605Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/boto3/session.py", line 470, in resource
+2025-05-30T11:27:53.647639257Z     client = self.client(
+2025-05-30T11:27:53.647646137Z              ^^^^^^^^^^^^
+2025-05-30T11:27:53.647650008Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/boto3/session.py", line 322, in client
+2025-05-30T11:27:53.647795079Z     return self._session.create_client(
+2025-05-30T11:27:53.64781244Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-05-30T11:27:53.64781725Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/botocore/context.py", line 123, in wrapper
+2025-05-30T11:27:53.647922021Z     return func(*args, **kwargs)
+2025-05-30T11:27:53.647929301Z            ^^^^^^^^^^^^^^^^^^^^^
+2025-05-30T11:27:53.647933371Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/botocore/session.py", line 1019, in create_client
+2025-05-30T11:27:53.648182864Z     client = client_creator.create_client(
+2025-05-30T11:27:53.648194615Z              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-05-30T11:27:53.648199955Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/botocore/client.py", line 154, in create_client
+2025-05-30T11:27:53.648283226Z     client_args = self._get_client_args(
+2025-05-30T11:27:53.648292366Z                   ^^^^^^^^^^^^^^^^^^^^^^
+2025-05-30T11:27:53.648297236Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/botocore/client.py", line 550, in _get_client_args
+2025-05-30T11:27:53.648439748Z     return args_creator.get_client_args(
+2025-05-30T11:27:53.648446538Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-05-30T11:27:53.648451018Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/botocore/args.py", line 125, in get_client_args
+2025-05-30T11:27:53.648550129Z     final_args = self.compute_client_args(
+2025-05-30T11:27:53.648555749Z                  ^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-05-30T11:27:53.64855906Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/botocore/args.py", line 249, in compute_client_args
+2025-05-30T11:27:53.648666371Z     endpoint_config = self._compute_endpoint_config(
+2025-05-30T11:27:53.648673591Z                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-05-30T11:27:53.648677971Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/botocore/args.py", line 432, in _compute_endpoint_config
+2025-05-30T11:27:53.648834773Z     return self._resolve_endpoint(**resolve_endpoint_kwargs)
+2025-05-30T11:27:53.648851473Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-05-30T11:27:53.648858444Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/botocore/args.py", line 537, in _resolve_endpoint
+2025-05-30T11:27:53.649025106Z     return endpoint_bridge.resolve(
+2025-05-30T11:27:53.649043506Z            ^^^^^^^^^^^^^^^^^^^^^^^^
+2025-05-30T11:27:53.649046126Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/botocore/client.py", line 655, in resolve
+2025-05-30T11:27:53.649193948Z     resolved = self.endpoint_resolver.construct_endpoint(
+2025-05-30T11:27:53.649196788Z                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-05-30T11:27:53.649198678Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/botocore/regions.py", line 233, in construct_endpoint
+2025-05-30T11:27:53.64931913Z     result = self._endpoint_for_partition(
+2025-05-30T11:27:53.64932214Z              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-05-30T11:27:53.64932437Z   File "/opt/render/project/src/.venv/lib/python3.11/site-packages/botocore/regions.py", line 281, in _endpoint_for_partition
+2025-05-30T11:27:53.649461081Z     raise NoRegionError()
+2025-05-30T11:27:53.649465741Z botocore.exceptions.NoRegionError: You must specify a region.

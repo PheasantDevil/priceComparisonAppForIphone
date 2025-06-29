@@ -1,14 +1,19 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "NIXPACKS"
+    "builder": "NIXPACKS",
+    "buildCommand": "chmod +x build-and-copy.sh && ./build-and-copy.sh"
   },
   "deploy": {
-    "startCommand": "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --keep-alive 2",
+    "startCommand": "python app.py",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,
     "numReplicas": 1
-  }
+  },
+  "service": "web",
+  "project": "price-comparison-app",
+  "projectId": "4f0bf6cf-f794-41a9-9c8c-1f74bc38ab48",
+  "serviceId": "9b4de8d6-2fab-4cc6-80a2-3d742b566990"
 }

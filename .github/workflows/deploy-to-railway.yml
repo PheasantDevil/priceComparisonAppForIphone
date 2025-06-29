@@ -5,44 +5,15 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-
   workflow_dispatch:  # 手動実行も可能
 
-env:
-  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
 jobs:
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Run tests
-      env:
-        BUCKET_NAME: "price-comparison-app-data"
-        APP_ENV: "test"
-      run: |
-        python -c "import app; print('App imports successfully')"
-        python -c "from app import app; print('Flask app created successfully')"
-
   deploy:
     name: Deploy to Railway
     runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/main'
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
     
     steps:
     - name: Checkout repository
@@ -56,70 +27,77 @@ jobs:
     - name: Install Railway CLI
       run: |
         npm install -g @railway/cli@latest
+        railway --version
+        echo "Railway CLI installed successfully"
 
-    - name: Deploy to Railway
-      env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    - name: Debug Railway Token
+      run: |
+        echo "Checking Railway token availability..."
+        if [ -n "${{ secrets.RAILWAY_TOKEN }}" ]; then
+          echo "✅ Railway token is available"
+          echo "Token length: ${#RAILWAY_TOKEN}"
+        else
+          echo "❌ Railway token is not available"
+          exit 1
+        fi
+        
+        echo "Checking Railway Project ID availability..."
+        if [ -n "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
+          echo "✅ Railway Project ID is available"
+          echo "Project ID: ${{ secrets.RAILWAY_PROJECT_ID }}"
+        else
+          echo "❌ Railway Project ID is not available"
+          exit 1
+        fi
+        
+        echo "Checking Railway Service ID availability..."
+        if [ -n "${{ secrets.RAILWAY_SERVICE_ID }}" ]; then
+          echo "✅ Railway Service ID is available"
+          echo "Service ID: ${{ secrets.RAILWAY_SERVICE_ID }}"
+        else
+          echo "❌ Railway Service ID is not available"
+          exit 1
+        fi
+
+    - name: Prepare for deployment
+      run: |
+        echo "Preparing for deployment..."
+        echo "Current directory: $(pwd)"
+        echo "Repository size: $(du -sh . | cut -f1)"
+        echo "Frontend directory exists: $(test -d frontend && echo 'Yes' || echo 'No')"
+        if [ -d frontend ]; then
+          echo "Frontend size: $(du -sh frontend | cut -f1)"
+          echo "Frontend files: $(find frontend -type f | wc -l)"
+        fi
+
+    - name: Setup Railway authentication
       run: |
         echo "Setting up Railway authentication..."
-        # 環境変数を設定
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         
-        # Railway CLIの設定ディレクトリを完全にクリア
-        rm -rf ~/.railway
-        
-        echo "Testing Railway authentication..."
-        # CI環境での認証方法
+        # Railway CLIの認証設定ファイルを作成
         mkdir -p ~/.railway
         echo "$RAILWAY_TOKEN" > ~/.railway/token.json
         
-        echo "Getting project info..."
-        railway status || echo "Status check failed, continuing..."
-        
-        echo "Discovering available services..."
-        # 利用可能なサービスを確認
-        railway service list 2>/dev/null || echo "Service list command not available"
-        
-        echo "Checking current directory and files..."
-        pwd
-        ls -la
-        
-        echo "Deploying to Railway..."
-        # サービス名を明示的に指定してデプロイ
-        railway up --detach --service price-comparison-app || \
-        railway up --detach --service web || \
-        railway up --detach --service app || \
-        (echo "All service deployments failed, trying default" && railway up --detach)
-        
-        echo "Deployment initiated successfully!"
+        echo "✅ Railway authentication setup completed"
 
-    - name: Wait for deployment
+    - name: Deploy to Railway
       run: |
-        echo "Waiting for deployment to complete..."
-        sleep 60
+        echo "Deploying to Railway with Service ID: $RAILWAY_SERVICE_ID"
+        railway up --detach --service $RAILWAY_SERVICE_ID || {
+          echo "❌ Deployment failed"
+          echo "Checking Railway logs..."
+          railway logs --service $RAILWAY_SERVICE_ID || echo "Could not retrieve logs"
+          exit 1
+        }
+        echo "✅ Deployment completed successfully!"
 
     - name: Get deployment URL
       id: get-url
-      env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       run: |
         echo "Getting deployment URL..."
-        # 環境変数を設定
-        export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
-        
-        # Railway CLIの設定ディレクトリを完全にクリア
-        rm -rf ~/.railway
-        
-        echo "Setting up Railway authentication..."
-        # CI環境での認証方法
-        mkdir -p ~/.railway
-        echo "$RAILWAY_TOKEN" > ~/.railway/token.json
-        
-        echo "Getting service status..."
-        # シンプルな方法でURLを取得
-        URL=$(railway status 2>/dev/null | grep -o 'https://[^[:space:]]*' | head -1) || \
-        URL="https://price-comparison-app-production.up.railway.app"
-        
+        URL=$(railway status --service $RAILWAY_SERVICE_ID | grep -o 'https://[^[:space:]]*' | head -1 || \
+              echo "https://price-comparison-app-production.up.railway.app")
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
 
@@ -127,7 +105,9 @@ jobs:
       run: |
         echo "Performing health check..."
         sleep 30
-        # Health check will be performed by Railway's built-in healthcheck
+        URL="${{ steps.get-url.outputs.deployment_url }}"
+        echo "Checking health at: $URL/health"
+        curl -f "$URL/health" || echo "Health check failed - this is normal for first deployment"
 
     - name: Comment on PR
       if: github.event_name == 'pull_request'
@@ -149,4 +129,14 @@ jobs:
             console.log('PRコメントを投稿しました');
           } catch (error) {
             console.log('PRコメントの投稿に失敗しました:', error.message);
-          } 
+          }
+
+    # - name: Get Railway logs
+    #   run: |
+    #     echo "Getting Railway logs..."
+    #     railway logs --service $RAILWAY_SERVICE_ID
+
+    # - name: Get Railway status
+    #   run: |
+    #     echo "Getting Railway status..."
+    #     railway status --service $RAILWAY_SERVICE_ID

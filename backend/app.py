@@ -5,6 +5,15 @@ from datetime import datetime
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
+
+# CORS対応のための関数
+def add_cors_headers(response):
+    """CORSヘッダーを追加する関数"""
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
+
 # Google Cloud Storageクライアントの初期化
 storage_client = None
 bucket = None
@@ -105,7 +114,21 @@ def create_app():
 
     @app.route('/')
     def index():
-        return render_template('index.html')
+        """メインページ - 静的HTMLファイルを配信"""
+        try:
+            return send_from_directory('templates', 'index.html')
+        except FileNotFoundError:
+            # 静的ファイルがない場合は従来のテンプレートを使用
+            return render_template('index.html')
+
+    @app.route('/<path:filename>')
+    def static_files(filename):
+        """静的ファイル（CSS、JS、画像など）を配信"""
+        try:
+            return send_from_directory('templates', filename)
+        except FileNotFoundError:
+            # ファイルが見つからない場合は404
+            return "File not found", 404
 
     @app.route('/health')
     def health_check():
@@ -222,23 +245,26 @@ def create_app():
         }
         
         if series in sample_data:
-            return jsonify({
+            response = jsonify({
                 'series': series,
                 'prices': sample_data[series]
             })
+            return add_cors_headers(response)
         else:
-            return jsonify({
+            response = jsonify({
                 'error': 'Series not found',
                 'message': f'Series "{series}" is not available'
             }), 404
+            return add_cors_headers(response[0]), response[1]
 
     @app.route("/get_prices")
     def get_prices():
         """価格取得エンドポイント（現在は無効化）"""
-        return jsonify({
+        response = jsonify({
             'error': 'Price retrieval functionality is currently disabled in Railway environment',
             'message': 'This feature requires web scraping capabilities'
         }), 503
+        return add_cors_headers(response[0]), response[1]
 
     return app
 
