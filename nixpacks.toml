@@ -1,0 +1,22 @@
+[phases.setup]
+nixPkgs = ["python3", "gcc", "nodejs_18", "npm"]
+
+[phases.install]
+cmds = [
+  "echo 'Installing Python dependencies...'",
+  "cd backend && pip install -r requirements.txt"
+]
+
+[phases.build]
+cmds = [
+  "echo 'Building Next.js frontend...'",
+  "chmod +x backend/build-and-copy.sh",
+  "timeout 600 backend/build-and-copy.sh"
+]
+
+[start]
+cmd = "cd backend && python app.py"
+
+[variables]
+NODE_ENV = "production"
+NEXT_TELEMETRY_DISABLED = "1" 

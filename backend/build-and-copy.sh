@@ -3,7 +3,11 @@
 # エラー時に即座に終了
 set -e
 
+# タイムアウト設定（Railway環境での問題を防ぐ）
+TIMEOUT=600  # 10分
+
 echo "🚀 Building Next.js frontend..."
+echo "⏰ Timeout set to ${TIMEOUT} seconds"
 
 # 現在のディレクトリを確認
 echo "📂 Current directory: $(pwd)"
@@ -62,19 +66,26 @@ fi
 
 echo "✅ package.json found"
 
-# 依存関係をインストール
+# 依存関係をインストール（タイムアウト付き）
 echo "📦 Installing dependencies..."
-npm install || {
-  echo "❌ npm install failed"
-  exit 1
+timeout $TIMEOUT npm install || {
+  echo "❌ npm install failed or timed out"
+  echo "🔍 Checking npm cache and retrying..."
+  npm cache clean --force
+  timeout $TIMEOUT npm install || {
+    echo "❌ npm install failed after retry"
+    exit 1
+  }
 }
 
 echo "✅ Dependencies installed successfully"
 
-# Next.jsをビルド
+# Next.jsをビルド（タイムアウト付き）
 echo "🔨 Building Next.js application..."
-npm run build || {
-  echo "❌ npm run build failed"
+timeout $TIMEOUT npm run build || {
+  echo "❌ npm run build failed or timed out"
+  echo "🔍 Checking build configuration..."
+  cat package.json | grep -A 10 -B 5 "scripts"
   exit 1
 }
 
