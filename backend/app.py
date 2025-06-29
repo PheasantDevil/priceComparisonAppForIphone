@@ -116,10 +116,39 @@ def create_app():
     def index():
         """メインページ - 静的HTMLファイルを配信"""
         try:
+            # 現在のディレクトリを確認
+            current_dir = os.getcwd()
+            templates_path = os.path.join(current_dir, 'templates')
+            
+            app.logger.info(f"Current directory: {current_dir}")
+            app.logger.info(f"Templates path: {templates_path}")
+            app.logger.info(f"Templates exists: {os.path.exists(templates_path)}")
+            
+            if os.path.exists(templates_path):
+                app.logger.info(f"Templates contents: {os.listdir(templates_path)}")
+            
             return send_from_directory('templates', 'index.html')
-        except FileNotFoundError:
-            # 静的ファイルがない場合は従来のテンプレートを使用
-            return render_template('index.html')
+        except FileNotFoundError as e:
+            app.logger.error(f"index.html not found: {e}")
+            # フォールバック: シンプルなHTMLを返す
+            return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Price Comparison App</title>
+                <meta charset="utf-8">
+            </head>
+            <body>
+                <h1>Price Comparison App</h1>
+                <p>Static files are being generated. Please try again in a moment.</p>
+                <p>Current directory: {}</p>
+                <p>Templates exists: {}</p>
+            </body>
+            </html>
+            """.format(os.getcwd(), os.path.exists('templates')), 200
+        except Exception as e:
+            app.logger.error(f"Error serving index: {e}")
+            return f"Error: {str(e)}", 500
 
     @app.route('/<path:filename>')
     def static_files(filename):
@@ -280,4 +309,14 @@ def create_app():
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+    # Railway環境での起動設定
+    port = int(os.environ.get('PORT', 8080))
+    host = os.environ.get('HOST', '0.0.0.0')
+    
+    print(f"🚀 Starting Flask app on {host}:{port}")
+    print(f"📂 Current working directory: {os.getcwd()}")
+    print(f"📂 Templates directory exists: {os.path.exists('templates')}")
+    if os.path.exists('templates'):
+        print(f"📂 Templates contents: {os.listdir('templates')}")
+    
+    app.run(host=host, port=port, debug=False)
