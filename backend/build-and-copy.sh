@@ -54,12 +54,30 @@ echo "📁 Copying static files to templates directory..."
 # プロジェクトルートに戻る
 cd "$PROJECT_ROOT"
 
+# ビルド後のディレクトリ状態を確認
+echo "📂 Post-build project root contents:"
+ls -la
+
+# frontendディレクトリの再確認
+if [ ! -d "frontend" ]; then
+  echo "❌ frontend directory not found after build"
+  echo "🔍 Available directories:"
+  ls -la
+  exit 1
+fi
+
+echo "✅ frontend directory still exists after build"
+
 # templatesディレクトリをクリア
 rm -rf templates/*
 mkdir -p templates
 
 # Next.js 15の静的エクスポート出力を確認
 echo "🔍 Checking Next.js build output structure..."
+
+# frontendディレクトリの内容を確認
+echo "📂 frontend directory contents:"
+ls -la frontend/
 
 # まず、static exportのoutディレクトリを確認（Next.js 15のoutput: 'export'）
 if [ -d "frontend/out" ]; then
