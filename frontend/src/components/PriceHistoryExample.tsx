@@ -7,6 +7,7 @@ const PriceHistoryExample: React.FC = () => {
   const [selectedSeries, setSelectedSeries] = useState('iPhone 16 Pro');
   const [selectedCapacity, setSelectedCapacity] = useState('1TB');
   const [selectedDays, setSelectedDays] = useState(14);
+  const [tickInterval, setTickInterval] = useState(10000); // Y軸の目盛り間隔
 
   const seriesOptions = [
     'iPhone 16',
@@ -33,7 +34,7 @@ const PriceHistoryExample: React.FC = () => {
 
       {/* コントロールパネル */}
       <div className='bg-white rounded-lg shadow-md p-6 mb-8'>
-        <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
+        <div className='grid grid-cols-1 md:grid-cols-5 gap-4'>
           <div>
             <label className='block text-sm font-medium text-gray-700 mb-2'>
               シリーズ
@@ -85,6 +86,25 @@ const PriceHistoryExample: React.FC = () => {
             </select>
           </div>
 
+          <div>
+            <label className='block text-sm font-medium text-gray-700 mb-2'>
+              Y軸目盛り間隔
+            </label>
+            <select
+              value={tickInterval}
+              onChange={e => setTickInterval(Number(e.target.value))}
+              className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+            >
+              <option value={5000}>¥5,000</option>
+              <option value={10000}>¥10,000</option>
+              <option value={15000}>¥15,000</option>
+              <option value={20000}>¥20,000</option>
+              <option value={30000}>¥30,000</option>
+              <option value={50000}>¥50,000</option>
+              <option value={60000}>¥60,000</option>
+            </select>
+          </div>
+
           <div className='flex items-end'>
             <button
               onClick={() => {
@@ -107,6 +127,7 @@ const PriceHistoryExample: React.FC = () => {
           days={selectedDays}
           height={500}
           className='w-full'
+          tickInterval={tickInterval}
         />
       </div>
 

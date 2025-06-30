@@ -28,6 +28,7 @@ export default function Home() {
     useState('iPhone 16 Pro');
   const [selectedHistoryCapacity, setSelectedHistoryCapacity] = useState('1TB');
   const [showRakutenColumns, setShowRakutenColumns] = useState(false);
+  const [tickInterval, setTickInterval] = useState(10000); // Y軸の目盛り間隔
 
   // GitHub Pages 404 redirect handling
   useEffect(() => {
@@ -173,7 +174,7 @@ export default function Home() {
         {showPriceHistory && (
           <div className='space-y-6'>
             {/* グラフ設定 */}
-            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+            <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
               <div>
                 <label className='block text-sm font-medium text-gray-700 mb-2'>
                   シリーズ
@@ -207,6 +208,25 @@ export default function Home() {
                 </select>
               </div>
 
+              <div>
+                <label className='block text-sm font-medium text-gray-700 mb-2'>
+                  Y軸目盛り間隔
+                </label>
+                <select
+                  value={tickInterval}
+                  onChange={e => setTickInterval(Number(e.target.value))}
+                  className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                >
+                  <option value={5000}>¥5,000</option>
+                  <option value={10000}>¥10,000</option>
+                  <option value={15000}>¥15,000</option>
+                  <option value={20000}>¥20,000</option>
+                  <option value={30000}>¥30,000</option>
+                  <option value={50000}>¥50,000</option>
+                  <option value={60000}>¥60,000</option>
+                </select>
+              </div>
+
               <div className='flex items-end'>
                 <div className='text-sm text-gray-600'>
                   過去14日間の価格推移を表示
@@ -222,6 +242,7 @@ export default function Home() {
                 days={14}
                 height={400}
                 className='w-full'
+                tickInterval={tickInterval}
               />
             </div>
 
@@ -247,7 +268,12 @@ export default function Home() {
         )}
       </div>
     ),
-    [showPriceHistory, selectedHistorySeries, selectedHistoryCapacity]
+    [
+      showPriceHistory,
+      selectedHistorySeries,
+      selectedHistoryCapacity,
+      tickInterval,
+    ]
   );
 
   return (
