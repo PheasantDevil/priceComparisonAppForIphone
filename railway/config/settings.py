@@ -29,7 +29,7 @@ class SlackConfig:
     webhook_url: str
     channel: str = "#general"
     username: str = "Railway Log Monitor"
-    icon_emoji: str = ":railway_track:"
+    icon_emoji: str = ":steam_locomotive:"
     
     @classmethod
     def from_env(cls) -> 'SlackConfig':
@@ -38,7 +38,7 @@ class SlackConfig:
             webhook_url=os.getenv('SLACK_WEBHOOK_URL', ''),
             channel=os.getenv('SLACK_CHANNEL', '#general'),
             username=os.getenv('SLACK_USERNAME', 'Railway Log Monitor'),
-            icon_emoji=os.getenv('SLACK_ICON_EMOJI', ':railway_track:')
+            icon_emoji=os.getenv('SLACK_ICON_EMOJI', ':steam_locomotive:')
         )
 
 

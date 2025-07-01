@@ -25,22 +25,40 @@ class SlackNotifier:
     
     def send_message(self, message: str, level: str = "INFO", 
                     attachments: Optional[List[Dict]] = None) -> bool:
-        """メッセージを送信"""
+        """メッセージを送信（attachments付き→失敗時はtextのみで再送）"""
         try:
-            payload = self._build_payload(message, level, attachments)
+            # attachmentsが指定されていればリッチ通知を試みる
+            if attachments:
+                payload = {
+                    "text": message,
+                    "attachments": attachments
+                }
+            else:
+                payload = {"text": message}
             response = requests.post(
                 self.config['webhook_url'],
                 json=payload,
                 timeout=10
             )
             response.raise_for_status()
-            
             self.logger.info(f"Slack notification sent: {level}")
             return True
-            
         except Exception as e:
-            self.logger.error(f"Failed to send Slack notification: {e}")
-            return False
+            self.logger.warning(f"Rich Slack notification failed, fallback to text only: {e}")
+            # フォールバック: textのみで再送
+            try:
+                payload = {"text": message}
+                response = requests.post(
+                    self.config['webhook_url'],
+                    json=payload,
+                    timeout=10
+                )
+                response.raise_for_status()
+                self.logger.info(f"Slack fallback notification sent: {level}")
+                return True
+            except Exception as e2:
+                self.logger.error(f"Failed to send Slack notification (fallback): {e2}")
+                return False
     
     def send_log_notification(self, log_entry: Dict) -> bool:
         """ログエントリを通知"""
