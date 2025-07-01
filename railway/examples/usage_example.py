@@ -6,9 +6,10 @@ import os
 import sys
 
 # プロジェクトルートをパスに追加
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-
 from railway import RailwayClient, SlackNotifier, validate_configs
+
+# プロジェクトルートをパスに追加
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
 def example_health_check():

@@ -99,11 +99,17 @@ class RailwayClient:
     def _build_logs_command(self, limit: Optional[int], since: Optional[datetime],
                            service_id: Optional[str] = None) -> List[str]:
         """ログ取得コマンドを構築"""
-        cmd = [
-            'railway', 'logs',
-            '--project', self.config['project_id'],
-            '--json'
-        ]
+     def _build_logs_command(self, limit: Optional[int], since: Optional[datetime],
+                             service_id: Optional[str] = None) -> List[str]:
+         """ログ取得コマンドを構築"""
++        if not self.config.get('project_id'):
++            raise ValueError("project_id is required for Railway commands")
++
+         cmd = [
+             'railway', 'logs',
+             '--project', self.config['project_id'],
+             '--json'
+         ]
         
         if service_id:
             cmd.extend(['--service', service_id])
@@ -150,17 +156,18 @@ class RailwayClient:
         """必要に応じてログイン"""
         try:
             # ログイン状態をチェック
-            result = subprocess.run(['railway', 'whoami'], 
-                                  capture_output=True, text=True, timeout=10)
+            result = subprocess.run(
+                ['railway', 'whoami'],
+                capture_output=True, text=True, timeout=10
+            )
             
             if result.returncode != 0:
                 self.logger.info("Railway CLI login required")
-                login_result = subprocess.run(['railway', 'login'], 
-                                            capture_output=True, text=True, timeout=60)
-                return login_result.returncode == 0
+                self.logger.warning("Please run 'railway login' manually to authenticate")
+                return False
             
             return True
             
         except Exception as e:
             self.logger.error(f"Error checking Railway CLI login: {e}")
-            return False 
+            return False

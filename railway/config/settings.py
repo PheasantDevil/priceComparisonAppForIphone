@@ -66,10 +66,10 @@ class LogMonitorConfig:
     def from_env(cls) -> 'LogMonitorConfig':
         """環境変数から設定を読み込み"""
         return cls(
-            interval=int(os.getenv('LOG_MONITOR_INTERVAL', '60')),
-            max_logs_per_batch=int(os.getenv('LOG_MONITOR_MAX_LOGS', '100')),
-            important_keywords=os.getenv('LOG_MONITOR_KEYWORDS', '').split(',') if os.getenv('LOG_MONITOR_KEYWORDS') else None,
-            log_levels=os.getenv('LOG_MONITOR_LEVELS', '').split(',') if os.getenv('LOG_MONITOR_LEVELS') else None
+            interval=int(os.getenv('LOG_MONITOR_INTERVAL', '60')) if os.getenv('LOG_MONITOR_INTERVAL', '60').isdigit() else 60,
+            max_logs_per_batch=int(os.getenv('LOG_MONITOR_MAX_LOGS', '100')) if os.getenv('LOG_MONITOR_MAX_LOGS', '100').isdigit() else 100,
+            important_keywords=[k.strip() for k in os.getenv('LOG_MONITOR_KEYWORDS', '').split(',') if k.strip()] if os.getenv('LOG_MONITOR_KEYWORDS') else None,
+            log_levels=[l.strip() for l in os.getenv('LOG_MONITOR_LEVELS', '').split(',') if l.strip()] if os.getenv('LOG_MONITOR_LEVELS') else None
         )
 
 

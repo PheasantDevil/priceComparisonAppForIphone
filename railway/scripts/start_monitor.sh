@@ -24,17 +24,18 @@ fi
 
 # Railway CLIがインストールされているか確認
 if ! command -v railway &> /dev/null; then
-    echo "Installing Railway CLI..."
-    npm install -g @railway/cli
+    echo "Error: Railway CLI not found. Install it in the base image or supply PATH." >&2
+    exit 2
 fi
 
-# Railwayにログイン
-echo "Checking Railway CLI login status..."
+# Non-interactive auth: expect RAILWAY_TOKEN to be preset
 if ! railway whoami &> /dev/null; then
-    echo "Logging into Railway..."
-    railway login
+    if [ -z "${RAILWAY_TOKEN:-}" ]; then
+        echo "Error: Railway CLI not logged in and RAILWAY_TOKEN not provided for headless auth." >&2
+        exit 3
+    fi
+    echo "$RAILWAY_TOKEN" | railway login --token -
 fi
-
 # ログディレクトリを作成
 mkdir -p "$PROJECT_ROOT/railway/logs"
 
