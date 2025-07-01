@@ -17,6 +17,7 @@ secrets/
 .env.development.local
 .env.test.local
 .env.production.local
+railway/config/env.example
 
 # ログファイル
 *.log
