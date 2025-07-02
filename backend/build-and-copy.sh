@@ -61,11 +61,11 @@ echo "✅ package.json found"
 
 # 依存関係をインストール（タイムアウト付き）
 echo "📦 Installing dependencies..."
-timeout $TIMEOUT npm install || {
+timeout $TIMEOUT npm ci --include=dev || {
   echo "❌ npm install failed or timed out"
   echo "🔍 Checking npm cache and retrying..."
   npm cache clean --force
-  timeout $TIMEOUT npm install || {
+  timeout $TIMEOUT npm ci --include=dev || {
     echo "❌ npm install failed after retry"
     exit 1
   }
@@ -102,10 +102,18 @@ if [ -d "frontend/out" ]; then
     exit 1
   }
   echo "✅ Static files copied successfully from out/"
+elif [ -d "frontend/dist" ]; then
+  cp -r frontend/dist/* templates/ || {
+    echo "❌ Failed to copy files from frontend/dist/"
+    exit 1
+  }
+  echo "✅ Static files copied successfully from dist/"
 else
-  echo "❌ frontend/out directory not found after build"
+  echo "❌ frontend/out or frontend/dist directory not found after build"
   echo "🔍 Available directories in frontend:"
   ls -la frontend/
+  echo "🔍 Checking for other possible output directories:"
+  find frontend/ -type d -name "out" -o -name "dist" -o -name "build" 2>/dev/null || echo "No output directories found"
   exit 1
 fi
 
