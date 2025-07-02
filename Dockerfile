@@ -1,4 +1,16 @@
-# Use Python 3.11 slim image as base
+# Build stage for Next.js
+FROM node:18-alpine AS frontend-builder
+
+WORKDIR /app
+
+# Copy frontend files
+COPY frontend/package*.json ./
+RUN npm ci --include=dev
+
+COPY frontend/ ./
+RUN npm run build
+
+# Production stage
 FROM python:3.11-slim
 
 # Set environment variables
@@ -7,39 +19,23 @@ ENV PYTHONUNBUFFERED=1
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install system dependencies and Node.js
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
-    gnupg \
-    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Set work directory
 WORKDIR /app
 
-# Copy package files first for better caching
-COPY frontend/package*.json ./frontend/
-COPY backend/requirements.txt ./backend/
+# Copy Python requirements and install dependencies
+COPY backend/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Node.js dependencies (including dev dependencies for build)
-WORKDIR /app/frontend
-RUN npm ci --include=dev
+# Copy backend application code
+COPY backend/ ./backend/
 
-# Install Python dependencies
-WORKDIR /app
-RUN pip install --no-cache-dir -r backend/requirements.txt
-
-# Copy application code
-COPY . .
-
-# Build Next.js frontend
-WORKDIR /app/frontend
-RUN npm run build
-
-# Copy static files to templates directory
-WORKDIR /app
-RUN mkdir -p templates && cp -r frontend/out/* templates/
+# Copy built frontend from build stage
+COPY --from=frontend-builder /app/out ./templates/
 
 # Set working directory back to app root
 WORKDIR /app
