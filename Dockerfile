@@ -18,16 +18,20 @@ RUN apt-get update && apt-get install -y \
 # Set work directory
 WORKDIR /app
 
-# Copy application code first
-COPY . .
+# Copy package files first for better caching
+COPY frontend/package*.json ./frontend/
+COPY backend/requirements.txt ./backend/
 
-# Install Node.js dependencies
+# Install Node.js dependencies (including dev dependencies for build)
 WORKDIR /app/frontend
-RUN npm ci --only=production
+RUN npm ci --include=dev
 
 # Install Python dependencies
 WORKDIR /app
 RUN pip install --no-cache-dir -r backend/requirements.txt
+
+# Copy application code
+COPY . .
 
 # Build Next.js frontend
 WORKDIR /app/frontend
@@ -40,8 +44,8 @@ RUN mkdir -p templates && cp -r frontend/out/* templates/
 # Set working directory back to app root
 WORKDIR /app
 
-# Expose port
-EXPOSE 8000
+# Expose port (Railway will set PORT environment variable)
+EXPOSE $PORT
 
-# Start the application
-CMD ["python", "backend/app.py"] 
+# Start the application with gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "1", "--timeout", "120", "backend.app:create_app()"] 

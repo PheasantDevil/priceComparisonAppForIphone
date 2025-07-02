@@ -55,6 +55,10 @@ jobs:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       run: |
         echo "Deploying to Railway with Service ID: $RAILWAY_SERVICE_ID"
+        echo "Current directory: $(pwd)"
+        echo "Directory contents:"
+        ls -la
+        
         railway up --detach --service $RAILWAY_SERVICE_ID || {
           echo "❌ Deployment failed"
           echo "Checking Railway logs..."
@@ -95,19 +99,27 @@ jobs:
               **プラットフォーム**: Railway.app
               **無料枠**: 月500時間まで無料
               **安定性**: 高（App Engine Standardより安定）
-              **デプロイURL**: ${{ steps.get-url.outputs.deployment_url }}`
+              **デプロイURL**: ${{ steps.get-url.outputs.deployment_url }}
+              
+              **修正内容**:
+              - Dockerfileの最適化（マルチステージビルド）
+              - Next.js 15対応の静的エクスポート
+              - 環境変数設定の改善
+              - エラーハンドリングの強化`
             });
             console.log('PRコメントを投稿しました');
           } catch (error) {
             console.log('PRコメントの投稿に失敗しました:', error.message);
           }
 
-    # - name: Get Railway logs
-    #   run: |
-    #     echo "Getting Railway logs..."
-    #     railway logs --service $RAILWAY_SERVICE_ID
+    - name: Get Railway logs
+      if: failure()
+      run: |
+        echo "Getting Railway logs after failure..."
+        railway logs --service $RAILWAY_SERVICE_ID || echo "Could not retrieve logs"
 
-    # - name: Get Railway status
-    #   run: |
-    #     echo "Getting Railway status..."
-    #     railway status --service $RAILWAY_SERVICE_ID
+    - name: Get Railway status
+      if: failure()
+      run: |
+        echo "Getting Railway status after failure..."
+        railway status --service $RAILWAY_SERVICE_ID || echo "Could not retrieve status"

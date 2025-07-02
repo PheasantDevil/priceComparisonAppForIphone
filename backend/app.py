@@ -305,18 +305,10 @@ def create_app():
 
     return app
 
-# アプリケーションインスタンスを作成
+# Railway用のアプリケーション作成
 app = create_app()
 
 if __name__ == '__main__':
-    # Railway環境での起動設定
-    port = int(os.environ.get('PORT', 8080))
-    host = os.environ.get('HOST', '0.0.0.0')
-    
-    print(f"🚀 Starting Flask app on {host}:{port}")
-    print(f"📂 Current working directory: {os.getcwd()}")
-    print(f"📂 Templates directory exists: {os.path.exists('templates')}")
-    if os.path.exists('templates'):
-        print(f"📂 Templates contents: {os.listdir('templates')}")
-    
-    app.run(host=host, port=port, debug=False)
+    # Railway環境ではPORT環境変数を使用
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port, debug=False)
