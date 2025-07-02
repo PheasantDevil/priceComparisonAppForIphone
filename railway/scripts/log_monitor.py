@@ -12,13 +12,12 @@ from datetime import datetime, timedelta
 from typing import Dict, List
 
 # プロジェクトルートをパスに追加
+sys.path.append('.')
+
 from railway.config.settings import (log_monitor_config, railway_config,
                                      slack_config, validate_configs)
 from railway.utils.railway_client import RailwayClient
 from railway.utils.slack_notifier import SlackNotifier
-
-# プロジェクトルートをパスに追加
-sys.path.append('.')
 
 
 class RailwayLogMonitor:
@@ -63,34 +62,6 @@ class RailwayLogMonitor:
         
         return new_logs
     
-    def _process_logs_batch(self) -> bool:
-        """Process a single batch of logs"""
-        logs = self.railway_client.get_logs(
-            limit=log_monitor_config.max_logs_per_batch
-        )
-
-        if not logs:
-            self.logger.debug("No logs retrieved")
-            return False
-
-        new_logs = self.filter_new_logs(logs)
-        if new_logs:
-            self.logger.info(f"Found {len(new_logs)} new logs")
-            logs_to_notify = [
-                log for log in new_logs
-                if self.should_notify(log)
-            ]
-
-            if logs_to_notify:
-                self.logger.info(f"Sending {len(logs_to_notify)} notifications")
-                self.slack_notifier.send_batch_notification(logs_to_notify)
-            else:
-                self.logger.debug("No logs to notify")
-        else:
-            self.logger.debug("No new logs found")
-
-        return True
-
     def monitor_logs(self, interval: int = None, single_run: bool = False):
         """ログを継続的に監視"""
         interval = interval or log_monitor_config.interval
@@ -112,12 +83,41 @@ class RailwayLogMonitor:
         try:
             while True:
                 try:
-                    if not self._process_logs_batch() and single_run:
-                        break
-
+                    # ログを取得
+                    logs = self.railway_client.get_logs(
+                        limit=log_monitor_config.max_logs_per_batch
+                    )
+                    
+                    if not logs:
+                        self.logger.debug("No logs retrieved")
+                        if single_run:
+                            break
+                        time.sleep(interval)
+                        continue
+                    
+                    # 新しいログをフィルタリング
+                    new_logs = self.filter_new_logs(logs)
+                    
+                    if new_logs:
+                        self.logger.info(f"Found {len(new_logs)} new logs")
+                        
+                        # 通知すべきログをフィルタリング
+                        logs_to_notify = [
+                            log for log in new_logs 
+                            if self.should_notify(log)
+                        ]
+                        
+                        if logs_to_notify:
+                            self.logger.info(f"Sending {len(logs_to_notify)} notifications")
+                            self.slack_notifier.send_batch_notification(logs_to_notify)
+                        else:
+                            self.logger.debug("No logs to notify")
+                    else:
+                        self.logger.debug("No new logs found")
+                    
                     if single_run:
                         break
-
+                    
                     time.sleep(interval)
                     
                 except KeyboardInterrupt:
@@ -134,6 +134,7 @@ class RailwayLogMonitor:
         except Exception as e:
             self.logger.error(f"Fatal error in monitoring: {e}")
             return False
+    
     def send_health_check(self) -> bool:
         """ヘルスチェックを実行してSlackに通知"""
         try:

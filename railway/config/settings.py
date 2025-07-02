@@ -1,82 +1,63 @@
 """
-Railway関連の設定管理
+Railway設定管理
 """
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import List
 
 
 @dataclass
 class RailwayConfig:
-    """Railway設定クラス"""
+    """Railway設定"""
     project_id: str
-    service_id: Optional[str] = None
+    service_id: str = ""
     environment: str = "production"
-    
-    @classmethod
-    def from_env(cls) -> 'RailwayConfig':
-        """環境変数から設定を読み込み"""
-        return cls(
-            project_id=os.getenv('RAILWAY_PROJECT_ID', ''),
-            service_id=os.getenv('RAILWAY_SERVICE_ID'),
-            environment=os.getenv('RAILWAY_ENVIRONMENT', 'production')
-        )
 
 
 @dataclass
 class SlackConfig:
-    """Slack通知設定クラス"""
+    """Slack設定"""
     webhook_url: str
-    channel: str = "#general"
+    channel: str = "#alerts"
     username: str = "Railway Log Monitor"
     icon_emoji: str = ":steam_locomotive:"
-    
-    @classmethod
-    def from_env(cls) -> 'SlackConfig':
-        """環境変数から設定を読み込み"""
-        return cls(
-            webhook_url=os.getenv('SLACK_WEBHOOK_URL', ''),
-            channel=os.getenv('SLACK_CHANNEL', '#general'),
-            username=os.getenv('SLACK_USERNAME', 'Railway Log Monitor'),
-            icon_emoji=os.getenv('SLACK_ICON_EMOJI', ':steam_locomotive:')
-        )
 
 
 @dataclass
 class LogMonitorConfig:
-    """ログ監視設定クラス"""
-    interval: int = 60  # 監視間隔（秒）
-    max_logs_per_batch: int = 100  # 一度に取得する最大ログ数
-    important_keywords: list = None
-    log_levels: list = None
+    """ログ監視設定"""
+    interval: int = 60
+    max_logs_per_batch: int = 100
+    important_keywords: List[str] = None
+    log_levels: List[str] = None
     
     def __post_init__(self):
         if self.important_keywords is None:
-            self.important_keywords = [
-                'error', 'exception', 'failed', 'critical',
-                'deploy', 'restart', 'health', 'timeout',
-                'price', 'scrape', 'update', 'database',
-                'connection', 'memory', 'cpu', 'disk'
-            ]
-        
+            self.important_keywords = ["error", "failed", "timeout", "exception", "critical"]
         if self.log_levels is None:
-            self.log_levels = ['ERROR', 'WARN', 'CRITICAL']
-    
-    @classmethod
-    def from_env(cls) -> 'LogMonitorConfig':
-        """環境変数から設定を読み込み"""
-        return cls(
-            interval=int(os.getenv('LOG_MONITOR_INTERVAL', '60')) if os.getenv('LOG_MONITOR_INTERVAL', '60').isdigit() else 60,
-            max_logs_per_batch=int(os.getenv('LOG_MONITOR_MAX_LOGS', '100')) if os.getenv('LOG_MONITOR_MAX_LOGS', '100').isdigit() else 100,
-            important_keywords=[k.strip() for k in os.getenv('LOG_MONITOR_KEYWORDS', '').split(',') if k.strip()] if os.getenv('LOG_MONITOR_KEYWORDS') else None,
-            log_levels=[l.strip() for l in os.getenv('LOG_MONITOR_LEVELS', '').split(',') if l.strip()] if os.getenv('LOG_MONITOR_LEVELS') else None
-        )
+            self.log_levels = ["ERROR", "WARN", "CRITICAL"]
 
 
-# グローバル設定インスタンス
-railway_config = RailwayConfig.from_env()
-slack_config = SlackConfig.from_env()
-log_monitor_config = LogMonitorConfig.from_env()
+# 設定インスタンス
+railway_config = RailwayConfig(
+    project_id=os.getenv("RAILWAY_PROJECT_ID", ""),
+    service_id=os.getenv("RAILWAY_SERVICE_ID", ""),
+    environment=os.getenv("RAILWAY_ENVIRONMENT", "production")
+)
+
+slack_config = SlackConfig(
+    webhook_url=os.getenv("SLACK_WEBHOOK_URL", ""),
+    channel=os.getenv("SLACK_CHANNEL", "#alerts"),
+    username=os.getenv("SLACK_USERNAME", "Railway Log Monitor"),
+    icon_emoji=os.getenv("SLACK_ICON_EMOJI", ":steam_locomotive:")
+)
+
+log_monitor_config = LogMonitorConfig(
+    interval=int(os.getenv("LOG_MONITOR_INTERVAL", "60")),
+    max_logs_per_batch=int(os.getenv("LOG_MONITOR_MAX_LOGS", "100")),
+    important_keywords=os.getenv("LOG_MONITOR_KEYWORDS", "error,failed,timeout,exception,critical").split(","),
+    log_levels=os.getenv("LOG_MONITOR_LEVELS", "ERROR,WARN,CRITICAL").split(",")
+)
 
 
 def validate_configs() -> bool:
