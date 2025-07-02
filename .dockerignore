@@ -60,10 +60,6 @@ logs
 tmp
 temp
 
-# Documentation
-docs
-*.md
-
 # Tests
 tests
 test
@@ -78,4 +74,8 @@ __tests__
 
 # Railway specific
 .railwayignore
-railway.json 
+railway.json
+
+# Documentation (keep only essential docs)
+docs/deployment/RAILWAY_ENV_SETUP.md
+docs/README.md 
