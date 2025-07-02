@@ -6,19 +6,38 @@ Railway ダッシュボードの「Variables」タブで以下の環境変数を
 
 ### 必須環境変数
 
-| 変数名                    | 値           | 説明                                                                 |
-| ------------------------- | ------------ | -------------------------------------------------------------------- |
-| `PORT`                    | `8000`       | アプリケーションのポート番号（Railway が自動設定する場合もあります） |
-| `NODE_ENV`                | `production` | Node.js 環境設定                                                     |
-| `NEXT_TELEMETRY_DISABLED` | `1`          | Next.js テレメトリを無効化                                           |
+| 変数名                    | 値                                            | 説明                                                                 |
+| ------------------------- | --------------------------------------------- | -------------------------------------------------------------------- |
+| `PORT`                    | `8000`                                        | アプリケーションのポート番号（Railway が自動設定する場合もあります） |
+| `NODE_ENV`                | `production`                                  | Node.js 環境設定                                                     |
+| `NEXT_TELEMETRY_DISABLED` | `1`                                           | Next.js テレメトリを無効化                                           |
+| `SECRET_KEY`              | `f11B-iPLVaRGVayBXFmq57b70nhHgBDwIA-Xj0AdpzU` | Flask セッション用のシークレットキー                                 |
 
 ### オプション環境変数
 
 | 変数名                     | 値           | 説明                                                    |
 | -------------------------- | ------------ | ------------------------------------------------------- |
 | `APP_ENV`                  | `production` | アプリケーション環境                                    |
-| `SECRET_KEY`               | 任意の文字列 | Flask セッション用のシークレットキー                    |
 | `USE_GOOGLE_CLOUD_STORAGE` | `false`      | Google Cloud Storage の使用（Railway 環境では無効推奨） |
+
+## SECRET_KEY の生成方法
+
+### 方法 1: Python を使用（推奨）
+
+```bash
+python3 -c "import secrets; print('SECRET_KEY=' + secrets.token_urlsafe(32))"
+```
+
+### 方法 2: オンライン生成ツール
+
+- [Random.org](https://www.random.org/strings/) で 64 文字のランダム文字列を生成
+- 英数字とハイフン、アンダースコアを含む
+
+### 方法 3: 複数のバックアップキーを生成
+
+```bash
+python3 -c "import secrets; [print(f'SECRET_KEY_{i+1}={secrets.token_urlsafe(32)}') for i in range(3)]"
+```
 
 ## 設定手順
 
@@ -28,11 +47,29 @@ Railway ダッシュボードの「Variables」タブで以下の環境変数を
 4. 「New Variable」ボタンをクリック
 5. 上記の変数を一つずつ追加
 
+## 推奨設定値（コピー&ペースト用）
+
+```
+PORT=8000
+NODE_ENV=production
+NEXT_TELEMETRY_DISABLED=1
+SECRET_KEY=f11B-iPLVaRGVayBXFmq57b70nhHgBDwIA-Xj0AdpzU
+APP_ENV=production
+USE_GOOGLE_CLOUD_STORAGE=false
+```
+
 ## 注意事項
 
 - `PORT`変数は Railway が自動的に設定する場合があります
 - 環境変数を変更した後は、アプリケーションが自動的に再デプロイされます
 - 機密情報（API キーなど）は必ず環境変数として設定し、コードに直接記述しないでください
+- `SECRET_KEY`は一度設定したら変更しないでください（セッションが無効になります）
+
+```bash
+# セキュリティチェック用コマンド
+echo "SECRET_KEY length: ${#SECRET_KEY}"
+echo "SECRET_KEY contains special chars: $(echo $SECRET_KEY | grep -q '[^a-zA-Z0-9_-]' && echo 'Yes' || echo 'No')"
+```
 
 ```bash
 # アプリケーション設定
