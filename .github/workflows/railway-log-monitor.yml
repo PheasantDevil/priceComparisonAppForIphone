@@ -2,7 +2,7 @@ name: Railway Log Monitor
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # 5分ごと
+    - cron: '0 0,12 * * *'  # 0時と12時（12時間ごと）
   workflow_dispatch:
 
 jobs:

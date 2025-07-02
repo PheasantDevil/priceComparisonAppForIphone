@@ -3,47 +3,24 @@
 Slack通知テストスクリプト
 """
 
-import os
 import sys
+from datetime import datetime
 
 # プロジェクトルートをパスに追加
 sys.path.append('.')
 
-from railway import SlackNotifier, validate_configs
+from railway.config.settings import validate_configs
+from railway.utils.slack_notifier import SlackNotifier
 
 
 def test_basic_notification():
     """基本的な通知テスト"""
     print("🧪 基本的な通知テスト")
     
-    if not validate_configs():
-        print("❌ 設定の妥当性確認に失敗しました")
-        return False
+    notifier = SlackNotifier()
+    message = f"🚂 Railway Log Monitor テスト通知\n時刻: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     
-    slack_notifier = SlackNotifier()
-    
-    success = slack_notifier.send_message(
-        "🚂 Railway Log Monitor テスト通知",
-        "INFO",
-        attachments=[{
-            "color": "#36a64f",
-            "title": "テスト通知",
-            "text": "これはテスト通知です。Railway Log Monitorが正常に動作しています。",
-            "fields": [
-                {
-                    "title": "テストタイプ",
-                    "value": "基本通知",
-                    "short": True
-                },
-                {
-                    "title": "ステータス",
-                    "value": "✅ 成功",
-                    "short": True
-                }
-            ]
-        }]
-    )
-    
+    success = notifier.send_message(message, "INFO")
     if success:
         print("✅ 基本的な通知テストが成功しました")
         return True
@@ -56,34 +33,10 @@ def test_error_notification():
     """エラー通知テスト"""
     print("🧪 エラー通知テスト")
     
-    if not validate_configs():
-        print("❌ 設定の妥当性確認に失敗しました")
-        return False
+    notifier = SlackNotifier()
+    message = f"🚨 Railway Log Monitor エラーテスト\n時刻: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     
-    slack_notifier = SlackNotifier()
-    
-    success = slack_notifier.send_message(
-        "❌ テストエラー通知",
-        "ERROR",
-        attachments=[{
-            "color": "#ff0000",
-            "title": "テストエラー",
-            "text": "これはテスト用のエラー通知です。実際のエラーではありません。",
-            "fields": [
-                {
-                    "title": "エラータイプ",
-                    "value": "テストエラー",
-                    "short": True
-                },
-                {
-                    "title": "重要度",
-                    "value": "低",
-                    "short": True
-                }
-            ]
-        }]
-    )
-    
+    success = notifier.send_message(message, "ERROR")
     if success:
         print("✅ エラー通知テストが成功しました")
         return True
@@ -96,19 +49,15 @@ def test_health_check():
     """ヘルスチェック通知テスト"""
     print("🧪 ヘルスチェック通知テスト")
     
-    if not validate_configs():
-        print("❌ 設定の妥当性確認に失敗しました")
-        return False
-    
-    slack_notifier = SlackNotifier()
-    
-    success = slack_notifier.send_health_check('healthy', {
+    notifier = SlackNotifier()
+    details = {
         'project': 'Price Comparison App',
         'services': 1,
         'environment': 'production',
-        'test': True
-    })
+        'status': 'healthy'
+    }
     
+    success = notifier.send_health_check('healthy', details)
     if success:
         print("✅ ヘルスチェック通知テストが成功しました")
         return True
@@ -127,43 +76,47 @@ def main():
     if not validate_configs():
         print("❌ 設定の妥当性確認に失敗しました")
         print("環境変数が正しく設定されているか確認してください")
-        sys.exit(1)
+        return False
     
     print("✅ 設定の妥当性確認が完了しました")
     print()
     
-    # 各テストを実行
+    # テスト実行
     tests = [
         test_basic_notification,
         test_error_notification,
         test_health_check
     ]
     
-    passed = 0
-    total = len(tests)
-    
+    results = []
     for test in tests:
         try:
-            if test():
-                passed += 1
+            result = test()
+            results.append(result)
+            print()
         except Exception as e:
             print(f"❌ テスト実行中にエラーが発生しました: {e}")
-        print()
+            results.append(False)
+            print()
     
-    # 結果を表示
+    # 結果表示
     print("📊 テスト結果")
     print("=" * 20)
-    print(f"成功: {passed}/{total}")
+    success_count = sum(results)
+    total_count = len(results)
     
-    if passed == total:
+    print(f"成功: {success_count}/{total_count}")
+    
+    if success_count == total_count:
         print("🎉 全てのテストが成功しました！")
         print("Railway Log Monitorが正常に動作しています。")
-        sys.exit(0)
+        return True
     else:
-        print("⚠️  一部のテストが失敗しました")
+        print("⚠️ 一部のテストが失敗しました。")
         print("設定を確認してください。")
-        sys.exit(1)
+        return False
 
 
 if __name__ == "__main__":
-    main() 
+    success = main()
+    sys.exit(0 if success else 1) 

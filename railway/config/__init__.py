@@ -1,3 +1,3 @@
 """
-設定パッケージ
+Railway configuration package
 """ 

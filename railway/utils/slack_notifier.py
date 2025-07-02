@@ -143,21 +143,6 @@ class SlackNotifier:
         
         return self.send_message(message, status, attachments)
     
-    def _build_payload(self, message: str, level: str, 
-                      attachments: Optional[List[Dict]]) -> Dict:
-        """Slackペイロードを構築"""
-        payload = {
-            "channel": self.config['channel'],
-            "username": self.config['username'],
-            "icon_emoji": self.config['icon_emoji'],
-            "text": message
-        }
-        
-        if attachments:
-            payload["attachments"] = attachments
-        
-        return payload
-    
     def _get_color_for_level(self, level: str) -> str:
         """ログレベルに応じた色を取得"""
         color_map = {

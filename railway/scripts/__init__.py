@@ -1,3 +1,3 @@
 """
-スクリプトパッケージ
+Railway scripts package
 """ 
