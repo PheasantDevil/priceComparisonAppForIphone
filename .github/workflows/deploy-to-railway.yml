@@ -30,16 +30,6 @@ jobs:
         railway --version
         echo "Railway CLI installed successfully"
 
-    - name: Build and copy frontend
-      run: |
-        echo "Building Next.js frontend and copying to templates..."
-        chmod +x backend/build-and-copy.sh
-        ./backend/build-and-copy.sh
-        
-        echo "✅ Frontend build and copy completed"
-        echo "📊 Templates directory contents:"
-        ls -la templates/ || echo "Templates directory not found"
-
     - name: Setup Railway authentication
       run: |
         echo "Setting up Railway authentication..."
@@ -105,7 +95,8 @@ jobs:
               - Dockerfileの最適化（マルチステージビルド）
               - Next.js 15対応の静的エクスポート
               - 環境変数設定の改善
-              - エラーハンドリングの強化`
+              - エラーハンドリングの強化
+              - フロントエンドビルドのRailway移行`
             });
             console.log('PRコメントを投稿しました');
           } catch (error) {
