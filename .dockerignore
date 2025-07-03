@@ -46,7 +46,7 @@ env
 .DS_Store
 Thumbs.db
 
-# Build artifacts (keep only the final output)
+# Build artifacts
 .next
 out
 dist
@@ -65,7 +65,7 @@ tests
 test
 __tests__
 
-# Configuration files that shouldn't be in container
+# Configuration files
 .env
 .env.local
 .env.development
@@ -80,7 +80,7 @@ railway.json
 docs
 *.md
 
-# Other directories not needed in container
+# Other directories
 cache/
 data/
 config/

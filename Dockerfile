@@ -4,7 +4,6 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV NODE_ENV=production
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -15,20 +14,17 @@ RUN apt-get update && apt-get install -y \
 # Set work directory
 WORKDIR /app
 
-# Copy all application code first
+# Copy all files first
 COPY . .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
-# Create templates directory if it doesn't exist
+# Create templates directory
 RUN mkdir -p templates
 
-# Set working directory back to app root
-WORKDIR /app
-
-# Expose port (Railway will set PORT environment variable)
+# Expose port
 EXPOSE $PORT
 
-# Start the application with gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "1", "--timeout", "120", "backend.app:create_app()"] 
+# Start the application
+CMD ["python", "backend/app.py"] 
