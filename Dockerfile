@@ -15,15 +15,14 @@ RUN apt-get update && apt-get install -y \
 # Set work directory
 WORKDIR /app
 
-# Copy Python requirements and install dependencies
-COPY backend/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy all application code first
+COPY . .
 
-# Copy backend application code
-COPY backend/ ./backend/
+# Install Python dependencies
+RUN pip install --no-cache-dir -r backend/requirements.txt
 
-# Copy pre-built frontend static files (if they exist)
-COPY templates/ ./templates/ 2>/dev/null || mkdir -p templates
+# Create templates directory if it doesn't exist
+RUN mkdir -p templates
 
 # Set working directory back to app root
 WORKDIR /app

@@ -80,10 +80,6 @@ railway.json
 docs
 *.md
 
-# Frontend source (we only need the built templates)
-frontend/
-scripts/
-
 # Other directories not needed in container
 cache/
 data/
