@@ -46,7 +46,7 @@ env
 .DS_Store
 Thumbs.db
 
-# Build artifacts
+# Build artifacts (keep only the final output)
 .next
 out
 dist
@@ -76,6 +76,20 @@ __tests__
 .railwayignore
 railway.json
 
-# Documentation (keep only essential docs)
-docs/deployment/RAILWAY_ENV_SETUP.md
-docs/README.md 
+# Documentation
+docs
+*.md
+
+# Frontend source (we only need the built templates)
+frontend/
+scripts/
+
+# Other directories not needed in container
+cache/
+data/
+config/
+infrastructure/
+reports/
+railway/
+assets/
+artifacts/ 
