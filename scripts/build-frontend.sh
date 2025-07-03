@@ -17,9 +17,9 @@ echo "🔍 Checking Node.js and npm..."
 node --version
 npm --version
 
-# 依存関係をインストール
+# 依存関係をインストール（package-lock.jsonの問題を回避）
 echo "📦 Installing dependencies..."
-npm ci --include=dev --no-audit --no-fund
+npm install --no-audit --no-fund
 
 # Next.jsをビルド
 echo "🔨 Building Next.js application..."

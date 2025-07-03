@@ -22,8 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend application code
 COPY backend/ ./backend/
 
-# Copy pre-built frontend static files
-COPY templates/ ./templates/
+# Copy pre-built frontend static files (if they exist)
+COPY templates/ ./templates/ 2>/dev/null || mkdir -p templates
 
 # Set working directory back to app root
 WORKDIR /app
