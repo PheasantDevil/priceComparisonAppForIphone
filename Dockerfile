@@ -14,20 +14,14 @@ RUN apt-get update && apt-get install -y \
 # Set work directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY backend/requirements.txt requirements.txt
+# Copy all files first
+COPY . .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy backend code
-COPY backend/ backend/
+RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # Create templates directory
 RUN mkdir -p templates
-
-# Copy templates if they exist (will be created by GitHub Actions)
-COPY templates/ templates/ 2>/dev/null || true
 
 # Expose port
 EXPOSE $PORT

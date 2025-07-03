@@ -9,7 +9,7 @@
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,
     "numReplicas": 1,
-    "startCommand": "gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 backend.app:create_app()"
+    "startCommand": "python backend/app.py"
   },
   "service": "web",
   "project": "price-comparison-app",

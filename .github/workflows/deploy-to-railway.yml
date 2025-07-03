@@ -72,7 +72,8 @@ jobs:
         echo "Directory contents:"
         ls -la
         
-        railway up --detach --service $RAILWAY_SERVICE_ID || {
+        # Force new deployment with cache clear
+        railway up --detach --service $RAILWAY_SERVICE_ID --force || {
           echo "❌ Deployment failed"
           echo "Checking Railway logs..."
           railway logs --service $RAILWAY_SERVICE_ID || echo "Could not retrieve logs"
@@ -115,10 +116,10 @@ jobs:
               **デプロイURL**: ${{ steps.get-url.outputs.deployment_url }}
               
               **修正内容**:
-              - Dockerfileの根本的簡素化
-              - 確実なtemplatesディレクトリ作成
-              - フォールバック機能の強化
-              - エラーハンドリングの改善`
+              - Dockerfileの完全書き直し
+              - Railwayキャッシュクリア
+              - 確実なファイルコピー
+              - シンプルな起動コマンド`
             });
             console.log('PRコメントを投稿しました');
           } catch (error) {
