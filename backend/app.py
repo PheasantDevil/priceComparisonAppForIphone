@@ -125,7 +125,54 @@ def create_app():
             app.logger.info(f"Templates exists: {os.path.exists(templates_path)}")
             
             if os.path.exists(templates_path):
-                app.logger.info(f"Templates contents: {os.listdir(templates_path)}")
+                templates_contents = os.listdir(templates_path)
+                app.logger.info(f"Templates contents: {templates_contents}")
+                
+                # templatesディレクトリが空の場合のフォールバック
+                if not templates_contents:
+                    app.logger.warning("Templates directory is empty, serving fallback HTML")
+                    return """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Price Comparison App</title>
+                        <meta charset="utf-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1">
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+                            .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                            h1 { color: #333; text-align: center; }
+                            .status { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }
+                            .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+                            .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+                            .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <h1>Price Comparison App</h1>
+                            <div class="status warning">
+                                <h3>🚧 Frontend Build Status</h3>
+                                <p><strong>Status:</strong> Templates directory is empty</p>
+                                <p><strong>Backend:</strong> ✅ Running successfully</p>
+                                <p><strong>Directory:</strong> {}</p>
+                                <p><strong>Contents:</strong> {}</p>
+                            </div>
+                            <div class="status success">
+                                <h3>✅ Backend Services Available</h3>
+                                <ul>
+                                    <li><a href="/health">Health Check</a></li>
+                                    <li><a href="/api/status">API Status</a></li>
+                                </ul>
+                            </div>
+                            <div class="status info">
+                                <h3>ℹ️ About This App</h3>
+                                <p>This is a price comparison application for iPhone products. The backend API is fully functional and ready to serve data.</p>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                    """.format(templates_path, templates_contents), 200
             
             return send_from_directory('templates', 'index.html')
         except FileNotFoundError as e:
@@ -137,18 +184,73 @@ def create_app():
             <head>
                 <title>Price Comparison App</title>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+                    .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                    h1 { color: #333; text-align: center; }
+                    .status { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }
+                    .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+                    .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+                </style>
             </head>
             <body>
-                <h1>Price Comparison App</h1>
-                <p>Static files are being generated. Please try again in a moment.</p>
-                <p>Current directory: {}</p>
-                <p>Templates exists: {}</p>
+                <div class="container">
+                    <h1>Price Comparison App</h1>
+                    <div class="status error">
+                        <h3>❌ File Not Found</h3>
+                        <p><strong>Error:</strong> index.html not found</p>
+                        <p><strong>Backend:</strong> ✅ Running successfully</p>
+                        <p><strong>Current directory:</strong> {}</p>
+                        <p><strong>Templates exists:</strong> {}</p>
+                    </div>
+                    <div class="status success">
+                        <h3>✅ Backend Services Available</h3>
+                        <ul>
+                            <li><a href="/health">Health Check</a></li>
+                            <li><a href="/api/status">API Status</a></li>
+                        </ul>
+                    </div>
+                </div>
             </body>
             </html>
             """.format(os.getcwd(), os.path.exists('templates')), 200
         except Exception as e:
             app.logger.error(f"Error serving index: {e}")
-            return f"Error: {str(e)}", 500
+            return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Price Comparison App - Error</title>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+                    .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                    h1 { color: #333; text-align: center; }
+                    .status { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 4px; margin: 20px 0; }
+                    .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 4px; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Price Comparison App</h1>
+                    <div class="status">
+                        <h3>❌ Server Error</h3>
+                        <p><strong>Error:</strong> {}</p>
+                        <p><strong>Backend:</strong> ✅ Running successfully</p>
+                    </div>
+                    <div class="success">
+                        <h3>✅ Backend Services Available</h3>
+                        <ul>
+                            <li><a href="/health">Health Check</a></li>
+                            <li><a href="/api/status">API Status</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.format(str(e)), 500
 
     @app.route('/<path:filename>')
     def static_files(filename):
