@@ -131,7 +131,7 @@ def create_app():
                 # templatesディレクトリが空の場合のフォールバック
                 if not templates_contents:
                     app.logger.warning("Templates directory is empty, serving fallback HTML")
-                    return """
+                    return f"""
                     <!DOCTYPE html>
                     <html>
                     <head>
@@ -139,13 +139,13 @@ def create_app():
                         <meta charset="utf-8">
                         <meta name="viewport" content="width=device-width, initial-scale=1">
                         <style>
-                            body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
-                            .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-                            h1 { color: #333; text-align: center; }
-                            .status { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }
-                            .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
-                            .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
-                            .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+                            body {{ font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }}
+                            .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                            h1 {{ color: #333; text-align: center; }}
+                            .status {{ background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }}
+                            .warning {{ background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }}
+                            .success {{ background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }}
+                            .info {{ background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }}
                         </style>
                     </head>
                     <body>
@@ -155,8 +155,8 @@ def create_app():
                                 <h3>🚧 Frontend Build Status</h3>
                                 <p><strong>Status:</strong> Templates directory is empty</p>
                                 <p><strong>Backend:</strong> ✅ Running successfully</p>
-                                <p><strong>Directory:</strong> {}</p>
-                                <p><strong>Contents:</strong> {}</p>
+                                <p><strong>Directory:</strong> {templates_path}</p>
+                                <p><strong>Contents:</strong> {templates_contents}</p>
                             </div>
                             <div class="status success">
                                 <h3>✅ Backend Services Available</h3>
@@ -172,13 +172,13 @@ def create_app():
                         </div>
                     </body>
                     </html>
-                    """.format(templates_path, templates_contents), 200
+                    """, 200
             
             return send_from_directory('templates', 'index.html')
         except FileNotFoundError as e:
             app.logger.error(f"index.html not found: {e}")
             # フォールバック: シンプルなHTMLを返す
-            return """
+            return f"""
             <!DOCTYPE html>
             <html>
             <head>
@@ -186,12 +186,12 @@ def create_app():
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <style>
-                    body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
-                    .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-                    h1 { color: #333; text-align: center; }
-                    .status { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }
-                    .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
-                    .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+                    body {{ font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }}
+                    .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                    h1 {{ color: #333; text-align: center; }}
+                    .status {{ background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }}
+                    .error {{ background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }}
+                    .success {{ background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }}
                 </style>
             </head>
             <body>
@@ -201,8 +201,8 @@ def create_app():
                         <h3>❌ File Not Found</h3>
                         <p><strong>Error:</strong> index.html not found</p>
                         <p><strong>Backend:</strong> ✅ Running successfully</p>
-                        <p><strong>Current directory:</strong> {}</p>
-                        <p><strong>Templates exists:</strong> {}</p>
+                        <p><strong>Current directory:</strong> {os.getcwd()}</p>
+                        <p><strong>Templates exists:</strong> {os.path.exists('templates')}</p>
                     </div>
                     <div class="status success">
                         <h3>✅ Backend Services Available</h3>
@@ -214,10 +214,10 @@ def create_app():
                 </div>
             </body>
             </html>
-            """.format(os.getcwd(), os.path.exists('templates')), 200
+            """, 200
         except Exception as e:
             app.logger.error(f"Error serving index: {e}")
-            return """
+            return f"""
             <!DOCTYPE html>
             <html>
             <head>
@@ -225,11 +225,11 @@ def create_app():
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <style>
-                    body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
-                    .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-                    h1 { color: #333; text-align: center; }
-                    .status { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 4px; margin: 20px 0; }
-                    .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 4px; margin: 20px 0; }
+                    body {{ font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }}
+                    .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                    h1 {{ color: #333; text-align: center; }}
+                    .status {{ background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 4px; margin: 20px 0; }}
+                    .success {{ background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 4px; margin: 20px 0; }}
                 </style>
             </head>
             <body>
@@ -237,7 +237,7 @@ def create_app():
                     <h1>Price Comparison App</h1>
                     <div class="status">
                         <h3>❌ Server Error</h3>
-                        <p><strong>Error:</strong> {}</p>
+                        <p><strong>Error:</strong> {str(e)}</p>
                         <p><strong>Backend:</strong> ✅ Running successfully</p>
                     </div>
                     <div class="success">
@@ -250,7 +250,7 @@ def create_app():
                 </div>
             </body>
             </html>
-            """.format(str(e)), 500
+            """, 500
 
     @app.route('/<path:filename>')
     def static_files(filename):
