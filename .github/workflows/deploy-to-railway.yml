@@ -82,31 +82,17 @@ jobs:
         # 環境変数でRailwayトークンを設定
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         
-        # Railway CLIの認証を設定（複数の方法を試行）
-        echo "🔐 Attempting Railway authentication..."
+        # Railway CLIの認証を設定
+        echo "🔐 Setting up Railway authentication via environment variable..."
         
-        # 方法1: トークンベース認証
-        echo "${{ secrets.RAILWAY_TOKEN }}" | railway login --token || {
-          echo "⚠️ Token-based login failed, trying alternative method..."
-          
-          # 方法2: 環境変数による認証
-          railway login --token "${{ secrets.RAILWAY_TOKEN }}" || {
-            echo "⚠️ Environment variable login failed, trying direct method..."
-            
-            # 方法3: 直接認証
-            railway login --token "$RAILWAY_TOKEN" || {
-              echo "❌ All Railway authentication methods failed"
-              exit 1
-            }
-          }
-        }
-        
-        # 認証の確認
-        echo "🔍 Verifying authentication..."
-        railway whoami || {
-          echo "❌ Railway authentication verification failed"
+        # 環境変数の確認
+        echo "🔍 Checking environment variables:"
+        if [ -n "$RAILWAY_TOKEN" ]; then
+          echo "✅ RAILWAY_TOKEN is set (length: ${#RAILWAY_TOKEN})"
+        else
+          echo "❌ RAILWAY_TOKEN is not set"
           exit 1
-        }
+        fi
         
         echo "✅ Railway authentication setup completed"
 
@@ -126,16 +112,9 @@ jobs:
         echo "RAILWAY_TOKEN: ${RAILWAY_TOKEN:0:10}..." # 最初の10文字のみ表示
         echo "RAILWAY_SERVICE_ID: $RAILWAY_SERVICE_ID"
         
-        # Railway CLIのバージョンとヘルプを確認
+        # Railway CLIのバージョンを確認
         echo "🔍 Railway CLI version:"
         railway --version
-        
-        echo "🔍 Railway up help:"
-        railway up --help || echo "Help command not available"
-        
-        # 認証状態の確認
-        echo "🔍 Checking authentication status:"
-        railway whoami || echo "Authentication check failed"
         
         # デプロイを実行
         echo "🚀 Starting deployment..."
