@@ -78,26 +78,72 @@ jobs:
     - name: Setup Railway authentication
       run: |
         echo "Setting up Railway authentication..."
+        
+        # 環境変数でRailwayトークンを設定
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
         
-        # 環境変数を確実に設定
-        echo "RAILWAY_TOKEN=$RAILWAY_TOKEN" >> $GITHUB_ENV
+        # Railway CLIの認証を設定（複数の方法を試行）
+        echo "🔐 Attempting Railway authentication..."
+        
+        # 方法1: トークンベース認証
+        echo "${{ secrets.RAILWAY_TOKEN }}" | railway login --token || {
+          echo "⚠️ Token-based login failed, trying alternative method..."
+          
+          # 方法2: 環境変数による認証
+          railway login --token "${{ secrets.RAILWAY_TOKEN }}" || {
+            echo "⚠️ Environment variable login failed, trying direct method..."
+            
+            # 方法3: 直接認証
+            railway login --token "$RAILWAY_TOKEN" || {
+              echo "❌ All Railway authentication methods failed"
+              exit 1
+            }
+          }
+        }
+        
+        # 認証の確認
+        echo "🔍 Verifying authentication..."
+        railway whoami || {
+          echo "❌ Railway authentication verification failed"
+          exit 1
+        }
         
         echo "✅ Railway authentication setup completed"
 
     - name: Deploy to Railway
       env:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
       run: |
-        echo "Deploying to Railway with Service ID: $RAILWAY_SERVICE_ID"
+        echo "🚀 Deploying to Railway..."
+        echo "Service ID: $RAILWAY_SERVICE_ID"
         echo "Current directory: $(pwd)"
         echo "Directory contents:"
         ls -la
         
-        # Force new deployment with cache clear
-        railway up --detach --service $RAILWAY_SERVICE_ID --force || {
+        # 環境変数の確認
+        echo "🔍 Environment variables:"
+        echo "RAILWAY_TOKEN: ${RAILWAY_TOKEN:0:10}..." # 最初の10文字のみ表示
+        echo "RAILWAY_SERVICE_ID: $RAILWAY_SERVICE_ID"
+        
+        # Railway CLIのバージョンとヘルプを確認
+        echo "🔍 Railway CLI version:"
+        railway --version
+        
+        echo "🔍 Railway up help:"
+        railway up --help || echo "Help command not available"
+        
+        # 認証状態の確認
+        echo "🔍 Checking authentication status:"
+        railway whoami || echo "Authentication check failed"
+        
+        # デプロイを実行
+        echo "🚀 Starting deployment..."
+        railway up --detach --service $RAILWAY_SERVICE_ID || {
           echo "❌ Deployment failed"
-          echo "Checking Railway logs..."
+          echo "🔍 Checking Railway status..."
+          railway status --service $RAILWAY_SERVICE_ID || echo "Status check failed"
+          echo "🔍 Checking Railway logs..."
           railway logs --service $RAILWAY_SERVICE_ID || echo "Could not retrieve logs"
           exit 1
         }
@@ -150,12 +196,34 @@ jobs:
 
     - name: Get Railway logs
       if: failure()
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
       run: |
-        echo "Getting Railway logs after failure..."
+        echo "🔍 Getting Railway logs after failure..."
+        echo "Service ID: $RAILWAY_SERVICE_ID"
+        
+        # 認証状態の確認
+        railway whoami || echo "Authentication check failed"
+        
+        # ログの取得
         railway logs --service $RAILWAY_SERVICE_ID || echo "Could not retrieve logs"
+        
+        # ステータスの取得
+        echo "🔍 Getting Railway status..."
+        railway status --service $RAILWAY_SERVICE_ID || echo "Could not retrieve status"
 
     - name: Get Railway status
       if: failure()
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
       run: |
-        echo "Getting Railway status after failure..."
+        echo "🔍 Getting Railway status after failure..."
+        echo "Service ID: $RAILWAY_SERVICE_ID"
+        
+        # 認証状態の確認
+        railway whoami || echo "Authentication check failed"
+        
+        # ステータスの取得
         railway status --service $RAILWAY_SERVICE_ID || echo "Could not retrieve status"
