@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# エラー時に即座に終了
-set -e
+# エラー時に即座に終了しない（再試行のため）
+set +e
 
 echo "🚀 Building Next.js frontend for production..."
 
@@ -39,8 +39,11 @@ ls -la
 
 # ビルドを試行（詳細なログ出力）
 echo "🔨 Running npm run build..."
+BUILD_SUCCESS=false
+
 if npm run build; then
   echo "✅ Next.js build successful"
+  BUILD_SUCCESS=true
   
   # ビルド後のディレクトリ構造を確認
   echo "📁 Post-build directory structure:"
@@ -63,6 +66,16 @@ if npm run build; then
     # コピー後の確認
     echo "📁 Templates directory after copy:"
     ls -la templates/
+    
+    # ファイルが正しくコピーされたか確認
+    if [ -f "templates/index.html" ]; then
+      echo "✅ index.html found in templates directory"
+      echo "📄 First few lines of index.html:"
+      head -5 templates/index.html
+    else
+      echo "❌ index.html not found in templates directory"
+      BUILD_SUCCESS=false
+    fi
   else
     echo "❌ frontend/out directory not found"
     echo "📁 Checking frontend directory structure:"
@@ -107,15 +120,17 @@ if npm run build; then
 </body>
 </html>
 EOF
+      BUILD_SUCCESS=true
     else
       echo "❌ No build output found"
       echo "📁 Checking for any build artifacts:"
       find frontend/ -name "*.html" -o -name "*.js" -o -name "*.css" | head -10
-      exit 1
+      BUILD_SUCCESS=false
     fi
   fi
 else
   echo "❌ Next.js build failed"
+  BUILD_SUCCESS=false
   
   # ビルドエラーの詳細を確認
   echo "🔍 Checking build error details..."
@@ -182,4 +197,13 @@ echo "✅ Frontend build process completed!"
 echo "📊 Templates directory contents:"
 ls -la templates/
 echo "📊 Templates directory size:"
-du -sh templates/ 
+du -sh templates/
+
+# ビルド成功の確認
+if [ "$BUILD_SUCCESS" = true ]; then
+  echo "✅ Build process completed successfully"
+  exit 0
+else
+  echo "❌ Build process failed"
+  exit 1
+fi 
