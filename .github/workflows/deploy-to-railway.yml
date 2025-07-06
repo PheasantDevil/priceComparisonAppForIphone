@@ -46,22 +46,33 @@ jobs:
           exit 0
         fi
         
-        # Try to build frontend
-        if [ -f "scripts/build-frontend.sh" ]; then
-          echo "📋 Found build script, executing..."
-          chmod +x scripts/build-frontend.sh
+        # フロントエンドビルドを強制実行
+        echo "📋 Building frontend with enhanced error handling..."
+        chmod +x scripts/build-frontend.sh
+        
+        # ビルドスクリプトを実行（失敗した場合は再試行）
+        MAX_RETRIES=3
+        RETRY_COUNT=0
+        
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          echo "🔄 Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES"
           
-          # ビルドスクリプトを実行（エラーが発生しても続行）
           if ./scripts/build-frontend.sh; then
             echo "✅ Frontend build completed successfully"
+            break
           else
-            echo "⚠️ Frontend build failed, creating enhanced fallback HTML"
-            echo '<!DOCTYPE html><html><head><title>Price Comparison App</title><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font-family:Arial,sans-serif;margin:40px;background:#f5f5f5}.container{max-width:800px;margin:0 auto;background:white;padding:40px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1)}h1{color:#333;text-align:center}.status{background:#fff3cd;border:1px solid #ffeaa7;padding:15px;border-radius:4px;margin:20px 0}.error{background:#f8d7da;border:1px solid #f5c6cb;color:#721c24}.success{background:#d4edda;border:1px solid #c3e6cb;color:#155724}.info{background:#d1ecf1;border:1px solid #bee5eb;color:#0c5460}</style></head><body><div class="container"><h1>Price Comparison App</h1><div class="status error"><h3>🚧 Frontend Build Issue</h3><p><strong>Status:</strong> Frontend build encountered an issue during CI/CD</p><p><strong>Backend:</strong> ✅ Running successfully</p><p><strong>Next Steps:</strong> The development team has been notified</p></div><div class="status success"><h3>✅ Backend Services Available</h3><ul><li><a href="/health">Health Check</a></li><li><a href="/api/status">API Status</a></li></ul></div><div class="status info"><h3>ℹ️ About This App</h3><p>This is a price comparison application for iPhone products. The backend API is fully functional and ready to serve data.</p></div></div></body></html>' > templates/index.html
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "⚠️ Build attempt $RETRY_COUNT failed"
+            
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+              echo "🔄 Retrying in 5 seconds..."
+              sleep 5
+            else
+              echo "❌ All build attempts failed, creating enhanced fallback HTML"
+              echo '<!DOCTYPE html><html><head><title>Price Comparison App</title><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font-family:Arial,sans-serif;margin:40px;background:#f5f5f5}.container{max-width:800px;margin:0 auto;background:white;padding:40px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1)}h1{color:#333;text-align:center}.status{background:#fff3cd;border:1px solid #ffeaa7;padding:15px;border-radius:4px;margin:20px 0}.error{background:#f8d7da;border:1px solid #f5c6cb;color:#721c24}.success{background:#d4edda;border:1px solid #c3e6cb;color:#155724}.info{background:#d1ecf1;border:1px solid #bee5eb;color:#0c5460}</style></head><body><div class="container"><h1>Price Comparison App</h1><div class="status error"><h3>🚧 Frontend Build Issue</h3><p><strong>Status:</strong> Frontend build failed after multiple attempts</p><p><strong>Backend:</strong> ✅ Running successfully</p><p><strong>Next Steps:</strong> Check build logs for details</p></div><div class="status success"><h3>✅ Backend Services Available</h3><ul><li><a href="/health">Health Check</a></li><li><a href="/api/status">API Status</a></li></ul></div><div class="status info"><h3>ℹ️ About This App</h3><p>This is a price comparison application for iPhone products. The backend API is fully functional and ready to serve data.</p></div></div></body></html>' > templates/index.html
+            fi
           fi
-        else
-          echo "⚠️ Build script not found, creating fallback HTML"
-          echo '<!DOCTYPE html><html><head><title>Price Comparison App</title><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font-family:Arial,sans-serif;margin:40px;background:#f5f5f5}.container{max-width:800px;margin:0 auto;background:white;padding:40px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1)}h1{color:#333;text-align:center}.status{background:#fff3cd;border:1px solid #ffeaa7;padding:15px;border-radius:4px;margin:20px 0}.success{background:#d4edda;border:1px solid #c3e6cb;color:#155724}</style></head><body><div class="container"><h1>Price Comparison App</h1><div class="status"><h3>🚧 Frontend Build Status</h3><p><strong>Status:</strong> Frontend build script not found</p><p><strong>Backend:</strong> ✅ Running successfully</p></div><div class="status success"><h3>✅ Backend Services Available</h3><ul><li><a href="/health">Health Check</a></li><li><a href="/api/status">API Status</a></li></ul></div></div></body></html>' > templates/index.html
-        fi
+        done
         
         echo "✅ Frontend build process completed"
         echo "📊 Templates directory contents:"
