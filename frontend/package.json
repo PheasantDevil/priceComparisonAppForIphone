@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "build:fast": "NEXT_TELEMETRY_DISABLED=1 next build",
-    "build:export": "next build && next export",
+    "build:static": "next build",
     "start": "next start",
     "lint": "next lint"
   },

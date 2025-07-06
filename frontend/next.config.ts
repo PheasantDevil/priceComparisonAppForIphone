@@ -15,6 +15,13 @@ const nextConfig: NextConfig = {
   },
   // 静的エクスポートの最適化
   distDir: 'out',
+  // ビルド時の最適化
+  swcMinify: false,
+  // 静的エクスポート用の設定
+  experimental: {
+    // 静的エクスポートを確実にする
+    staticExport: true,
+  },
 };
 
 export default nextConfig;
