@@ -143,7 +143,7 @@ jobs:
       id: get-url
       run: |
         echo "Getting deployment URL..."
-        URL=$(railway status --service $RAILWAY_SERVICE_ID | grep -o 'https://[^[:space:]]*' | head -1 || \
+        URL=$(railway status | grep -o 'https://[^[:space:]]*' | head -1 || \
               echo "https://price-comparison-app-production.up.railway.app")
         echo "deployment_url=$URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $URL"
@@ -197,11 +197,11 @@ jobs:
         railway whoami || echo "Authentication check failed"
         
         # ログの取得
-        railway logs --service $RAILWAY_SERVICE_ID || echo "Could not retrieve logs"
+        railway logs || echo "Could not retrieve logs"
         
         # ステータスの取得
         echo "🔍 Getting Railway status..."
-        railway status --service $RAILWAY_SERVICE_ID || echo "Could not retrieve status"
+        railway status || echo "Could not retrieve status"
 
     - name: Get Railway status
       if: failure()
@@ -216,4 +216,4 @@ jobs:
         railway whoami || echo "Authentication check failed"
         
         # ステータスの取得
-        railway status --service $RAILWAY_SERVICE_ID || echo "Could not retrieve status"
+        railway status || echo "Could not retrieve status"
