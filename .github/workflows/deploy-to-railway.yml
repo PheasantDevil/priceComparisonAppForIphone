@@ -79,6 +79,10 @@ jobs:
         ls -la templates/
         echo "📊 Templates directory size:"
         du -sh templates/
+        
+        # デバッグ用：プロジェクト全体の構造を確認
+        echo "🔍 Project structure after build:"
+        find . -name "*.html" -o -name "templates" -type d | head -20
 
     - name: Install Railway CLI
       run: |
