@@ -20,8 +20,11 @@ COPY . .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
-# Create templates directory
+# Create templates directory and ensure it exists
 RUN mkdir -p templates
+
+# Verify templates directory contents
+RUN ls -la templates/ || echo "Templates directory is empty or does not exist"
 
 # Expose port
 EXPOSE $PORT
