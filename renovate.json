@@ -1,0 +1,68 @@
+{
+  "extends": ["config:recommended", ":timezone(Asia/Tokyo)"],
+  "labels": ["dependencies", "renovate"],
+  "automerge": true,
+  "pin": {
+    "automerge": true
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["pip_requirements"],
+      "matchPackageNames": ["MarkupSafe"],
+      "allowedVersions": ">=3.0.0",
+      "automerge": false
+    },
+    {
+      "automerge": true,
+      "major": {
+        "automerge": false
+      },
+      "matchPackageNames": ["/^@types//"]
+    },
+    {
+      "groupName": "jest",
+      "automerge": true,
+      "matchSourceUrls": [
+        "https://github.com/facebook/jest{/,}**",
+        "https://github.com/kulshekhar/ts-jest{/,}**"
+      ]
+    },
+    {
+      "groupName": "linters",
+      "automerge": true,
+      "extends": ["packages:linters"],
+      "matchPackageNames": ["prettier", "/^@typescript-eslint//"]
+    },
+    {
+      "matchDepTypes": ["githubActionsForWorkflows"],
+      "groupName": "actions for github actions workflows",
+      "automerge": true,
+      "groupSlug": "actions-update-for-github-actions-workflows"
+    },
+    {
+      "matchDepTypes": ["dockerImageForWorkflows"],
+      "groupName": "docker image for github actions workflows",
+      "automerge": true,
+      "groupSlug": "docker-image-update-for-github-actions-workflows"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "prConcurrentLimit": 10,
+      "prPriority": -1,
+      "matchPackageNames": [
+        "!/@*/",
+        "!/some-risky-package/",
+        "!/another-risky-package/"
+      ]
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "prConcurrentLimit": 5,
+      "prPriority": 1
+    }
+  ],
+  "prConcurrentLimit": 10
+}
