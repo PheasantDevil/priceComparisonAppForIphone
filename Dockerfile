@@ -1,5 +1,5 @@
 # Use Node.js 18 image as base for frontend build
-FROM node:18-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 
 # Set work directory
 WORKDIR /app
