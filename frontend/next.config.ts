@@ -30,6 +30,9 @@ const nextConfig: NextConfig = {
   // 静的エクスポート用の設定
   skipTrailingSlashRedirect: true,
   skipMiddlewareUrlNormalize: true,
+  // 静的エクスポートを強制
+  assetPrefix: '',
+  basePath: '',
   // バンドル分析
   webpack: (config, { isServer, dev }) => {
     if (!isServer && !dev && process.env.ANALYZE === 'true') {
