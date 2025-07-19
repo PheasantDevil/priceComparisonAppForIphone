@@ -1,0 +1,55 @@
+# Cloud Run用最適化Dockerfile
+# Stage 1: Frontend Build
+FROM node:18-alpine AS frontend-builder
+
+WORKDIR /app
+
+# Copy package files for better caching
+COPY frontend/package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy frontend source
+COPY frontend/ .
+
+# Build frontend with static export
+RUN npm run build
+
+# Stage 2: Backend Runtime
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PORT=8080
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+WORKDIR /app
+
+# Copy backend requirements and install Python dependencies
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy backend application
+COPY backend/ ./backend/
+
+# Copy built frontend from stage 1
+COPY --from=frontend-builder /app/out ./templates
+
+# Verify templates directory
+RUN echo "=== Templates directory contents ===" && \
+    ls -la templates/ && \
+    echo "=== index.html exists ===" && \
+    ls -la templates/index.html 2>/dev/null || echo "index.html not found"
+
+# Expose port (Cloud Run will override this)
+EXPOSE 8080
+
+# Start the application
+CMD ["python", "backend/app.py"] 

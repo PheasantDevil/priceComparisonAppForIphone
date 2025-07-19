@@ -1,0 +1,17 @@
+frontend/.next
+frontend/node_modules
+frontend/*.log
+frontend/.env*
+frontend/.vercel
+backend/
+scripts/
+docs/
+*.log
+.env*
+.venv/
+node_modules/
+.next
+package.json.disabled
+package-lock.json
+next.config.*
+frontend/vercel.json 
