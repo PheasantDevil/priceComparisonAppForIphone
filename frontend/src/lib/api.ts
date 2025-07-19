@@ -22,10 +22,23 @@ const CACHE_DURATION = 5 * 60 * 1000;
 // メモリキャッシュ
 const cache: Record<string, CacheEntry> = {};
 
+// APIのベースURLを取得
+const getApiBaseUrl = () => {
+  // Vercelの環境変数を使用
+  if (typeof window !== 'undefined') {
+    // クライアントサイドでは環境変数が利用できないため、相対パスを使用
+    return '';
+  }
+  // サーバーサイドでは環境変数を使用
+  return (
+    process.env.BACKEND_URL ||
+    'https://price-comparison-app-asia-northeast1.run.app'
+  );
+};
+
 export async function fetchPrices(series: string): Promise<PricesResponse> {
-  const url = `${
-    process.env.NEXT_PUBLIC_API_URL
-  }/get_prices?series=${encodeURIComponent(series)}`;
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}/get_prices?series=${encodeURIComponent(series)}`;
 
   // キャッシュをチェック
   const cached = cache[url];
