@@ -9,4 +9,8 @@ docs/
 *.log
 .env*
 .venv/
-node_modules/ 
+node_modules/
+.next
+package.json
+package-lock.json
+next.config.* 

@@ -37,6 +37,13 @@ const nextConfig: NextConfig = {
   generateBuildId: async () => {
     return 'static-build';
   },
+  // 静的エクスポートの設定
+  exportPathMap: async function () {
+    return {
+      '/': { page: '/' },
+      '/404': { page: '/404' },
+    };
+  },
   // バンドル分析
   webpack: (config, { isServer, dev }) => {
     if (!isServer && !dev && process.env.ANALYZE === 'true') {
