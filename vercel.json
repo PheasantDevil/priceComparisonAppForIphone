@@ -3,7 +3,7 @@
   "buildCommand": "cd frontend && npm run build:vercel",
   "outputDirectory": "frontend/out",
   "installCommand": "cd frontend && npm install",
-  "framework": "nextjs",
+  "framework": null,
   "rewrites": [
     {
       "source": "/api/(.*)",

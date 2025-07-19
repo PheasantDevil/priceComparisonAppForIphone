@@ -44,6 +44,9 @@ const nextConfig: NextConfig = {
       '/404': { page: '/404' },
     };
   },
+  // Vercel用の設定
+  poweredByHeader: false,
+  compress: true,
   // バンドル分析
   webpack: (config, { isServer, dev }) => {
     if (!isServer && !dev && process.env.ANALYZE === 'true') {
