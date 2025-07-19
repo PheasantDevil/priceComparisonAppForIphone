@@ -1,17 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd frontend && npm run build:vercel",
+  "buildCommand": "cd frontend && npm run vercel-build",
   "outputDirectory": "frontend/out",
-  "installCommand": "cd frontend && npm install",
-  "framework": null,
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "https://price-comparison-app-asia-northeast1.run.app/api/$1"
-    },
-    {
-      "source": "/get_prices",
-      "destination": "https://price-comparison-app-asia-northeast1.run.app/get_prices"
-    }
-  ]
+  "installCommand": "cd frontend && npm install"
 }
