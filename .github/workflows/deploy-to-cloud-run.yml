@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  PROJECT_ID: price-comparison-app-123456
+  PROJECT_ID: price-comparison-app-463007
   REGION: asia-northeast1
   SERVICE_NAME: price-comparison-app
 
@@ -89,7 +89,7 @@ jobs:
     - name: Setup Google Cloud CLI
       uses: google-github-actions/setup-gcloud@v2
       with:
-        project_id: price-comparison-app-123456
+        project_id: price-comparison-app-463007
         service_account_key: ${{ secrets.GCP_SA_KEY }}
 
     - name: Configure Docker for GCR
@@ -101,12 +101,12 @@ jobs:
         echo "🐳 Building Docker image for Cloud Run..."
         
         # Build the image
-        docker build -f Dockerfile.cloudrun -t gcr.io/price-comparison-app-123456/price-comparison-app:${{ github.sha }} .
-        docker build -f Dockerfile.cloudrun -t gcr.io/price-comparison-app-123456/price-comparison-app:latest .
+        docker build -f Dockerfile.cloudrun -t gcr.io/price-comparison-app-463007/price-comparison-app:${{ github.sha }} .
+        docker build -f Dockerfile.cloudrun -t gcr.io/price-comparison-app-463007/price-comparison-app:latest .
         
         # Push to GCR
-        docker push gcr.io/price-comparison-app-123456/price-comparison-app:${{ github.sha }}
-        docker push gcr.io/price-comparison-app-123456/price-comparison-app:latest
+        docker push gcr.io/price-comparison-app-463007/price-comparison-app:${{ github.sha }}
+        docker push gcr.io/price-comparison-app-463007/price-comparison-app:latest
         
         echo "✅ Docker image built and pushed successfully"
 
@@ -115,7 +115,7 @@ jobs:
         echo "🚀 Deploying to Cloud Run..."
         
         gcloud run deploy price-comparison-app \
-          --image gcr.io/price-comparison-app-123456/price-comparison-app:${{ github.sha }} \
+          --image gcr.io/price-comparison-app-463007/price-comparison-app:${{ github.sha }} \
           --platform managed \
           --region asia-northeast1 \
           --allow-unauthenticated \
