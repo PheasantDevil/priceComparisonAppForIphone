@@ -84,15 +84,19 @@ const db = new Firestore();
 async function optimizeIndexes() {
   console.log('Creating optimized indexes...');
   
-  // 価格データのインデックス
-  await db.collection('prices').createIndex({
-    fields: [
-      { fieldPath: 'category', order: 'ASCENDING' },
-      { fieldPath: 'updated_at', order: 'DESCENDING' }
-    ]
-  });
-  
-  console.log('Indexes created successfully');
+  try {
+    // 価格データのインデックス
+    await db.collection('prices').createIndex({
+      fields: [
+        { fieldPath: 'category', order: 'ASCENDING' },
+        { fieldPath: 'updated_at', order: 'DESCENDING' }
+      ]
+    });
+    console.log('Indexes created successfully');
+  } catch (error) {
+    console.error('Failed to create indexes:', error);
+    throw error;
+  }
 }
 
 // データ圧縮
