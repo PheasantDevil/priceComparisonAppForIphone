@@ -27,30 +27,9 @@ const nextConfig: NextConfig = {
       process.env.BACKEND_URL ||
       'https://price-comparison-app-asia-northeast1.run.app',
   },
-  // リダイレクト設定
-  async redirects() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${process.env.BACKEND_URL}/api/:path*`,
-        permanent: false,
-      },
-    ];
-  },
-  // ヘッダー設定
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-    ];
-  },
+  // 静的エクスポート用の設定
+  skipTrailingSlashRedirect: true,
+  skipMiddlewareUrlNormalize: true,
   // バンドル分析
   webpack: (config, { isServer, dev }) => {
     if (!isServer && !dev && process.env.ANALYZE === 'true') {
