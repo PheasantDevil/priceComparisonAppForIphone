@@ -33,6 +33,10 @@ const nextConfig: NextConfig = {
   // 静的エクスポートを強制
   assetPrefix: '',
   basePath: '',
+  // 静的エクスポートの最適化
+  generateBuildId: async () => {
+    return 'static-build';
+  },
   // バンドル分析
   webpack: (config, { isServer, dev }) => {
     if (!isServer && !dev && process.env.ANALYZE === 'true') {
