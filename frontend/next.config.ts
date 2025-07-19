@@ -37,13 +37,6 @@ const nextConfig: NextConfig = {
   generateBuildId: async () => {
     return 'static-build';
   },
-  // 静的エクスポートの設定
-  exportPathMap: async function () {
-    return {
-      '/': { page: '/' },
-      '/404': { page: '/404' },
-    };
-  },
   // Vercel用の設定
   poweredByHeader: false,
   compress: true,
