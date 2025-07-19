@@ -22,13 +22,8 @@ module.exports = {
     optimizeCss: true,
     optimizePackageImports: ['react-icons', 'recharts'],
   },
-  // 静的生成最適化
-  async generateStaticParams() {
-    return {
-      fallback: 'blocking',
-      revalidate: 3600, // 1時間キャッシュ
-    };
-  },
+  // 静的生成最適化 - ISRは export モードと互換性がない
+  // export モードでは静的ファイルのみ生成される
 };
 EOF
 
