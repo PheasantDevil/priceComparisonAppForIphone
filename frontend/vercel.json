@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "buildCommand": "cd frontend && npm run build:vercel",
-  "outputDirectory": "frontend/out",
-  "installCommand": "cd frontend && npm install",
+  "buildCommand": "npm run build:vercel",
+  "outputDirectory": "out",
+  "installCommand": "npm install",
   "framework": null,
   "rewrites": [
     {
