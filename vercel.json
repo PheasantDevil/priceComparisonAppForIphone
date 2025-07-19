@@ -4,6 +4,8 @@
   "outputDirectory": "frontend/out",
   "installCommand": "cd frontend && npm install",
   "framework": null,
+  "functions": {},
+  "builds": [],
   "rewrites": [
     {
       "source": "/api/(.*)",

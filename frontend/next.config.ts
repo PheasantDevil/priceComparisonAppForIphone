@@ -47,6 +47,8 @@ const nextConfig: NextConfig = {
   // Vercel用の設定
   poweredByHeader: false,
   compress: true,
+  // 静的エクスポートを強制
+  staticPageGenerationTimeout: 120,
   // バンドル分析
   webpack: (config, { isServer, dev }) => {
     if (!isServer && !dev && process.env.ANALYZE === 'true') {
