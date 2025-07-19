@@ -6,7 +6,7 @@
 
 このアプリケーションは **Vercel + GCP（Cloud Run）** のハイブリッドアーキテクチャを採用しています：
 
-- **フロントエンド**: Vercel (Next.js)
+- **フロントエンド**: Vercel (Next.js 15.3.3)
 - **バックエンド**: Google Cloud Run (Flask)
 - **データベース**: Firestore
 - **ストレージ**: Cloud Storage
@@ -16,16 +16,25 @@
 
 ### フロントエンド (Vercel)
 
+フロントエンドは Vercel に自動デプロイされます：
+
 ```bash
-# Vercelにデプロイ
-npm run deploy:frontend
+# 手動デプロイ（必要な場合）
+cd frontend
+vercel --prod
 ```
 
 ### バックエンド (Cloud Run)
 
+バックエンドは GitHub Actions で自動デプロイされます：
+
 ```bash
-# Cloud Runにデプロイ
-npm run deploy:backend
+# 手動デプロイ（必要な場合）
+gcloud run deploy price-comparison-app \
+  --source . \
+  --platform managed \
+  --region asia-northeast1 \
+  --allow-unauthenticated
 ```
 
 ## 🛠️ 開発環境のセットアップ
@@ -41,15 +50,23 @@ npm run deploy:backend
 
 ```bash
 # リポジトリのクローン
-git clone https://github.com/yourusername/priceComparisonAppForIphone.git
+git clone https://github.com/PheasantDevil/priceComparisonAppForIphone.git
 cd priceComparisonAppForIphone
 
-# 依存関係のインストール
-npm run setup
+# フロントエンド依存関係のインストール
+cd frontend
+npm install
+
+# バックエンド依存関係のインストール
+cd ../backend
+pip install -r requirements.txt
 
 # 開発サーバーの起動
-npm run dev          # フロントエンド
-npm run backend:dev  # バックエンド
+cd ../frontend
+npm run dev          # フロントエンド (http://localhost:3000)
+
+cd ../backend
+python app.py        # バックエンド (http://localhost:5000)
 ```
 
 ## 📁 プロジェクト構造
@@ -58,18 +75,20 @@ npm run backend:dev  # バックエンド
 priceComparisonAppForIphone/
 ├── frontend/                 # Next.js フロントエンド
 │   ├── src/
+│   │   ├── app/             # App Router
+│   │   ├── components/      # React コンポーネント
+│   │   └── lib/            # ユーティリティ
 │   ├── package.json
-│   └── next.config.ts
+│   ├── next.config.ts
+│   └── vercel.json
 ├── backend/                  # Flask バックエンド
 │   ├── app.py
 │   └── requirements.txt
-├── infrastructure/           # GCP インフラ設定
-│   └── gcp/
-├── scripts/                  # デプロイメントスクリプト
+├── scripts/                  # データ管理スクリプト
 ├── .github/workflows/        # CI/CD 設定
 ├── vercel.json              # Vercel 設定
 ├── Dockerfile.cloudrun      # Cloud Run 用 Dockerfile
-└── package.json             # ルート設定
+└── README.md
 ```
 
 ## 🔧 設定
@@ -79,7 +98,7 @@ priceComparisonAppForIphone/
 #### フロントエンド (Vercel)
 
 ```env
-BACKEND_URL=https://your-cloud-run-url.com
+BACKEND_URL=https://price-comparison-app-asia-northeast1.run.app
 ```
 
 #### バックエンド (Cloud Run)
@@ -104,14 +123,13 @@ GOOGLE_APPLICATION_CREDENTIALS_JSON=your-service-account-key
 ## 🧪 テスト
 
 ```bash
-# 全テストの実行
+# フロントエンドテスト
+cd frontend
 npm run test
 
-# フロントエンドテスト
-npm run test:frontend
-
 # バックエンドテスト
-npm run test:backend
+cd backend
+python -m pytest
 ```
 
 ## 📊 パフォーマンス
@@ -121,6 +139,7 @@ npm run test:backend
 - **無料枠**: 月 100GB 帯域幅まで無料
 - **パフォーマンス**: 高速 CDN 配信
 - **自動デプロイ**: プッシュ時に自動更新
+- **静的エクスポート**: 最適化された静的サイト
 
 ### バックエンド (Cloud Run)
 
