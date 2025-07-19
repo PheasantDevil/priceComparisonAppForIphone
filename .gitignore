@@ -116,3 +116,4 @@ infrastructure/
 !infrastructure/gcp/deploy-cloud-run-main.sh
 !infrastructure/gcp/app.yaml
 !infrastructure/gcp/GCP_DEPLOYMENT.md
+gcp-key.json
