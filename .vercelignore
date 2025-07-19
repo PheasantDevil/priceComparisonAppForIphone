@@ -11,6 +11,7 @@ docs/
 .venv/
 node_modules/
 .next
-package.json
+package.json.disabled
 package-lock.json
-next.config.* 
+next.config.*
+frontend/vercel.json 
