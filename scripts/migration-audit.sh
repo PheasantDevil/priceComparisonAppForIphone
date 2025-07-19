@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
 # Railway → Cloud Run 移行前環境調査スクリプト
 echo "🔍 Railway → Cloud Run 移行前環境調査を開始します..."

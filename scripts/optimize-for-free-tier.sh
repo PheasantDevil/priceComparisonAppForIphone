@@ -22,13 +22,8 @@ module.exports = {
     optimizeCss: true,
     optimizePackageImports: ['react-icons', 'recharts'],
   },
-  // 静的生成最適化
-  async generateStaticParams() {
-    return {
-      fallback: 'blocking',
-      revalidate: 3600, // 1時間キャッシュ
-    };
-  },
+  // 静的生成最適化 - ISRは export モードと互換性がない
+  // export モードでは静的ファイルのみ生成される
 };
 EOF
 
@@ -84,15 +79,19 @@ const db = new Firestore();
 async function optimizeIndexes() {
   console.log('Creating optimized indexes...');
   
-  // 価格データのインデックス
-  await db.collection('prices').createIndex({
-    fields: [
-      { fieldPath: 'category', order: 'ASCENDING' },
-      { fieldPath: 'updated_at', order: 'DESCENDING' }
-    ]
-  });
-  
-  console.log('Indexes created successfully');
+  try {
+    // 価格データのインデックス
+    await db.collection('prices').createIndex({
+      fields: [
+        { fieldPath: 'category', order: 'ASCENDING' },
+        { fieldPath: 'updated_at', order: 'DESCENDING' }
+      ]
+    });
+    console.log('Indexes created successfully');
+  } catch (error) {
+    console.error('Failed to create indexes:', error);
+    throw error;
+  }
 }
 
 // データ圧縮

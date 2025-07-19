@@ -74,10 +74,9 @@ def create_app():
     Creates and configures the Flask application.
     """
     app = Flask(__name__, static_folder='static')
-
-    # CORS設定
-    CORS(app, origins=["*"])
-
+    # CORS設定 - 本番環境では特定のオリジンのみ許可
+    allowed_origins = os.getenv('ALLOWED_ORIGINS', 'https://your-frontend-domain.vercel.app').split(',')
+    CORS(app, origins=allowed_origins)
     # アプリケーション設定の適用
     app.config['DEBUG'] = config.app.DEBUG
     app.config['SECRET_KEY'] = config.app.SECRET_KEY
