@@ -1,9 +1,14 @@
 {
   "version": 2,
-  "buildCommand": "cd frontend && npm run build:vercel",
-  "outputDirectory": "frontend/out",
-  "installCommand": "cd frontend && npm install",
-  "framework": null,
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "out"
+      }
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
