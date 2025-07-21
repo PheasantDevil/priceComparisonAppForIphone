@@ -1,30 +1,26 @@
 import json
+import os
 from datetime import datetime
+
+from google.cloud import firestore
 
 
 def get_prices(request):
-    """Cloud Functions用 価格データ取得エンドポイント"""
-    # サンプルデータ
-    sample_prices = [
-        {
-            "id": "iphone-15-pro",
-            "name": "iPhone 15 Pro",
-            "price": 159800,
-            "currency": "JPY",
-            "store": "Apple Store",
-            "updated_at": datetime.now().isoformat()
-        },
-        {
-            "id": "iphone-15",
-            "name": "iPhone 15",
-            "price": 119800,
-            "currency": "JPY",
-            "store": "Apple Store",
-            "updated_at": datetime.now().isoformat()
-        }
-    ]
+    """Cloud Functions用 価格データ取得エンドポイント (Firestore版)"""
+    db = firestore.Client()
+    series = request.args.get('series')
+    prices_ref = db.collection('kaitori_prices')
+    query = prices_ref
+    if series:
+        query = query.where('series', '==', series)
+    docs = query.stream()
+    result = []
+    for doc in docs:
+        data = doc.to_dict()
+        data['id'] = doc.id
+        result.append(data)
     headers = {
         'Content-Type': 'application/json',
         'Cache-Control': 'public, max-age=300'
     }
-    return (json.dumps(sample_prices), 200, headers) 
+    return (json.dumps(result, default=str), 200, headers) 
