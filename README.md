@@ -4,13 +4,15 @@
 
 ## 🏗️ アーキテクチャ
 
-このアプリケーションは **Vercel + GCP（Cloud Run）** のハイブリッドアーキテクチャを採用しています：
+このアプリケーションは **Vercel + GCP（Cloud Functions）** のハイブリッドアーキテクチャを採用しています：
 
 - **フロントエンド**: Vercel (Next.js 15.3.3)
-- **バックエンド**: Google Cloud Run (Flask)
+- **バックエンド**: Google Cloud Functions (Python)
 - **データベース**: Firestore
 - **ストレージ**: Cloud Storage
 - **CI/CD**: GitHub Actions
+
+---
 
 ## 🚀 デプロイメント
 
@@ -24,18 +26,38 @@ cd frontend
 vercel --prod
 ```
 
-### バックエンド (Cloud Run)
+### バックエンド (Cloud Functions)
 
-バックエンドは GitHub Actions で自動デプロイされます：
+#### Cloud Functions へのデプロイ
 
 ```bash
-# 手動デプロイ（必要な場合）
-gcloud run deploy price-comparison-app \
-  --source . \
-  --platform managed \
-  --region asia-northeast1 \
-  --allow-unauthenticated
+# 例: /functions/get_prices デプロイ
+cd functions/get_prices
+# GCPプロジェクト・認証設定済み前提
+# main.py の get_prices 関数をエントリポイントとしてデプロイ
+
+gcloud functions deploy get_prices \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point get_prices
 ```
+
+#### ローカルテスト
+
+```bash
+# Cloud Functions Frameworkのインストール
+pip install functions-framework
+
+# ローカル起動
+export PORT=8080
+functions-framework --target=get_prices
+
+# 動作確認
+curl "http://localhost:8080"
+```
+
+---
 
 ## 🛠️ 開発環境のセットアップ
 
@@ -61,13 +83,20 @@ npm install
 cd ../backend
 pip install -r requirements.txt
 
+# Cloud Functions依存関係のインストール（例: get_prices）
+cd ../functions/get_prices
+pip install -r requirements.txt
+
 # 開発サーバーの起動
 cd ../frontend
 npm run dev          # フロントエンド (http://localhost:3000)
 
-cd ../backend
-python app.py        # バックエンド (http://localhost:5000)
+# Cloud Functionsローカル起動例
+cd ../functions/get_prices
+functions-framework --target=get_prices
 ```
+
+---
 
 ## 📁 プロジェクト構造
 
@@ -81,15 +110,20 @@ priceComparisonAppForIphone/
 │   ├── package.json
 │   ├── next.config.ts
 │   └── vercel.json
-├── backend/                  # Flask バックエンド
+├── backend/                  # Flask バックエンド（Cloud Runから移行中）
 │   ├── app.py
 │   └── requirements.txt
+├── functions/                # Cloud Functions用API
+│   └── get_prices/
+│       └── main.py
 ├── scripts/                  # データ管理スクリプト
 ├── .github/workflows/        # CI/CD 設定
 ├── vercel.json              # Vercel 設定
-├── Dockerfile.cloudrun      # Cloud Run 用 Dockerfile
+├── Dockerfile.cloudrun      # Cloud Run 用 Dockerfile（旧）
 └── README.md
 ```
+
+---
 
 ## 🔧 設定
 
@@ -98,77 +132,35 @@ priceComparisonAppForIphone/
 #### フロントエンド (Vercel)
 
 ```env
-BACKEND_URL=https://price-comparison-app-asia-northeast1.run.app
+# Cloud Functionsのエンドポイントを直接指定
+BACKEND_URL=https://REGION-PROJECT_ID.cloudfunctions.net/get_prices
 ```
 
-#### バックエンド (Cloud Run)
+#### Cloud Functions
 
 ```env
-APP_ENV=production
-USE_GOOGLE_CLOUD_STORAGE=true
-BUCKET_NAME=price-comparison-app-data
 GOOGLE_APPLICATION_CREDENTIALS_JSON=your-service-account-key
+BUCKET_NAME=price-comparison-app-data
 ```
 
-### GitHub Secrets
-
-以下のシークレットを GitHub リポジトリに設定してください：
-
-- `GCP_SA_KEY`: Google Cloud Service Account Key
-- `GOOGLE_APPLICATION_CREDENTIALS_JSON`: Google Cloud 認証情報
-- `VERCEL_TOKEN`: Vercel API Token
-- `VERCEL_ORG_ID`: Vercel Organization ID
-- `VERCEL_PROJECT_ID`: Vercel Project ID
-
-## 🧪 テスト
-
-```bash
-# フロントエンドテスト
-cd frontend
-npm run test
-
-# バックエンドテスト
-cd backend
-python -m pytest
-```
-
-## 📊 パフォーマンス
-
-### フロントエンド (Vercel)
-
-- **無料枠**: 月 100GB 帯域幅まで無料
-- **パフォーマンス**: 高速 CDN 配信
-- **自動デプロイ**: プッシュ時に自動更新
-- **静的エクスポート**: 最適化された静的サイト
-
-### バックエンド (Cloud Run)
-
-- **無料枠**: 月 200 万リクエストまで無料
-- **スケーリング**: 0〜10 インスタンスの自動スケーリング
-- **可用性**: 99.9%の可用性保証
+---
 
 ## 🔍 API エンドポイント
 
-### ヘルスチェック
+### Cloud Functions
 
-- `GET /health` - アプリケーションの健全性確認
+- `GET /get_prices` - 価格データの取得（Cloud Functions で提供）
+- `GET /get_price_history` - 価格推移データの取得（Cloud Functions で提供）
 
-### API ステータス
+---
 
-- `GET /api/status` - API サービスの状態確認
+## 🚀 移行メモ
 
-### 価格データ
+- Cloud Run/Flask から Cloud Functions への API 移行を順次進行中
+- `/get_prices`エンドポイントは Cloud Functions で提供されるようになりました
+- フロントエンドの API 呼び出し先も Cloud Functions エンドポイントに統一予定
 
-- `GET /api/prices` - 価格データの取得
-- `GET /get_prices` - レガシー価格データエンドポイント
-
-## 🚀 デプロイメントフロー
-
-1. **コードプッシュ** → GitHub Actions が自動実行
-2. **テスト実行** → フロントエンド・バックエンドのテスト
-3. **Cloud Run デプロイ** → バックエンドのデプロイ
-4. **Vercel デプロイ** → フロントエンドのデプロイ
-5. **ヘルスチェック** → デプロイメントの検証
+---
 
 ## 📈 監視とログ
 
