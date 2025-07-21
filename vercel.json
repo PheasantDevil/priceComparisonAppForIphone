@@ -3,10 +3,10 @@
   "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/.next",
   "installCommand": "cd frontend && npm install",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/get_prices",
-      "destination": "https://price-comparison-app-asia-northeast1.run.app/get_prices"
+      "src": "/get_prices",
+      "dest": "https://price-comparison-app-asia-northeast1.run.app/get_prices"
     }
   ]
 }
