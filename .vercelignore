@@ -1,17 +1,27 @@
+# Vercel build artifacts
 frontend/.next
+frontend/out
 frontend/node_modules
 frontend/*.log
 frontend/.env*
 frontend/.vercel
+
+# Backend and other directories
 backend/
 scripts/
 docs/
+.venv/
+
+# Root level files
 *.log
 .env*
-.venv/
 node_modules/
 .next
 package.json.disabled
 package-lock.json
 next.config.*
-frontend/vercel.json 
+gcp-key.json
+Dockerfile.cloudrun
+.dockerignore
+renovate.json
+.bandit 
