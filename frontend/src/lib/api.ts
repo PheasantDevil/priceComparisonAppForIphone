@@ -42,9 +42,18 @@ export type HealthResponse = {
   version: string;
 };
 
+export type OfficialPriceData = {
+  id: string;
+  series: string;
+  capacity: string;
+  price: number;
+  date: string;
+  [key: string]: unknown;
+};
+
 // キャッシュの型定義
 type CacheEntry = {
-  data: any;
+  data: PricesResponse;
   timestamp: number;
 };
 
@@ -111,7 +120,7 @@ export async function fetchPriceHistory(
   return res.json();
 }
 
-export async function fetchApiPrices(): Promise<any[]> {
+export async function fetchApiPrices(): Promise<OfficialPriceData[]> {
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}/api_prices`;
 
