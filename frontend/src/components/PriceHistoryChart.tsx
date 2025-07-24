@@ -57,7 +57,7 @@ const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
 
       const API_BASE_URL =
         process.env.NEXT_PUBLIC_API_BASE_URL ||
-        'https://us-central1-price-comparison-app-463007.cloudfunctions.net';
+        'https://asia-northeast1-price-comparison-app.cloudfunctions.net';
 
       const response = await axios.get<PriceHistoryResponse>(
         `${API_BASE_URL}/get_price_history`,
@@ -111,13 +111,13 @@ const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
     // Calculate start and end ticks
     const startTick = Math.floor(minPrice / tickInterval) * tickInterval;
     const endTick = Math.ceil(maxPrice / tickInterval) * tickInterval;
-    
+
     // Generate ticks
     const ticks = [];
     for (let tick = startTick; tick <= endTick; tick += tickInterval) {
       ticks.push(tick);
     }
-    
+
     return ticks;
   }, [data, tickInterval]);
 
