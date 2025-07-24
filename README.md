@@ -4,7 +4,7 @@
 
 ## 🏗️ アーキテクチャ
 
-このアプリケーションは **Vercel + GCP（Cloud Functions）** のハイブリッドアーキテクチャを採用しています：
+このアプリケーションは **Vercel + GCP（Cloud Functions）** のサーバーレスアーキテクチャを採用しています：
 
 - **フロントエンド**: Vercel (Next.js 15.3.3)
 - **バックエンド**: Google Cloud Functions (Python)
@@ -31,16 +31,71 @@ vercel --prod
 #### Cloud Functions へのデプロイ
 
 ```bash
-# 例: /functions/get_prices デプロイ
+# 例: get_prices 関数のデプロイ
 cd functions/get_prices
-# GCPプロジェクト・認証設定済み前提
-# main.py の get_prices 関数をエントリポイントとしてデプロイ
-
 gcloud functions deploy get_prices \
   --runtime python311 \
   --trigger-http \
   --allow-unauthenticated \
-  --entry-point get_prices
+  --entry-point get_prices \
+  --region asia-northeast1
+
+# 他の関数も同様にデプロイ
+cd ../get_price_history
+gcloud functions deploy get_price_history \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point get_price_history \
+  --region asia-northeast1
+
+cd ../api_prices
+gcloud functions deploy api_prices \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point api_prices \
+  --region asia-northeast1
+
+cd ../api_status
+gcloud functions deploy api_status \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point api_status \
+  --region asia-northeast1
+
+cd ../health
+gcloud functions deploy health \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point health \
+  --region asia-northeast1
+
+cd ../scrape_prices
+gcloud functions deploy scrape_prices \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point scrape_prices \
+  --region asia-northeast1
+
+cd ../set_alert
+gcloud functions deploy set_alert \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point set_alert \
+  --region asia-northeast1
+
+cd ../check_prices
+gcloud functions deploy check_prices \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point check_prices \
+  --region asia-northeast1
 ```
 
 #### ローカルテスト
@@ -49,12 +104,13 @@ gcloud functions deploy get_prices \
 # Cloud Functions Frameworkのインストール
 pip install functions-framework
 
-# ローカル起動
+# ローカル起動（例: get_prices）
+cd functions/get_prices
 export PORT=8080
 functions-framework --target=get_prices
 
 # 動作確認
-curl "http://localhost:8080"
+curl "http://localhost:8080?series=iPhone15"
 ```
 
 ---
@@ -65,8 +121,8 @@ curl "http://localhost:8080"
 
 - Node.js 18+
 - Python 3.11+
-- Docker
 - Google Cloud CLI
+- Google Cloud SDK
 
 ### インストール
 
@@ -78,10 +134,6 @@ cd priceComparisonAppForIphone
 # フロントエンド依存関係のインストール
 cd frontend
 npm install
-
-# バックエンド依存関係のインストール
-cd ../backend
-pip install -r requirements.txt
 
 # Cloud Functions依存関係のインストール（例: get_prices）
 cd ../functions/get_prices
@@ -106,20 +158,23 @@ priceComparisonAppForIphone/
 │   ├── src/
 │   │   ├── app/             # App Router
 │   │   ├── components/      # React コンポーネント
-│   │   └── lib/            # ユーティリティ
+│   │   └── lib/            # ユーティリティ・API
 │   ├── package.json
 │   ├── next.config.ts
 │   └── vercel.json
-├── backend/                  # Flask バックエンド（Cloud Runから移行中）
-│   ├── app.py
-│   └── requirements.txt
 ├── functions/                # Cloud Functions用API
-│   └── get_prices/
-│       └── main.py
+│   ├── get_prices/          # 価格データ取得
+│   ├── get_price_history/   # 価格履歴取得
+│   ├── api_prices/          # 公式価格取得
+│   ├── api_status/          # APIステータス
+│   ├── health/              # ヘルスチェック
+│   ├── scrape_prices/       # 価格スクレイピング
+│   ├── set_alert/           # アラート設定
+│   └── check_prices/        # 価格チェック
 ├── scripts/                  # データ管理スクリプト
+├── backend/                  # 旧Flaskバックエンド（参考用）
 ├── .github/workflows/        # CI/CD 設定
 ├── vercel.json              # Vercel 設定
-├── Dockerfile.cloudrun      # Cloud Run 用 Dockerfile（旧）
 └── README.md
 ```
 
@@ -132,8 +187,9 @@ priceComparisonAppForIphone/
 #### フロントエンド (Vercel)
 
 ```env
-# Cloud Functionsのエンドポイントを直接指定
-BACKEND_URL=https://REGION-PROJECT_ID.cloudfunctions.net/get_prices
+# Cloud FunctionsのベースURL
+BACKEND_URL=https://asia-northeast1-price-comparison-app.cloudfunctions.net
+NEXT_PUBLIC_API_BASE_URL=https://asia-northeast1-price-comparison-app.cloudfunctions.net
 ```
 
 #### Cloud Functions
@@ -149,30 +205,50 @@ BUCKET_NAME=price-comparison-app-data
 
 ### Cloud Functions
 
-- `GET /get_prices` - 価格データの取得（Cloud Functions で提供）
-- `GET /get_price_history` - 価格推移データの取得（Cloud Functions で提供）
+- `GET /get_prices` - 価格データの取得
+- `GET /get_price_history` - 価格推移データの取得
+- `GET /api_prices` - 公式価格データの取得
+- `GET /api_status` - API ステータスの確認
+- `GET /health` - ヘルスチェック
+- `POST /scrape_prices` - 価格スクレイピングの実行
+- `POST /set_alert` - 価格アラートの設定
+- `GET /check_prices` - 価格チェックの実行
 
----
+### Vercel プロキシ設定
 
-## 🚀 移行メモ
+Vercel の`vercel.json`で Cloud Functions へのプロキシ設定を行っています：
 
-- Cloud Run/Flask から Cloud Functions への API 移行を順次進行中
-- `/get_prices`エンドポイントは Cloud Functions で提供されるようになりました
-- フロントエンドの API 呼び出し先も Cloud Functions エンドポイントに統一予定
+```json
+{
+  "routes": [
+    {
+      "src": "/get_prices",
+      "dest": "https://asia-northeast1-price-comparison-app.cloudfunctions.net/get_prices"
+    }
+    // ... 他のエンドポイント
+  ]
+}
+```
 
 ---
 
 ## 📈 監視とログ
 
-### Cloud Run ログ
+### Cloud Functions ログ
 
 ```bash
-gcloud logging read "resource.type=cloud_run_revision" --limit=50
+# 特定の関数のログを確認
+gcloud functions logs read get_prices --region=asia-northeast1 --limit=50
+
+# 全関数のログを確認
+gcloud functions logs read --region=asia-northeast1 --limit=50
 ```
 
 ### Vercel ログ
 
 Vercel ダッシュボードでリアルタイムログを確認できます。
+
+---
 
 ## 🔧 トラブルシューティング
 
@@ -185,17 +261,33 @@ Vercel ダッシュボードでリアルタイムログを確認できます。
    npm run build
    ```
 
-2. **バックエンド起動エラー**
+2. **Cloud Functions デプロイエラー**
 
    ```bash
-   cd backend
-   python app.py
+   # 関数の状態確認
+   gcloud functions describe get_prices --region=asia-northeast1
+
+   # ログ確認
+   gcloud functions logs read get_prices --region=asia-northeast1
    ```
 
-3. **Cloud Run デプロイエラー**
+3. **API 接続エラー**
+
    ```bash
-   gcloud run services describe price-comparison-app --region=asia-northeast1
+   # Cloud Functionsの直接テスト
+   curl "https://asia-northeast1-price-comparison-app.cloudfunctions.net/get_prices?series=iPhone15"
    ```
+
+---
+
+## 🚀 移行完了
+
+- ✅ Cloud Run/Flask から Cloud Functions への完全移行完了
+- ✅ 全 API エンドポイントが Cloud Functions で提供
+- ✅ フロントエンドの API 呼び出し先を Cloud Functions に統一
+- ✅ Vercel プロキシ設定でシームレスな統合
+
+---
 
 ## 📝 ライセンス
 
