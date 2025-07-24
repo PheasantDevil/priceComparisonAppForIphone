@@ -20,7 +20,10 @@ const nextConfig: NextConfig = {
   env: {
     BACKEND_URL:
       process.env.BACKEND_URL ||
-      'https://price-comparison-app-asia-northeast1.run.app',
+      'https://asia-northeast1-price-comparison-app.cloudfunctions.net/<correct-function-name>',
+    NEXT_PUBLIC_API_BASE_URL:
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      'https://asia-northeast1-price-comparison-app.cloudfunctions.net',
   },
   poweredByHeader: false,
   compress: true,

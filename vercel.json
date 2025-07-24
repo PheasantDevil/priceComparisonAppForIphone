@@ -6,7 +6,35 @@
   "routes": [
     {
       "src": "/get_prices",
-      "dest": "https://price-comparison-app-asia-northeast1.run.app/get_prices"
+      "dest": "https://asia-northeast1-price-comparison-app.cloudfunctions.net/get_prices"
+    },
+    {
+      "src": "/get_price_history",
+      "dest": "https://asia-northeast1-price-comparison-app.cloudfunctions.net/get_price_history"
+    },
+    {
+      "src": "/api/prices",
+      "dest": "https://asia-northeast1-price-comparison-app.cloudfunctions.net/api_prices"
+    },
+    {
+      "src": "/api/status",
+      "dest": "https://asia-northeast1-price-comparison-app.cloudfunctions.net/api_status"
+    },
+    {
+      "src": "/health",
+      "dest": "https://asia-northeast1-price-comparison-app.cloudfunctions.net/health"
+    },
+    {
+      "src": "/scrape_prices",
+      "dest": "https://asia-northeast1-price-comparison-app.cloudfunctions.net/scrape_prices"
+    },
+    {
+      "src": "/set_alert",
+      "dest": "https://asia-northeast1-price-comparison-app.cloudfunctions.net/set_alert"
+    },
+    {
+      "src": "/check_prices",
+      "dest": "https://asia-northeast1-price-comparison-app.cloudfunctions.net/check_prices"
     }
   ]
 }
