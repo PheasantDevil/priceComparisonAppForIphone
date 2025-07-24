@@ -6,9 +6,16 @@
 set -e
 
 # 設定
-PROJECT_ID="price-comparison-app"
+# 設定
+PROJECT_ID="${PROJECT_ID:-price-comparison-app}"
 REGION="asia-northeast1"
 RUNTIME="python311"
+
+# Validate required environment
+if [ -z "$PROJECT_ID" ]; then
+    echo "❌ PROJECT_ID is required"
+    exit 1
+fi
 
 echo "🚀 Cloud Functions 一括デプロイを開始します..."
 echo "プロジェクト: $PROJECT_ID"
@@ -29,22 +36,43 @@ FUNCTIONS=(
 )
 
 # 各関数をデプロイ
+# Validate prerequisites
+echo "🔍 Validating prerequisites..."
+if ! command -v gcloud &> /dev/null; then
+    echo "❌ gcloud CLI is not installed"
+    exit 1
+fi
+
+if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q "@"; then
+    echo "❌ Not authenticated with gcloud"
+    exit 1
+fi
+
+# 各関数をデプロイ
 for func in "${FUNCTIONS[@]}"; do
     echo "📦 $func をデプロイ中..."
-    
+
+    if [ ! -d "functions/$func" ]; then
+        echo "❌ Function directory functions/$func not found"
+        continue
+    fi
+
     cd "functions/$func"
-    
-    gcloud functions deploy "$func" \
+
+    if gcloud functions deploy "$func" \
         --runtime "$RUNTIME" \
         --trigger-http \
         --allow-unauthenticated \
         --entry-point "$func" \
         --region "$REGION" \
-        --project "$PROJECT_ID"
-    
-    echo "✅ $func のデプロイが完了しました"
+        --project "$PROJECT_ID"; then
+        echo "✅ $func のデプロイが完了しました"
+    else
+        echo "❌ $func のデプロイに失敗しました"
+    fi
+
     echo ""
-    
+
     cd ../..
 done
 

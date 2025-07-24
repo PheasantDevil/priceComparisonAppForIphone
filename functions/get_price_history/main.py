@@ -6,22 +6,45 @@ from google.cloud import firestore
 
 def get_price_history(request):
     """Cloud Functions用 価格推移データ取得エンドポイント (Firestore版)"""
-    db = firestore.Client()
+    # Input validation
     series = request.args.get('series')
     capacity = request.args.get('capacity')
-    days = int(request.args.get('days', 14))
-    end_date = datetime.utcnow()
+
+    if not series or not capacity:
+        return (json.dumps({'error': 'series and capacity parameters are required'}), 400, {'Content-Type': 'application/json'})
+
+    try:
+        days = int(request.args.get('days', 14))
+        if days <= 0 or days > 365:
+            raise ValueError("Days must be between 1 and 365")
+    except (ValueError, TypeError):
+        return (json.dumps({'error': 'days parameter must be a valid positive integer'}), 400, {'Content-Type': 'application/json'})
+
+    db = firestore.Client()
+    end_date = datetime.now()  # Use local time to match data storage
     start_date = end_date - timedelta(days=days)
 
-    # Firestoreのprice_historyコレクションから該当データを取得
-    query = db.collection('price_history')
-    if series:
-        query = query.where('series', '==', series)
-    if capacity:
-        query = query.where('capacity', '==', capacity)
-    query = query.where('date', '>=', start_date.strftime('%Y-%m-%d'))
-    docs = query.stream()
-    history = [doc.to_dict() for doc in docs]
+    try:
+        # Firestoreのprice_historyコレクションから該当データを取得
+        query = db.collection('price_history')
+        if series:
+            query = query.where('series', '==', series)
+        if capacity:
+            query = query.where('capacity', '==', capacity)
+        query = query.where('date', '>=', start_date.strftime('%Y-%m-%d'))
+        docs = query.stream()
+        history = [doc.to_dict() for doc in docs]
+        
+        # Sort by timestamp for consistent ordering
+        history.sort(key=lambda x: x.get('timestamp', 0))
+        
+    except Exception as e:
+        return (
+            json.dumps({'error': f'Database query failed: {str(e)}'}), 
+            500, 
+            {'Content-Type': 'application/json'}
+        )
+
     result = {
         'series': series,
         'capacity': capacity,
@@ -32,4 +55,4 @@ def get_price_history(request):
         'Content-Type': 'application/json',
         'Cache-Control': 'public, max-age=300'
     }
-    return (json.dumps(result, default=str), 200, headers) 
+    return (json.dumps(result, default=str), 200, headers)

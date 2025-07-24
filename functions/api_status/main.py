@@ -8,10 +8,12 @@ from google.cloud import firestore
 def api_status(request):
     """Cloud Functions用 APIステータスエンドポイント"""
     # Firestore接続確認
+    # Firestore接続確認
     try:
-        db = firestore.Client()
+        firestore.Client().collection('_health_check').limit(1).get()
         db_status = "connected"
-    except Exception:
+    except Exception as e:
+        print(f"Firestore connection failed: {e}")  # Log for debugging
         db_status = "disconnected"
     # Storage接続確認（省略可、必要ならgoogle-cloud-storageで実装）
     storage_status = os.getenv('BUCKET_NAME', None)
