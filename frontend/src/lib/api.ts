@@ -65,15 +65,11 @@ const cache: Record<string, CacheEntry> = {};
 
 // APIのベースURLを取得
 const getApiBaseUrl = () => {
-  // Vercelの環境変数を使用
-  if (typeof window !== 'undefined') {
-    // クライアントサイドでは環境変数が利用できないため、相対パスを使用
-    return '';
-  }
-  // サーバーサイドでは環境変数を使用
+  // クライアントサイドでもサーバーサイドでも同じURLを使用
   return (
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
     process.env.BACKEND_URL ||
-    'https://asia-northeast1-price-comparison-app.cloudfunctions.net'
+    'https://asia-northeast1-price-comparison-app-463007.cloudfunctions.net'
   );
 };
 
