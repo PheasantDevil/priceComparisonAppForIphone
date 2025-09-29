@@ -56,7 +56,11 @@ jobs:
               --allow-unauthenticated \
               --entry-point "$func" \
               --region "$REGION" \
-              --project "$PROJECT_ID"; then
+              --project "$PROJECT_ID" \
+              --timeout 540s \
+              --memory 256MB \
+              --max-instances 10 \
+              --no-gen2; then
               echo "✅ $func deployed successfully"
             else
               echo "❌ $func deployment failed"
