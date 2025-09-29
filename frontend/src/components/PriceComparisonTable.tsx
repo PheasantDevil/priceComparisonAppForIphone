@@ -177,7 +177,7 @@ export const PriceComparisonTable = memo(function PriceComparisonTable({
                   {row.capacity}
                 </td>
                 <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>
-                  {formatPrice(row.official_price)}
+                  {row.official_price > 0 ? formatPrice(row.official_price) : 'データなし'}
                 </td>
                 <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>
                   {formatPrice(row.kaitori_price)}
@@ -185,12 +185,12 @@ export const PriceComparisonTable = memo(function PriceComparisonTable({
                 <td
                   className={`px-6 py-4 whitespace-nowrap text-sm text-right ${diffColor}`}
                 >
-                  {formatPrice(row.price_diff)}
+                  {row.official_price > 0 ? formatPrice(row.price_diff) : '-'}
                 </td>
                 <td
                   className={`px-6 py-4 whitespace-nowrap text-sm text-right ${diffColor}`}
                 >
-                  {formatPercentage(row.price_diff, row.official_price)}
+                  {row.official_price > 0 ? formatPercentage(row.price_diff, row.official_price) : '-'}
                 </td>
                 {showRakutenColumns && (
                   <>
@@ -199,14 +199,14 @@ export const PriceComparisonTable = memo(function PriceComparisonTable({
                         row.rakuten_diff
                       )}`}
                     >
-                      {formatPrice(row.rakuten_diff)}
+                      {row.official_price > 0 ? formatPrice(row.rakuten_diff) : '-'}
                     </td>
                     <td
                       className={`px-6 py-4 whitespace-nowrap text-sm text-right ${getPriceDiffColor(
                         row.rakuten_diff
                       )}`}
                     >
-                      {formatPercentage(row.rakuten_diff, row.kaitori_price)}
+                      {row.official_price > 0 ? formatPercentage(row.rakuten_diff, row.kaitori_price) : '-'}
                     </td>
                   </>
                 )}
