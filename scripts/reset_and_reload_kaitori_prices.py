@@ -44,183 +44,148 @@ def reset_and_reload_kaitori_prices():
     if not current_data:
         print("No current data found, using dummy data...")
         current_data = {
-            "iPhone 16": {
-                "128GB": {
-                    "colors": {
-                        "Black": 65000,
-                        "White": 65000,
-                        "Blue": 65000,
-                        "Green": 65000
-                    },
-                    "kaitori_price_min": 65000,
-                    "kaitori_price_max": 65000,
-                    "source": "kaitori-rudea"
-                },
+            "iPhone 17": {
                 "256GB": {
                     "colors": {
-                        "Black": 70000,
-                        "White": 70000,
-                        "Blue": 70000,
-                        "Green": 70000
+                        "Lavender": 120000,
+                        "Sage": 120000,
+                        "Black": 120000,
+                        "White": 120000,
+                        "Mist Blue": 120000
                     },
-                    "kaitori_price_min": 70000,
-                    "kaitori_price_max": 70000,
+                    "kaitori_price_min": 120000,
+                    "kaitori_price_max": 120000,
                     "source": "kaitori-rudea"
                 },
                 "512GB": {
                     "colors": {
-                        "Black": 80000,
-                        "White": 80000,
-                        "Blue": 80000,
-                        "Green": 80000
+                        "Lavender": 150000,
+                        "Sage": 150000,
+                        "Black": 150000,
+                        "White": 150000,
+                        "Mist Blue": 150000
                     },
-                    "kaitori_price_min": 80000,
-                    "kaitori_price_max": 80000,
+                    "kaitori_price_min": 150000,
+                    "kaitori_price_max": 150000,
                     "source": "kaitori-rudea"
                 }
             },
-            "iPhone 16 Plus": {
-                "128GB": {
-                    "colors": {
-                        "Black": 70000,
-                        "White": 70000,
-                        "Blue": 70000,
-                        "Green": 70000
-                    },
-                    "kaitori_price_min": 70000,
-                    "kaitori_price_max": 70000,
-                    "source": "kaitori-rudea"
-                },
+            "iPhone 17 Air": {
                 "256GB": {
                     "colors": {
-                        "Black": 75000,
-                        "White": 75000,
-                        "Blue": 75000,
-                        "Green": 75000
+                        "Light Gold": 146000,
+                        "Sage": 146000,
+                        "Black": 146000,
+                        "White": 146000,
+                        "Mist Blue": 146000
                     },
-                    "kaitori_price_min": 75000,
-                    "kaitori_price_max": 75000,
+                    "kaitori_price_min": 146000,
+                    "kaitori_price_max": 146000,
                     "source": "kaitori-rudea"
                 },
                 "512GB": {
                     "colors": {
-                        "Black": 85000,
-                        "White": 85000,
-                        "Blue": 85000,
-                        "Green": 85000
+                        "Light Gold": 176000,
+                        "Sage": 176000,
+                        "Black": 176000,
+                        "White": 176000,
+                        "Mist Blue": 176000
                     },
-                    "kaitori_price_min": 85000,
-                    "kaitori_price_max": 85000,
-                    "source": "kaitori-rudea"
-                }
-            },
-            "iPhone 16 Pro": {
-                "128GB": {
-                    "colors": {
-                        "Natural Titanium": 85000,
-                        "Blue Titanium": 85000,
-                        "White Titanium": 85000,
-                        "Black Titanium": 85000
-                    },
-                    "kaitori_price_min": 85000,
-                    "kaitori_price_max": 85000,
-                    "source": "kaitori-rudea"
-                },
-                "256GB": {
-                    "colors": {
-                        "Natural Titanium": 90000,
-                        "Blue Titanium": 90000,
-                        "White Titanium": 90000,
-                        "Black Titanium": 90000
-                    },
-                    "kaitori_price_min": 90000,
-                    "kaitori_price_max": 90000,
-                    "source": "kaitori-rudea"
-                },
-                "512GB": {
-                    "colors": {
-                        "Natural Titanium": 100000,
-                        "Blue Titanium": 100000,
-                        "White Titanium": 100000,
-                        "Black Titanium": 100000
-                    },
-                    "kaitori_price_min": 100000,
-                    "kaitori_price_max": 100000,
+                    "kaitori_price_min": 176000,
+                    "kaitori_price_max": 176000,
                     "source": "kaitori-rudea"
                 },
                 "1TB": {
                     "colors": {
-                        "Natural Titanium": 110000,
-                        "Blue Titanium": 110000,
-                        "White Titanium": 110000,
-                        "Black Titanium": 110000
+                        "Light Gold": 201000,
+                        "Sage": 201000,
+                        "Black": 201000,
+                        "White": 201000,
+                        "Mist Blue": 201000
                     },
-                    "kaitori_price_min": 110000,
-                    "kaitori_price_max": 110000,
+                    "kaitori_price_min": 201000,
+                    "kaitori_price_max": 201000,
                     "source": "kaitori-rudea"
                 }
             },
-            "iPhone 16 Pro Max": {
+            "iPhone 17 Pro": {
                 "256GB": {
                     "colors": {
-                        "Natural Titanium": 95000,
-                        "Blue Titanium": 95000,
-                        "White Titanium": 95000,
-                        "Black Titanium": 95000
+                        "Natural Titanium": 177200,
+                        "Blue Titanium": 177200,
+                        "White Titanium": 177200,
+                        "Black Titanium": 177200
                     },
-                    "kaitori_price_min": 95000,
-                    "kaitori_price_max": 95000,
+                    "kaitori_price_min": 177200,
+                    "kaitori_price_max": 177200,
                     "source": "kaitori-rudea"
                 },
                 "512GB": {
                     "colors": {
-                        "Natural Titanium": 105000,
-                        "Blue Titanium": 105000,
-                        "White Titanium": 105000,
-                        "Black Titanium": 105000
+                        "Natural Titanium": 210200,
+                        "Blue Titanium": 210200,
+                        "White Titanium": 210200,
+                        "Black Titanium": 210200
                     },
-                    "kaitori_price_min": 105000,
-                    "kaitori_price_max": 105000,
+                    "kaitori_price_min": 210200,
+                    "kaitori_price_max": 210200,
                     "source": "kaitori-rudea"
                 },
                 "1TB": {
                     "colors": {
-                        "Natural Titanium": 115000,
-                        "Blue Titanium": 115000,
-                        "White Titanium": 115000,
-                        "Black Titanium": 115000
+                        "Natural Titanium": 243200,
+                        "Blue Titanium": 243200,
+                        "White Titanium": 243200,
+                        "Black Titanium": 243200
                     },
-                    "kaitori_price_min": 115000,
-                    "kaitori_price_max": 115000,
+                    "kaitori_price_min": 243200,
+                    "kaitori_price_max": 243200,
                     "source": "kaitori-rudea"
                 }
             },
-            "iPhone 16 e": {
-                "128GB": {
-                    "colors": {
-                        "Black": 55000,
-                        "White": 55000
-                    },
-                    "kaitori_price_min": 55000,
-                    "kaitori_price_max": 55000,
-                    "source": "kaitori-rudea"
-                },
+            "iPhone 17 Pro Max": {
                 "256GB": {
                     "colors": {
-                        "Black": 60000,
-                        "White": 60000
+                        "Natural Titanium": 210200,
+                        "Blue Titanium": 210200,
+                        "White Titanium": 210200,
+                        "Black Titanium": 210200
                     },
-                    "kaitori_price_min": 60000,
-                    "kaitori_price_max": 60000,
+                    "kaitori_price_min": 210200,
+                    "kaitori_price_max": 210200,
                     "source": "kaitori-rudea"
                 },
                 "512GB": {
                     "colors": {
-                        "Black": 70000,
-                        "White": 70000
+                        "Natural Titanium": 236200,
+                        "Blue Titanium": 236200,
+                        "White Titanium": 236200,
+                        "Black Titanium": 236200
                     },
-                    "kaitori_price_min": 70000,
-                    "kaitori_price_max": 70000,
+                    "kaitori_price_min": 236200,
+                    "kaitori_price_max": 236200,
+                    "source": "kaitori-rudea"
+                },
+                "1TB": {
+                    "colors": {
+                        "Natural Titanium": 276200,
+                        "Blue Titanium": 276200,
+                        "White Titanium": 276200,
+                        "Black Titanium": 276200
+                    },
+                    "kaitori_price_min": 276200,
+                    "kaitori_price_max": 276200,
+                    "source": "kaitori-rudea"
+                },
+                "2TB": {
+                    "colors": {
+                        "Natural Titanium": 330200,
+                        "Blue Titanium": 330200,
+                        "White Titanium": 330200,
+                        "Black Titanium": 330200
+                    },
+                    "kaitori_price_min": 330200,
+                    "kaitori_price_max": 330200,
                     "source": "kaitori-rudea"
                 }
             }
