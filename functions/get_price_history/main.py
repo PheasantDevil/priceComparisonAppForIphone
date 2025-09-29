@@ -2,23 +2,37 @@ import json
 from datetime import datetime, timedelta
 
 from google.cloud import firestore
+from common.cors import get_cors_headers, handle_cors_request
 
 
 def get_price_history(request):
     """Cloud Functions用 価格推移データ取得エンドポイント (Firestore版)"""
+    # CORS preflight request handling
+    cors_response = handle_cors_request(request)
+    if cors_response:
+        return cors_response
+    
     # Input validation
     series = request.args.get('series')
     capacity = request.args.get('capacity')
 
     if not series or not capacity:
-        return (json.dumps({'error': 'series and capacity parameters are required'}), 400, {'Content-Type': 'application/json'})
+        headers = {
+            'Content-Type': 'application/json',
+            **get_cors_headers()
+        }
+        return (json.dumps({'error': 'series and capacity parameters are required'}), 400, headers)
 
     try:
         days = int(request.args.get('days', 14))
         if days <= 0 or days > 365:
             raise ValueError("Days must be between 1 and 365")
     except (ValueError, TypeError):
-        return (json.dumps({'error': 'days parameter must be a valid positive integer'}), 400, {'Content-Type': 'application/json'})
+        headers = {
+            'Content-Type': 'application/json',
+            **get_cors_headers()
+        }
+        return (json.dumps({'error': 'days parameter must be a valid positive integer'}), 400, headers)
 
     db = firestore.Client()
     end_date = datetime.now()  # Use local time to match data storage
@@ -39,10 +53,14 @@ def get_price_history(request):
         history.sort(key=lambda x: x.get('timestamp', 0))
         
     except Exception as e:
+        headers = {
+            'Content-Type': 'application/json',
+            **get_cors_headers()
+        }
         return (
             json.dumps({'error': f'Database query failed: {str(e)}'}), 
             500, 
-            {'Content-Type': 'application/json'}
+            headers
         )
 
     result = {
@@ -53,6 +71,7 @@ def get_price_history(request):
     }
     headers = {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=300'
+        'Cache-Control': 'public, max-age=300',
+        **get_cors_headers()
     }
     return (json.dumps(result, default=str), 200, headers)

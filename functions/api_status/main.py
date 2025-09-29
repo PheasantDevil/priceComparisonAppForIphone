@@ -3,11 +3,16 @@ import os
 from datetime import datetime
 
 from google.cloud import firestore
+from common.cors import get_cors_headers, handle_cors_request
 
 
 def api_status(request):
     """Cloud Functions用 APIステータスエンドポイント"""
-    # Firestore接続確認
+    # CORS preflight request handling
+    cors_response = handle_cors_request(request)
+    if cors_response:
+        return cors_response
+    
     # Firestore接続確認
     try:
         firestore.Client().collection('_health_check').limit(1).get()
@@ -28,6 +33,7 @@ def api_status(request):
     }
     headers = {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=60'
+        'Cache-Control': 'public, max-age=60',
+        **get_cors_headers()
     }
     return (json.dumps(result, default=str), 200, headers) 
