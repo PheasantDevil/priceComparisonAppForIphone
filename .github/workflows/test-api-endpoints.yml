@@ -108,11 +108,22 @@ jobs:
             print(f'✅ api_prices: Found {len(data)} official price series')
             
             # iPhone 17シリーズが含まれているかチェック
-            iphone17_series = [key for key in data.keys() if 'iPhone 17' in key]
-            if iphone17_series:
-                print(f'✅ iPhone 17 series found in official prices: {iphone17_series}')
+            if isinstance(data, list):
+                iphone17_series = [item for item in data if 'iPhone 17' in str(item)]
+                if iphone17_series:
+                    print(f'✅ iPhone 17 series found in official prices: {len(iphone17_series)} items')
+                else:
+                    print('❌ iPhone 17 series not found in official prices')
+                    exit(1)
+            elif isinstance(data, dict):
+                iphone17_series = [key for key in data.keys() if 'iPhone 17' in key]
+                if iphone17_series:
+                    print(f'✅ iPhone 17 series found in official prices: {iphone17_series}')
+                else:
+                    print('❌ iPhone 17 series not found in official prices')
+                    exit(1)
             else:
-                print('❌ iPhone 17 series not found in official prices')
+                print(f'❌ Unexpected data format: {type(data)}')
                 exit(1)
         else:
             print(f'❌ api_prices failed: {response.status_code}')
