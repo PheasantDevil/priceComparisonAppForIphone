@@ -2,8 +2,8 @@ import json
 import os
 from datetime import datetime
 
-from google.cloud import firestore
 from common.cors import get_cors_headers, handle_cors_request
+from google.cloud import firestore
 
 
 def api_status(request):

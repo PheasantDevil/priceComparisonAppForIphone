@@ -1,8 +1,8 @@
 import json
 from datetime import datetime, timedelta
 
-from google.cloud import firestore
 from common.cors import get_cors_headers, handle_cors_request
+from google.cloud import firestore
 
 
 def get_price_history(request):
