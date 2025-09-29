@@ -2,17 +2,17 @@ name: Test API Endpoints
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'functions/**'
-      - 'test_api_endpoints.py'
-      - 'test_detailed_api.py'
+      - "functions/**"
+      - "test_api_endpoints.py"
+      - "test_detailed_api.py"
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'functions/**'
-      - 'test_api_endpoints.py'
-      - 'test_detailed_api.py'
+      - "functions/**"
+      - "test_api_endpoints.py"
+      - "test_detailed_api.py"
   workflow_dispatch:
 
 env:
@@ -24,201 +24,201 @@ jobs:
   test-api-endpoints:
     name: Test API Endpoints
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
 
-    - name: Wait for Cloud Functions to be ready
-      run: |
-        echo "⏳ Waiting for Cloud Functions to be ready..."
-        sleep 30
-        
-        # ヘルスチェックでCloud Functionsが準備できているか確認
-        for i in {1..10}; do
-          echo "Attempt $i/10: Checking health endpoint..."
-          if curl -f "$BASE_URL/health" > /dev/null 2>&1; then
-            echo "✅ Cloud Functions are ready!"
-            break
-          else
-            echo "⚠️ Cloud Functions not ready yet, waiting 10 seconds..."
-            sleep 10
-          fi
-          
-          if [ $i -eq 10 ]; then
-            echo "❌ Cloud Functions failed to become ready after 10 attempts"
-            exit 1
-          fi
-        done
+      - name: Wait for Cloud Functions to be ready
+        run: |
+          echo "⏳ Waiting for Cloud Functions to be ready..."
+          sleep 30
 
-    - name: Run Basic API Tests
-      run: |
-        echo "🧪 Running basic API endpoint tests..."
-        python test_api_endpoints.py
-
-    - name: Run Detailed API Tests
-      run: |
-        echo "🔍 Running detailed API tests..."
-        python test_detailed_api.py
-
-    - name: Test iPhone 17 Series Data
-      run: |
-        echo "📱 Testing iPhone 17 series data availability..."
-        
-        # iPhone 17シリーズのデータが正しく取得できるかテスト
-        python -c "
-        import requests
-        import json
-        
-        base_url = '$BASE_URL'
-        
-        # 価格データのテスト
-        print('Testing get_prices endpoint...')
-        response = requests.get(f'{base_url}/get_prices', params={'series': 'iPhone 17'})
-        if response.status_code == 200:
-            data = response.json()
-            print(f'✅ get_prices: Found {len(data)} records for iPhone 17')
+          # ヘルスチェックでCloud Functionsが準備できているか確認
+          for i in {1..10}; do
+            echo "Attempt $i/10: Checking health endpoint..."
+            if curl -f "$BASE_URL/health" > /dev/null 2>&1; then
+              echo "✅ Cloud Functions are ready!"
+              break
+            else
+              echo "⚠️ Cloud Functions not ready yet, waiting 10 seconds..."
+              sleep 10
+            fi
             
-            # iPhone 17シリーズが含まれているかチェック
-            has_iphone17 = any('iPhone 17' in str(record) for record in data)
-            if has_iphone17:
-                print('✅ iPhone 17 series found in price data')
-            else:
-                print('❌ iPhone 17 series not found in price data')
-                exit(1)
-        else:
-            print(f'❌ get_prices failed: {response.status_code}')
-            exit(1)
-        
-        # 公式価格のテスト
-        print('Testing api_prices endpoint...')
-        response = requests.get(f'{base_url}/api_prices')
-        if response.status_code == 200:
-            data = response.json()
-            print(f'✅ api_prices: Found {len(data)} official price series')
-            
-            # iPhone 17シリーズが含まれているかチェック
-            if isinstance(data, list):
-                iphone17_series = [item for item in data if 'iPhone 17' in str(item)]
-                if iphone17_series:
-                    print(f'✅ iPhone 17 series found in official prices: {len(iphone17_series)} items')
-                else:
-                    print('❌ iPhone 17 series not found in official prices')
-                    exit(1)
-            elif isinstance(data, dict):
-                iphone17_series = [key for key in data.keys() if 'iPhone 17' in key]
-                if iphone17_series:
-                    print(f'✅ iPhone 17 series found in official prices: {iphone17_series}')
-                else:
-                    print('❌ iPhone 17 series not found in official prices')
-                    exit(1)
-            else:
-                print(f'❌ Unexpected data format: {type(data)}')
-                exit(1)
-        else:
-            print(f'❌ api_prices failed: {response.status_code}')
-            exit(1)
-        
-        print('🎉 All iPhone 17 series data tests passed!')
-        "
+            if [ $i -eq 10 ]; then
+              echo "❌ Cloud Functions failed to become ready after 10 attempts"
+              exit 1
+            fi
+          done
 
-    - name: Test API Response Times
-      run: |
-        echo "⏱️ Testing API response times..."
-        
-        python -c "
-        import requests
-        import time
-        
-        base_url = '$BASE_URL'
-        endpoints = [
-            ('health', f'{base_url}/health'),
-            ('api_status', f'{base_url}/api_status'),
-            ('get_prices', f'{base_url}/get_prices?series=iPhone%2017'),
-            ('api_prices', f'{base_url}/api_prices'),
-        ]
-        
-        max_response_time = 5.0  # 最大応答時間（秒）
-        
-        for name, url in endpoints:
-            start_time = time.time()
-            try:
-                response = requests.get(url, timeout=30)
-                end_time = time.time()
-                response_time = end_time - start_time
+      - name: Run Basic API Tests
+        run: |
+          echo "🧪 Running basic API endpoint tests..."
+          python test_api_endpoints.py
+
+      - name: Run Detailed API Tests
+        run: |
+          echo "🔍 Running detailed API tests..."
+          python test_detailed_api.py
+
+      - name: Test iPhone 17 Series Data
+        run: |
+          echo "📱 Testing iPhone 17 series data availability..."
+
+          # iPhone 17シリーズのデータが正しく取得できるかテスト
+          python -c "
+          import requests
+          import json
+
+          base_url = '$BASE_URL'
+
+          # 価格データのテスト
+          print('Testing get_prices endpoint...')
+          response = requests.get(f'{base_url}/get_prices', params={'series': 'iPhone 17'})
+          if response.status_code == 200:
+              data = response.json()
+              print(f'✅ get_prices: Found {len(data)} records for iPhone 17')
+              
+              # iPhone 17シリーズが含まれているかチェック
+              has_iphone17 = any('iPhone 17' in str(record) for record in data)
+              if has_iphone17:
+                  print('✅ iPhone 17 series found in price data')
+              else:
+                  print('❌ iPhone 17 series not found in price data')
+                  exit(1)
+          else:
+              print(f'❌ get_prices failed: {response.status_code}')
+              exit(1)
+
+          # 公式価格のテスト
+          print('Testing api_prices endpoint...')
+          response = requests.get(f'{base_url}/api_prices')
+          if response.status_code == 200:
+              data = response.json()
+              print(f'✅ api_prices: Found {len(data)} official price series')
+              
+              # iPhone 17シリーズが含まれているかチェック
+              if isinstance(data, list):
+                  iphone17_series = [item for item in data if 'iPhone 17' in str(item)]
+                  if iphone17_series:
+                      print(f'✅ iPhone 17 series found in official prices: {len(iphone17_series)} items')
+                  else:
+                      print('❌ iPhone 17 series not found in official prices')
+                      exit(1)
+              elif isinstance(data, dict):
+                  iphone17_series = [key for key in data.keys() if 'iPhone 17' in key]
+                  if iphone17_series:
+                      print(f'✅ iPhone 17 series found in official prices: {iphone17_series}')
+                  else:
+                      print('❌ iPhone 17 series not found in official prices')
+                      exit(1)
+              else:
+                  print(f'❌ Unexpected data format: {type(data)}')
+                  exit(1)
+          else:
+              print(f'❌ api_prices failed: {response.status_code}')
+              exit(1)
+
+          print('🎉 All iPhone 17 series data tests passed!')
+          "
+
+      - name: Test API Response Times
+        run: |
+          echo "⏱️ Testing API response times..."
+
+          python -c "
+          import requests
+          import time
+
+          base_url = '$BASE_URL'
+          endpoints = [
+              ('health', f'{base_url}/health'),
+              ('api_status', f'{base_url}/api_status'),
+              ('get_prices', f'{base_url}/get_prices?series=iPhone%2017'),
+              ('api_prices', f'{base_url}/api_prices'),
+          ]
+
+          max_response_time = 5.0  # 最大応答時間（秒）
+
+          for name, url in endpoints:
+              start_time = time.time()
+              try:
+                  response = requests.get(url, timeout=30)
+                  end_time = time.time()
+                  response_time = end_time - start_time
+                  
+                  if response.status_code == 200:
+                      if response_time <= max_response_time:
+                          print(f'✅ {name}: {response_time:.2f}s (within {max_response_time}s limit)')
+                      else:
+                          print(f'⚠️  {name}: {response_time:.2f}s (exceeds {max_response_time}s limit)')
+                  else:
+                      print(f'❌ {name}: HTTP {response.status_code} in {response_time:.2f}s')
+              except Exception as e:
+                  print(f'❌ {name}: Error - {str(e)}')
+          "
+
+      - name: Generate Test Report
+        if: always()
+        run: |
+          echo "📊 Generating test report..."
+
+          # テスト結果のサマリーを作成
+          echo "## API Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Tested Endpoints" >> $GITHUB_STEP_SUMMARY
+          echo "- Health Check: \`$BASE_URL/health\`" >> $GITHUB_STEP_SUMMARY
+          echo "- API Status: \`$BASE_URL/api_status\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Get Prices: \`$BASE_URL/get_prices\`" >> $GITHUB_STEP_SUMMARY
+          echo "- API Prices: \`$BASE_URL/api_prices\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Get Price History: \`$BASE_URL/get_price_history\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Basic endpoint availability" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Response format validation" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ iPhone 17 series data verification" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Response time monitoring" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Error handling validation" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `🧪 APIテストが完了しました！
                 
-                if response.status_code == 200:
-                    if response_time <= max_response_time:
-                        print(f'✅ {name}: {response_time:.2f}s (within {max_response_time}s limit)')
-                    else:
-                        print(f'⚠️  {name}: {response_time:.2f}s (exceeds {max_response_time}s limit)')
-                else:
-                    print(f'❌ {name}: HTTP {response.status_code} in {response_time:.2f}s')
-            except Exception as e:
-                print(f'❌ {name}: Error - {str(e)}')
-        "
-
-    - name: Generate Test Report
-      if: always()
-      run: |
-        echo "📊 Generating test report..."
-        
-        # テスト結果のサマリーを作成
-        echo "## API Test Results" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Tested Endpoints" >> $GITHUB_STEP_SUMMARY
-        echo "- Health Check: \`$BASE_URL/health\`" >> $GITHUB_STEP_SUMMARY
-        echo "- API Status: \`$BASE_URL/api_status\`" >> $GITHUB_STEP_SUMMARY
-        echo "- Get Prices: \`$BASE_URL/get_prices\`" >> $GITHUB_STEP_SUMMARY
-        echo "- API Prices: \`$BASE_URL/api_prices\`" >> $GITHUB_STEP_SUMMARY
-        echo "- Get Price History: \`$BASE_URL/get_price_history\`" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Test Coverage" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Basic endpoint availability" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Response format validation" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ iPhone 17 series data verification" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Response time monitoring" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Error handling validation" >> $GITHUB_STEP_SUMMARY
-
-    - name: Comment on PR
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          try {
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `🧪 APIテストが完了しました！
-              
-              **テスト対象エンドポイント**:
-              - Health Check: \`${{ env.BASE_URL }}/health\`
-              - API Status: \`${{ env.BASE_URL }}/api_status\`
-              - Get Prices: \`${{ env.BASE_URL }}/get_prices\`
-              - API Prices: \`${{ env.BASE_URL }}/api_prices\`
-              - Get Price History: \`${{ env.BASE_URL }}/get_price_history\`
-              
-              **テスト内容**:
-              - ✅ エンドポイントの可用性確認
-              - ✅ レスポンス形式の検証
-              - ✅ iPhone 17シリーズデータの確認
-              - ✅ 応答時間の監視
-              - ✅ エラーハンドリングの検証
-              
-              **結果**: すべてのAPIテストが正常に完了しました！`
-            });
-            console.log('PRコメントを投稿しました');
-          } catch (error) {
-            console.log('PRコメントの投稿に失敗しました:', error.message);
-          }
+                **テスト対象エンドポイント**:
+                - Health Check: \`${{ env.BASE_URL }}/health\`
+                - API Status: \`${{ env.BASE_URL }}/api_status\`
+                - Get Prices: \`${{ env.BASE_URL }}/get_prices\`
+                - API Prices: \`${{ env.BASE_URL }}/api_prices\`
+                - Get Price History: \`${{ env.BASE_URL }}/get_price_history\`
+                
+                **テスト内容**:
+                - ✅ エンドポイントの可用性確認
+                - ✅ レスポンス形式の検証
+                - ✅ iPhone 17シリーズデータの確認
+                - ✅ 応答時間の監視
+                - ✅ エラーハンドリングの検証
+                
+                **結果**: すべてのAPIテストが正常に完了しました！`
+              });
+              console.log('PRコメントを投稿しました');
+            } catch (error) {
+              console.log('PRコメントの投稿に失敗しました:', error.message);
+            }

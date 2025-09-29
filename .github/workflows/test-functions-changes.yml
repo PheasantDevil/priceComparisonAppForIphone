@@ -2,13 +2,13 @@ name: Test Functions Changes
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'functions/**'
+      - "functions/**"
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'functions/**'
+      - "functions/**"
   workflow_dispatch:
 
 env:
@@ -23,261 +23,261 @@ jobs:
     outputs:
       changed-functions: ${{ steps.changes.outputs.changed-functions }}
       has-changes: ${{ steps.changes.outputs.has-changes }}
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
-    - name: Detect changed functions
-      id: changes
-      run: |
-        echo "🔍 Detecting changed functions..."
-        
-        # 変更されたfunctionsディレクトリ内のファイルを検出
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          # PRの場合、ベースブランチとの差分を取得
-          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep '^functions/' || true)
-        else
-          # プッシュの場合、前のコミットとの差分を取得
-          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep '^functions/' || true)
-        fi
-        
-        if [ -n "$CHANGED_FILES" ]; then
-          echo "📝 Changed files:"
-          echo "$CHANGED_FILES"
-          
-          # 変更された関数名を抽出
-          CHANGED_FUNCTIONS=$(echo "$CHANGED_FILES" | sed 's|functions/\([^/]*\)/.*|\1|' | sort -u | tr '\n' ' ')
-          echo "🔧 Changed functions: $CHANGED_FUNCTIONS"
-          
-          echo "changed-functions=$CHANGED_FUNCTIONS" >> $GITHUB_OUTPUT
-          echo "has-changes=true" >> $GITHUB_OUTPUT
-        else
-          echo "ℹ️ No function files changed"
-          echo "changed-functions=" >> $GITHUB_OUTPUT
-          echo "has-changes=false" >> $GITHUB_OUTPUT
-        fi
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed functions
+        id: changes
+        run: |
+          echo "🔍 Detecting changed functions..."
+
+          # 変更されたfunctionsディレクトリ内のファイルを検出
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # PRの場合、ベースブランチとの差分を取得
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep '^functions/' || true)
+          else
+            # プッシュの場合、前のコミットとの差分を取得
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep '^functions/' || true)
+          fi
+
+          if [ -n "$CHANGED_FILES" ]; then
+            echo "📝 Changed files:"
+            echo "$CHANGED_FILES"
+            
+            # 変更された関数名を抽出
+            CHANGED_FUNCTIONS=$(echo "$CHANGED_FILES" | sed 's|functions/\([^/]*\)/.*|\1|' | sort -u | tr '\n' ' ')
+            echo "🔧 Changed functions: $CHANGED_FUNCTIONS"
+            
+            echo "changed-functions=$CHANGED_FUNCTIONS" >> $GITHUB_OUTPUT
+            echo "has-changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "ℹ️ No function files changed"
+            echo "changed-functions=" >> $GITHUB_OUTPUT
+            echo "has-changes=false" >> $GITHUB_OUTPUT
+          fi
 
   test-changed-functions:
     name: Test Changed Functions
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.has-changes == 'true'
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
 
-    - name: Display changed functions
-      run: |
-        echo "🔧 Changed functions: ${{ needs.detect-changes.outputs.changed-functions }}"
-        echo "📋 Testing the following functions:"
-        for func in ${{ needs.detect-changes.outputs.changed-functions }}; do
-          echo "  - $func"
-        done
+      - name: Display changed functions
+        run: |
+          echo "🔧 Changed functions: ${{ needs.detect-changes.outputs.changed-functions }}"
+          echo "📋 Testing the following functions:"
+          for func in ${{ needs.detect-changes.outputs.changed-functions }}; do
+            echo "  - $func"
+          done
 
-    - name: Wait for Cloud Functions to be ready
-      run: |
-        echo "⏳ Waiting for Cloud Functions to be ready..."
-        sleep 30
-        
-        # ヘルスチェックでCloud Functionsが準備できているか確認
-        for i in {1..10}; do
-          echo "Attempt $i/10: Checking health endpoint..."
-          if curl -f "$BASE_URL/health" > /dev/null 2>&1; then
-            echo "✅ Cloud Functions are ready!"
-            break
-          else
-            echo "⚠️ Cloud Functions not ready yet, waiting 10 seconds..."
-            sleep 10
-          fi
-          
-          if [ $i -eq 10 ]; then
-            echo "❌ Cloud Functions failed to become ready after 10 attempts"
-            exit 1
-          fi
-        done
+      - name: Wait for Cloud Functions to be ready
+        run: |
+          echo "⏳ Waiting for Cloud Functions to be ready..."
+          sleep 30
 
-    - name: Test specific changed functions
-      run: |
-        echo "🧪 Testing changed functions..."
-        
-        # 変更された関数ごとにテストを実行
-        for func in ${{ needs.detect-changes.outputs.changed-functions }}; do
+          # ヘルスチェックでCloud Functionsが準備できているか確認
+          for i in {1..10}; do
+            echo "Attempt $i/10: Checking health endpoint..."
+            if curl -f "$BASE_URL/health" > /dev/null 2>&1; then
+              echo "✅ Cloud Functions are ready!"
+              break
+            else
+              echo "⚠️ Cloud Functions not ready yet, waiting 10 seconds..."
+              sleep 10
+            fi
+            
+            if [ $i -eq 10 ]; then
+              echo "❌ Cloud Functions failed to become ready after 10 attempts"
+              exit 1
+            fi
+          done
+
+      - name: Test specific changed functions
+        run: |
+          echo "🧪 Testing changed functions..."
+
+          # 変更された関数ごとにテストを実行
+          for func in ${{ needs.detect-changes.outputs.changed-functions }}; do
+            echo ""
+            echo "🔍 Testing function: $func"
+            echo "----------------------------------------"
+            
+            case $func in
+              "health")
+                echo "Testing health endpoint..."
+                response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/health")
+                if [ "$response" = "200" ]; then
+                  echo "✅ Health endpoint: OK"
+                else
+                  echo "❌ Health endpoint: HTTP $response"
+                  exit 1
+                fi
+                ;;
+                
+              "api_status")
+                echo "Testing api_status endpoint..."
+                response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/api_status")
+                if [ "$response" = "200" ]; then
+                  echo "✅ API Status endpoint: OK"
+                else
+                  echo "❌ API Status endpoint: HTTP $response"
+                  exit 1
+                fi
+                ;;
+                
+              "get_prices")
+                echo "Testing get_prices endpoint..."
+                response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/get_prices?series=iPhone%2017")
+                if [ "$response" = "200" ]; then
+                  echo "✅ Get Prices endpoint: OK"
+                else
+                  echo "❌ Get Prices endpoint: HTTP $response"
+                  exit 1
+                fi
+                ;;
+                
+              "get_price_history")
+                echo "Testing get_price_history endpoint..."
+                response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/get_price_history?series=iPhone%2017&capacity=256GB")
+                if [ "$response" = "200" ]; then
+                  echo "✅ Get Price History endpoint: OK"
+                else
+                  echo "❌ Get Price History endpoint: HTTP $response"
+                  exit 1
+                fi
+                ;;
+                
+              "api_prices")
+                echo "Testing api_prices endpoint..."
+                response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/api_prices")
+                if [ "$response" = "200" ]; then
+                  echo "✅ API Prices endpoint: OK"
+                else
+                  echo "❌ API Prices endpoint: HTTP $response"
+                  exit 1
+                fi
+                ;;
+                
+              "scrape_prices")
+                echo "Testing scrape_prices endpoint..."
+                response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/scrape_prices")
+                if [ "$response" = "200" ]; then
+                  echo "✅ Scrape Prices endpoint: OK"
+                else
+                  echo "❌ Scrape Prices endpoint: HTTP $response"
+                  exit 1
+                fi
+                ;;
+                
+              "set_alert")
+                echo "Testing set_alert endpoint..."
+                response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/set_alert")
+                if [ "$response" = "200" ]; then
+                  echo "✅ Set Alert endpoint: OK"
+                else
+                  echo "❌ Set Alert endpoint: HTTP $response"
+                  exit 1
+                fi
+                ;;
+                
+              "check_prices")
+                echo "Testing check_prices endpoint..."
+                response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/check_prices")
+                if [ "$response" = "200" ]; then
+                  echo "✅ Check Prices endpoint: OK"
+                else
+                  echo "❌ Check Prices endpoint: HTTP $response"
+                  exit 1
+                fi
+                ;;
+                
+              *)
+                echo "⚠️ Unknown function: $func"
+                ;;
+            esac
+          done
+
           echo ""
-          echo "🔍 Testing function: $func"
-          echo "----------------------------------------"
-          
-          case $func in
-            "health")
-              echo "Testing health endpoint..."
-              response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/health")
-              if [ "$response" = "200" ]; then
-                echo "✅ Health endpoint: OK"
-              else
-                echo "❌ Health endpoint: HTTP $response"
-                exit 1
-              fi
-              ;;
-              
-            "api_status")
-              echo "Testing api_status endpoint..."
-              response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/api_status")
-              if [ "$response" = "200" ]; then
-                echo "✅ API Status endpoint: OK"
-              else
-                echo "❌ API Status endpoint: HTTP $response"
-                exit 1
-              fi
-              ;;
-              
-            "get_prices")
-              echo "Testing get_prices endpoint..."
-              response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/get_prices?series=iPhone%2017")
-              if [ "$response" = "200" ]; then
-                echo "✅ Get Prices endpoint: OK"
-              else
-                echo "❌ Get Prices endpoint: HTTP $response"
-                exit 1
-              fi
-              ;;
-              
-            "get_price_history")
-              echo "Testing get_price_history endpoint..."
-              response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/get_price_history?series=iPhone%2017&capacity=256GB")
-              if [ "$response" = "200" ]; then
-                echo "✅ Get Price History endpoint: OK"
-              else
-                echo "❌ Get Price History endpoint: HTTP $response"
-                exit 1
-              fi
-              ;;
-              
-            "api_prices")
-              echo "Testing api_prices endpoint..."
-              response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/api_prices")
-              if [ "$response" = "200" ]; then
-                echo "✅ API Prices endpoint: OK"
-              else
-                echo "❌ API Prices endpoint: HTTP $response"
-                exit 1
-              fi
-              ;;
-              
-            "scrape_prices")
-              echo "Testing scrape_prices endpoint..."
-              response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/scrape_prices")
-              if [ "$response" = "200" ]; then
-                echo "✅ Scrape Prices endpoint: OK"
-              else
-                echo "❌ Scrape Prices endpoint: HTTP $response"
-                exit 1
-              fi
-              ;;
-              
-            "set_alert")
-              echo "Testing set_alert endpoint..."
-              response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/set_alert")
-              if [ "$response" = "200" ]; then
-                echo "✅ Set Alert endpoint: OK"
-              else
-                echo "❌ Set Alert endpoint: HTTP $response"
-                exit 1
-              fi
-              ;;
-              
-            "check_prices")
-              echo "Testing check_prices endpoint..."
-              response=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/check_prices")
-              if [ "$response" = "200" ]; then
-                echo "✅ Check Prices endpoint: OK"
-              else
-                echo "❌ Check Prices endpoint: HTTP $response"
-                exit 1
-              fi
-              ;;
-              
-            *)
-              echo "⚠️ Unknown function: $func"
-              ;;
-          esac
-        done
-        
-        echo ""
-        echo "🎉 All changed functions tested successfully!"
+          echo "🎉 All changed functions tested successfully!"
 
-    - name: Run comprehensive API tests
-      run: |
-        echo "🔍 Running comprehensive API tests..."
-        python test_api_endpoints.py
+      - name: Run comprehensive API tests
+        run: |
+          echo "🔍 Running comprehensive API tests..."
+          python test_api_endpoints.py
 
-    - name: Generate function test report
-      if: always()
-      run: |
-        echo "📊 Generating function test report..."
-        
-        # テスト結果のサマリーを作成
-        echo "## Function Change Test Results" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Changed Functions" >> $GITHUB_STEP_SUMMARY
-        for func in ${{ needs.detect-changes.outputs.changed-functions }}; do
-          echo "- \`$func\`" >> $GITHUB_STEP_SUMMARY
-        done
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Test Results" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Function availability check" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ HTTP response validation" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Comprehensive API testing" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Base URL" >> $GITHUB_STEP_SUMMARY
-        echo "\`${{ env.BASE_URL }}\`" >> $GITHUB_STEP_SUMMARY
+      - name: Generate function test report
+        if: always()
+        run: |
+          echo "📊 Generating function test report..."
 
-    - name: Comment on PR
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          try {
-            const changedFunctions = '${{ needs.detect-changes.outputs.changed-functions }}'.split(' ').filter(f => f);
-            
-            let functionList = '';
-            if (changedFunctions.length > 0) {
-              functionList = changedFunctions.map(func => `- \`${func}\``).join('\n');
-            } else {
-              functionList = '- No functions changed';
+          # テスト結果のサマリーを作成
+          echo "## Function Change Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Changed Functions" >> $GITHUB_STEP_SUMMARY
+          for func in ${{ needs.detect-changes.outputs.changed-functions }}; do
+            echo "- \`$func\`" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Function availability check" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ HTTP response validation" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Comprehensive API testing" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Base URL" >> $GITHUB_STEP_SUMMARY
+          echo "\`${{ env.BASE_URL }}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const changedFunctions = '${{ needs.detect-changes.outputs.changed-functions }}'.split(' ').filter(f => f);
+              
+              let functionList = '';
+              if (changedFunctions.length > 0) {
+                functionList = changedFunctions.map(func => `- \`${func}\``).join('\n');
+              } else {
+                functionList = '- No functions changed';
+              }
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `🔧 Functions変更テストが完了しました！
+                
+                **変更された関数**:
+                ${functionList}
+                
+                **テスト内容**:
+                - ✅ 関数の可用性確認
+                - ✅ HTTPレスポンス検証
+                - ✅ 包括的なAPIテスト
+                
+                **ベースURL**: \`${{ env.BASE_URL }}\`
+                
+                **結果**: すべての関数テストが正常に完了しました！`
+              });
+              console.log('PRコメントを投稿しました');
+            } catch (error) {
+              console.log('PRコメントの投稿に失敗しました:', error.message);
             }
-            
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `🔧 Functions変更テストが完了しました！
-              
-              **変更された関数**:
-              ${functionList}
-              
-              **テスト内容**:
-              - ✅ 関数の可用性確認
-              - ✅ HTTPレスポンス検証
-              - ✅ 包括的なAPIテスト
-              
-              **ベースURL**: \`${{ env.BASE_URL }}\`
-              
-              **結果**: すべての関数テストが正常に完了しました！`
-            });
-            console.log('PRコメントを投稿しました');
-          } catch (error) {
-            console.log('PRコメントの投稿に失敗しました:', error.message);
-          }

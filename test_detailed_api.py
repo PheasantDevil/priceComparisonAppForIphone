@@ -5,10 +5,11 @@
 """
 
 import json
-import requests
 import sys
 import time
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
+import requests
 
 # Cloud Functions のベースURL
 BASE_URL = "https://asia-northeast1-price-comparison-app-463007.cloudfunctions.net"

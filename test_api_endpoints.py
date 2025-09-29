@@ -5,10 +5,11 @@ functionsディレクトリが更新された時にAPIの動作を確認する
 """
 
 import json
-import requests
 import sys
 import time
 from typing import Dict, List, Optional
+
+import requests
 
 # Cloud Functions のベースURL
 BASE_URL = "https://asia-northeast1-price-comparison-app-463007.cloudfunctions.net"
