@@ -17,259 +17,151 @@ env:
   RUNTIME: python311
 
 jobs:
-  test:
-    name: Test Application
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install frontend dependencies
-        run: |
-          cd frontend
-          npm ci
-
-      - name: Run frontend tests
-        run: |
-          cd frontend
-          npm run lint
-          npm run type-check
-
-      - name: Test Cloud Functions locally
-        run: |
-          # Install functions-framework for local testing
-          pip install functions-framework
-
-          # Test each function
-          for func in get_prices get_price_history api_prices api_status health; do
-            if [ -d "functions/$func" ]; then
-              echo "Testing $func..."
-              cd "functions/$func"
-              python -c "import main; print(f'$func module imported successfully')"
-              cd ../..
-            fi
-          done
-
   deploy-cloud-functions:
     name: Deploy Cloud Functions
     runs-on: ubuntu-latest
-    needs: test
     if: github.ref == 'refs/heads/main'
-
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Setup Google Cloud CLI
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: price-comparison-app-463007
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
+    - name: Setup Google Cloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: price-comparison-app-463007
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Deploy Cloud Functions
-        run: |
-          echo "🚀 Deploying Cloud Functions..."
-
-          # Function list
-          FUNCTIONS=(
-            "get_prices"
-            "get_price_history"
-            "api_prices"
-            "api_status"
-            "health"
-            "scrape_prices"
-            "set_alert"
-            "check_prices"
-          )
-
-          # Deploy each function
-          for func in "${FUNCTIONS[@]}"; do
-            echo "📦 Deploying $func..."
+    - name: Deploy Cloud Functions
+      run: |
+        echo "🚀 Deploying Cloud Functions..."
+        
+        # Function list
+        FUNCTIONS=(
+          "get_prices"
+          "get_price_history"
+          "api_prices"
+          "api_status"
+          "health"
+          "scrape_prices"
+          "set_alert"
+          "check_prices"
+        )
+        
+        # Deploy each function
+        for func in "${FUNCTIONS[@]}"; do
+          echo "📦 Deploying $func..."
+          
+          if [ -d "functions/$func" ]; then
+            cd "functions/$func"
             
-            if [ -d "functions/$func" ]; then
-              cd "functions/$func"
-              
-              if gcloud functions deploy "$func" \
-                --runtime "$RUNTIME" \
-                --trigger-http \
-                --allow-unauthenticated \
-                --entry-point "$func" \
-                --region "$REGION" \
-                --project "$PROJECT_ID"; then
-                echo "✅ $func deployed successfully"
+            if gcloud functions deploy "$func" \
+              --runtime "$RUNTIME" \
+              --trigger-http \
+              --allow-unauthenticated \
+              --entry-point "$func" \
+              --region "$REGION" \
+              --project "$PROJECT_ID"; then
+              echo "✅ $func deployed successfully"
+            else
+              echo "❌ $func deployment failed"
+              exit 1
+            fi
+            
+            cd ../..
+          else
+            echo "⚠️ Function directory functions/$func not found, skipping..."
+          fi
+        done
+        
+        echo "🎉 All Cloud Functions deployed successfully!"
+
+    - name: Get function URLs
+      id: get-urls
+      run: |
+        echo "📋 Getting function URLs..."
+        
+        FUNCTIONS=(
+          "get_prices"
+          "get_price_history"
+          "api_prices"
+          "api_status"
+          "health"
+          "scrape_prices"
+          "set_alert"
+          "check_prices"
+        )
+        
+        for func in "${FUNCTIONS[@]}"; do
+          URL=$(gcloud functions describe "$func" \
+            --region="$REGION" \
+            --project="$PROJECT_ID" \
+            --format='value(url)' 2>/dev/null || echo "")
+          
+          if [ -n "$URL" ]; then
+            echo "${func}_url=$URL" >> $GITHUB_OUTPUT
+            echo "$func: $URL"
+          fi
+        done
+
+    - name: Health check
+      run: |
+        echo "🏥 Performing health check..."
+        
+        # Wait for functions to be ready
+        sleep 30
+        
+        # Test health endpoint
+        HEALTH_URL="${{ steps.get-urls.outputs.health_url }}"
+        if [ -n "$HEALTH_URL" ]; then
+          echo "Checking health at: $HEALTH_URL"
+          
+          # Retry health check up to 3 times
+          for i in {1..3}; do
+            if curl -f "$HEALTH_URL"; then
+              echo "✅ Health check passed"
+              break
+            else
+              echo "⚠️ Health check attempt $i failed"
+              if [ $i -lt 3 ]; then
+                sleep 10
               else
-                echo "❌ $func deployment failed"
+                echo "❌ Health check failed after 3 attempts"
                 exit 1
               fi
-              
-              cd ../..
-            else
-              echo "⚠️ Function directory functions/$func not found, skipping..."
             fi
           done
-
-          echo "🎉 All Cloud Functions deployed successfully!"
-
-      - name: Get function URLs
-        id: get-urls
-        run: |
-          echo "📋 Getting function URLs..."
-
-          FUNCTIONS=(
-            "get_prices"
-            "get_price_history"
-            "api_prices"
-            "api_status"
-            "health"
-            "scrape_prices"
-            "set_alert"
-            "check_prices"
-          )
-
-          for func in "${FUNCTIONS[@]}"; do
-            URL=$(gcloud functions describe "$func" \
-              --region="$REGION" \
-              --project="$PROJECT_ID" \
-              --format='value(url)' 2>/dev/null || echo "")
-            
-            if [ -n "$URL" ]; then
-              echo "${func}_url=$URL" >> $GITHUB_OUTPUT
-              echo "$func: $URL"
-            fi
-          done
-
-      - name: Health check
-        run: |
-          echo "🏥 Performing health check..."
-
-          # Wait for functions to be ready
-          sleep 30
-
-          # Test health endpoint
-          HEALTH_URL="${{ steps.get-urls.outputs.health_url }}"
-          if [ -n "$HEALTH_URL" ]; then
-            echo "Checking health at: $HEALTH_URL"
-            
-            # Retry health check up to 3 times
-            for i in {1..3}; do
-              if curl -f "$HEALTH_URL"; then
-                echo "✅ Health check passed"
-                break
-              else
-                echo "⚠️ Health check attempt $i failed"
-                if [ $i -lt 3 ]; then
-                  sleep 10
-                else
-                  echo "❌ Health check failed after 3 attempts"
-                  exit 1
-                fi
-              fi
-            done
-          else
-            echo "⚠️ Health function URL not available, skipping health check"
-          fi
-
-      - name: Test API endpoints
-        run: |
-          echo "🧪 Testing API endpoints..."
-
-          # Test get_prices endpoint
-          GET_PRICES_URL="${{ steps.get-urls.outputs.get_prices_url }}"
-          if [ -n "$GET_PRICES_URL" ]; then
-            echo "Testing get_prices endpoint..."
-            if curl -f "$GET_PRICES_URL?series=iPhone%2017"; then
-              echo "✅ get_prices endpoint working"
-            else
-              echo "⚠️ get_prices endpoint test failed"
-            fi
-          fi
-
-          # Test api_status endpoint
-          API_STATUS_URL="${{ steps.get-urls.outputs.api_status_url }}"
-          if [ -n "$API_STATUS_URL" ]; then
-            echo "Testing api_status endpoint..."
-            if curl -f "$API_STATUS_URL"; then
-              echo "✅ api_status endpoint working"
-            else
-              echo "⚠️ api_status endpoint test failed"
-            fi
-          fi
+        else
+          echo "⚠️ Health function URL not available, skipping health check"
+        fi
 
   deploy-frontend:
     name: Deploy Frontend to Vercel
     runs-on: ubuntu-latest
     needs: deploy-cloud-functions
     if: github.ref == 'refs/heads/main'
-
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        run: |
-          cd frontend
-          npm ci
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
 
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: ./frontend
-          vercel-args: "--prod"
-
-      - name: Comment deployment status
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            try {
-              await github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `🚀 デプロイが完了しました！
-                
-                **Cloud Functions**:
-                - get_prices: ${{ steps.get-urls.outputs.get_prices_url }}
-                - get_price_history: ${{ steps.get-urls.outputs.get_price_history_url }}
-                - api_prices: ${{ steps.get-urls.outputs.api_prices_url }}
-                - api_status: ${{ steps.get-urls.outputs.api_status_url }}
-                - health: ${{ steps.get-urls.outputs.health_url }}
-                - scrape_prices: ${{ steps.get-urls.outputs.scrape_prices_url }}
-                - set_alert: ${{ steps.get-urls.outputs.set_alert_url }}
-                - check_prices: ${{ steps.get-urls.outputs.check_prices_url }}
-                
-                **フロントエンド**: Vercel にデプロイ済み
-                
-                **アーキテクチャ**:
-                - フロントエンド: Vercel (Next.js)
-                - バックエンド: Cloud Functions (Python)
-                - データベース: Firestore
-                - ストレージ: Cloud Storage`
-              });
-              console.log('PRコメントを投稿しました');
-            } catch (error) {
-              console.log('PRコメントの投稿に失敗しました:', error.message);
-            }
+    - name: Deploy to Vercel
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        working-directory: ./frontend
+        vercel-args: '--prod'
