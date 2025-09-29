@@ -3,12 +3,6 @@ name: Deploy to Cloud Functions
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'functions/**'
-      - 'scripts/add_iphone_prices.py'
-      - 'scripts/reset_and_reload_*.py'
-      - 'frontend/src/app/page.tsx'
-      - 'frontend/src/lib/api.ts'
   workflow_dispatch:
 
 env:
@@ -20,148 +14,57 @@ jobs:
   deploy-cloud-functions:
     name: Deploy Cloud Functions
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Setup Google Cloud CLI
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: price-comparison-app-463007
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
+    - name: Setup Google Cloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: price-comparison-app-463007
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Deploy Cloud Functions
-        run: |
-          echo "🚀 Deploying Cloud Functions..."
-
-          # Function list
-          FUNCTIONS=(
-            "get_prices"
-            "get_price_history"
-            "api_prices"
-            "api_status"
-            "health"
-            "scrape_prices"
-            "set_alert"
-            "check_prices"
-          )
-
-          # Deploy each function
-          for func in "${FUNCTIONS[@]}"; do
-            echo "📦 Deploying $func..."
+    - name: Deploy Cloud Functions
+      run: |
+        echo "🚀 Deploying Cloud Functions..."
+        
+        # Function list
+        FUNCTIONS=(
+          "get_prices"
+          "get_price_history"
+          "api_prices"
+          "api_status"
+          "health"
+          "scrape_prices"
+          "set_alert"
+          "check_prices"
+        )
+        
+        # Deploy each function
+        for func in "${FUNCTIONS[@]}"; do
+          echo "📦 Deploying $func..."
+          
+          if [ -d "functions/$func" ]; then
+            cd "functions/$func"
             
-            if [ -d "functions/$func" ]; then
-              cd "functions/$func"
-              
-              if gcloud functions deploy "$func" \
-                --runtime "$RUNTIME" \
-                --trigger-http \
-                --allow-unauthenticated \
-                --entry-point "$func" \
-                --region "$REGION" \
-                --project "$PROJECT_ID"; then
-                echo "✅ $func deployed successfully"
-              else
-                echo "❌ $func deployment failed"
-                exit 1
-              fi
-              
-              cd ../..
+            if gcloud functions deploy "$func" \
+              --runtime "$RUNTIME" \
+              --trigger-http \
+              --allow-unauthenticated \
+              --entry-point "$func" \
+              --region "$REGION" \
+              --project "$PROJECT_ID"; then
+              echo "✅ $func deployed successfully"
             else
-              echo "⚠️ Function directory functions/$func not found, skipping..."
+              echo "❌ $func deployment failed"
+              exit 1
             fi
-          done
-
-          echo "🎉 All Cloud Functions deployed successfully!"
-
-      - name: Get function URLs
-        id: get-urls
-        run: |
-          echo "📋 Getting function URLs..."
-
-          FUNCTIONS=(
-            "get_prices"
-            "get_price_history"
-            "api_prices"
-            "api_status"
-            "health"
-            "scrape_prices"
-            "set_alert"
-            "check_prices"
-          )
-
-          for func in "${FUNCTIONS[@]}"; do
-            URL=$(gcloud functions describe "$func" \
-              --region="$REGION" \
-              --project="$PROJECT_ID" \
-              --format='value(url)' 2>/dev/null || echo "")
             
-            if [ -n "$URL" ]; then
-              echo "${func}_url=$URL" >> $GITHUB_OUTPUT
-              echo "$func: $URL"
-            fi
-          done
-
-      - name: Health check
-        run: |
-          echo "🏥 Performing health check..."
-
-          # Wait for functions to be ready
-          sleep 30
-
-          # Test health endpoint
-          HEALTH_URL="${{ steps.get-urls.outputs.health_url }}"
-          if [ -n "$HEALTH_URL" ]; then
-            echo "Checking health at: $HEALTH_URL"
-            
-            # Retry health check up to 3 times
-            for i in {1..3}; do
-              if curl -f "$HEALTH_URL"; then
-                echo "✅ Health check passed"
-                break
-              else
-                echo "⚠️ Health check attempt $i failed"
-                if [ $i -lt 3 ]; then
-                  sleep 10
-                else
-                  echo "❌ Health check failed after 3 attempts"
-                  exit 1
-                fi
-              fi
-            done
+            cd ../..
           else
-            echo "⚠️ Health function URL not available, skipping health check"
+            echo "⚠️ Function directory functions/$func not found, skipping..."
           fi
-
-  deploy-frontend:
-    name: Deploy Frontend to Vercel
-    runs-on: ubuntu-latest
-    needs: deploy-cloud-functions
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: |
-          cd frontend
-          npm ci
-
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: ./frontend
-          vercel-args: "--prod"
+        done
+        
+        echo "🎉 All Cloud Functions deployed successfully!"
