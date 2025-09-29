@@ -37,107 +37,70 @@ def reset_and_reload_official_prices():
     if not current_data:
         print("No current data found, using dummy data...")
         current_data = {
-            "iPhone 16": {
-                "128GB": {
-                    "colors": {
-                        "Black": 124800,
-                        "White": 124800,
-                        "Blue": 124800,
-                        "Green": 124800
-                    }
-                },
+            "iPhone 17": {
                 "256GB": {
                     "colors": {
-                        "Black": 139800,
-                        "White": 139800,
-                        "Blue": 139800,
-                        "Green": 139800
+                        "Lavender": 129800,
+                        "Sage": 129800,
+                        "Black": 129800,
+                        "White": 129800,
+                        "Mist Blue": 129800
                     }
                 },
                 "512GB": {
                     "colors": {
-                        "Black": 169800,
-                        "White": 169800,
-                        "Blue": 169800,
-                        "Green": 169800
+                        "Lavender": 164800,
+                        "Sage": 164800,
+                        "Black": 164800,
+                        "White": 164800,
+                        "Mist Blue": 164800
                     }
                 }
             },
-            "iPhone 16 Plus": {
-                "128GB": {
-                    "colors": {
-                        "Black": 139800,
-                        "White": 139800,
-                        "Blue": 139800,
-                        "Green": 139800
-                    }
-                },
+            "iPhone 17 Air": {
                 "256GB": {
                     "colors": {
-                        "Black": 154800,
-                        "White": 154800,
-                        "Blue": 154800,
-                        "Green": 154800
+                        "Light Gold": 159800,
+                        "Sage": 159800,
+                        "Black": 159800,
+                        "White": 159800,
+                        "Mist Blue": 159800
                     }
                 },
                 "512GB": {
                     "colors": {
-                        "Black": 184800,
-                        "White": 184800,
-                        "Blue": 184800,
-                        "Green": 184800
-                    }
-                }
-            },
-            "iPhone 16 Pro": {
-                "128GB": {
-                    "colors": {
-                        "Natural Titanium": 159800,
-                        "Blue Titanium": 159800,
-                        "White Titanium": 159800,
-                        "Black Titanium": 159800
-                    }
-                },
-                "256GB": {
-                    "colors": {
-                        "Natural Titanium": 174800,
-                        "Blue Titanium": 174800,
-                        "White Titanium": 174800,
-                        "Black Titanium": 174800
-                    }
-                },
-                "512GB": {
-                    "colors": {
-                        "Natural Titanium": 204800,
-                        "Blue Titanium": 204800,
-                        "White Titanium": 204800,
-                        "Black Titanium": 204800
+                        "Light Gold": 194800,
+                        "Sage": 194800,
+                        "Black": 194800,
+                        "White": 194800,
+                        "Mist Blue": 194800
                     }
                 },
                 "1TB": {
                     "colors": {
-                        "Natural Titanium": 234800,
-                        "Blue Titanium": 234800,
-                        "White Titanium": 234800,
-                        "Black Titanium": 234800
+                        "Light Gold": 229800,
+                        "Sage": 229800,
+                        "Black": 229800,
+                        "White": 229800,
+                        "Mist Blue": 229800
                     }
                 }
             },
-            "iPhone 16 Pro Max": {
+            "iPhone 17 Pro": {
                 "256GB": {
                     "colors": {
-                        "Natural Titanium": 189800,
-                        "Blue Titanium": 189800,
-                        "White Titanium": 189800,
-                        "Black Titanium": 189800
+                        "Natural Titanium": 179800,
+                        "Blue Titanium": 179800,
+                        "White Titanium": 179800,
+                        "Black Titanium": 179800
                     }
                 },
                 "512GB": {
                     "colors": {
-                        "Natural Titanium": 219800,
-                        "Blue Titanium": 219800,
-                        "White Titanium": 219800,
-                        "Black Titanium": 219800
+                        "Natural Titanium": 214800,
+                        "Blue Titanium": 214800,
+                        "White Titanium": 214800,
+                        "Black Titanium": 214800
                     }
                 },
                 "1TB": {
@@ -149,23 +112,37 @@ def reset_and_reload_official_prices():
                     }
                 }
             },
-            "iPhone 16 e": {
-                "128GB": {
-                    "colors": {
-                        "Black": 99800,
-                        "White": 99800
-                    }
-                },
+            "iPhone 17 Pro Max": {
                 "256GB": {
                     "colors": {
-                        "Black": 114800,
-                        "White": 114800
+                        "Natural Titanium": 194800,
+                        "Blue Titanium": 194800,
+                        "White Titanium": 194800,
+                        "Black Titanium": 194800
                     }
                 },
                 "512GB": {
                     "colors": {
-                        "Black": 144800,
-                        "White": 144800
+                        "Natural Titanium": 229800,
+                        "Blue Titanium": 229800,
+                        "White Titanium": 229800,
+                        "Black Titanium": 229800
+                    }
+                },
+                "1TB": {
+                    "colors": {
+                        "Natural Titanium": 264800,
+                        "Blue Titanium": 264800,
+                        "White Titanium": 264800,
+                        "Black Titanium": 264800
+                    }
+                },
+                "2TB": {
+                    "colors": {
+                        "Natural Titanium": 329800,
+                        "Blue Titanium": 329800,
+                        "White Titanium": 329800,
+                        "Black Titanium": 329800
                     }
                 }
             }

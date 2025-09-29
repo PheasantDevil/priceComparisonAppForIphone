@@ -9,11 +9,10 @@ import PriceHistoryChart from '../components/PriceHistoryChart';
 import { clearCache, fetchPrices, PricesResponse } from '../lib/api';
 
 const SERIES = [
-  'iPhone 16',
-  'iPhone 16 Pro',
-  'iPhone 16 Plus',
-  'iPhone 16 Pro Max',
-  'iPhone 16 e',
+  'iPhone 17',
+  'iPhone 17 Air',
+  'iPhone 17 Pro',
+  'iPhone 17 Pro Max',
 ];
 const STORAGE_KEY = 'selected_iphone_models';
 const RAKUTEN_COLUMNS_STORAGE_KEY = 'show_rakuten_columns';
@@ -25,7 +24,7 @@ export default function Home() {
   const [error, setError] = useState<Error | null>(null);
   const [showPriceHistory, setShowPriceHistory] = useState(false);
   const [selectedHistorySeries, setSelectedHistorySeries] =
-    useState('iPhone 16 Pro');
+    useState('iPhone 17 Pro');
   const [selectedHistoryCapacity, setSelectedHistoryCapacity] = useState('1TB');
   const [showRakutenColumns, setShowRakutenColumns] = useState(false);
   const [tickInterval, setTickInterval] = useState(10000); // Y軸の目盛り間隔
