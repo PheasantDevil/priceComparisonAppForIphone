@@ -7,7 +7,7 @@ from google.oauth2 import service_account
 
 def add_prices_to_firestore():
     # 認証情報の設定
-    credentials = service_account.Credentials.from_service_account_file('key.json')
+    credentials = service_account.Credentials.from_service_account_file('gcp-key.json')
     
     # Firestoreクライアントの初期化
     db = firestore.Client(credentials=credentials)
