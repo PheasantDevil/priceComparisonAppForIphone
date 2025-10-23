@@ -2,9 +2,9 @@ name: Scrape iPhone Prices and Sync to Firestore
 
 on:
   schedule:
-    - cron: '0 10 * * *'  # 毎日10時に実行
-    - cron: '0 22 * * *'  # 毎日22時に実行
-  workflow_dispatch:  # 手動実行も可能
+    - cron: "0 10 * * *" # 毎日10時に実行
+    - cron: "0 22 * * *" # 毎日22時に実行
+  workflow_dispatch: # 手動実行も可能
 
 env:
   PYTHONPATH: ${{ github.workspace }}
@@ -21,8 +21,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
-          cache: 'pip'
+          python-version: "3.14"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -87,4 +87,4 @@ jobs:
         run: |
           echo "Cleaning up sensitive files..."
           rm -f key.json
-          echo "key.json file removed" 
+          echo "key.json file removed"
